@@ -17,16 +17,22 @@
     "lint:fix": "next lint --fix",
     "preview": "next build && next start",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test-script": "tsx src/server/test.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.7.2",
-    "@t3-oss/env-nextjs": "^0.12.0",
+    "@corsair-dev/cli": "^0.1.19",
+    "@corsair-dev/gmail": "^0.1.4",
+    "@corsair-dev/googlecalendar": "^0.1.3",
+    "@t3-oss/env-nextjs": "^0.13.11",
     "@tanstack/react-query": "^5.69.0",
     "@trpc/client": "^11.0.0",
     "@trpc/react-query": "^11.0.0",
     "@trpc/server": "^11.0.0",
     "better-auth": "^1.3",
+    "corsair": "^0.1.75",
+    "dotenv": "^17.4.2",
     "drizzle-orm": "^0.41.0",
     "next": "^15.2.3",
     "postgres": "^3.4.4",
@@ -34,7 +40,8 @@
     "react-dom": "^19.0.0",
     "server-only": "^0.0.1",
     "superjson": "^2.2.1",
-    "zod": "^3.24.2"
+    "tsx": "^4.22.4",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
