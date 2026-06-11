@@ -31,7 +31,7 @@ export const postRouter = createTRPCRouter({
     //});
 
     //return post ?? null;
-    return null;
+    return null as { name: string } | null;
   }),
 
   getSecretMessage: protectedProcedure.query(() => {

@@ -3,10 +3,31 @@ import { createCorsair } from 'corsair';
 import { gmail } from '@corsair-dev/gmail';     
 import { googlecalendar } from '@corsair-dev/googlecalendar';    
 import {conn} from './db/index';
+import { classifyAndSaveEmail } from './api/tasks/prioritizer';
 
 
 export const corsair = createCorsair({
-    plugins: [gmail(), googlecalendar()],
+    plugins: [
+        gmail({
+            authType: "oauth_2",
+            webhookHooks: {
+                messageChanged: {
+                    after: async (ctx, response) => {
+                        if (response.success && response.data?.type === 'messageReceived') {
+                            const message = response.data.message;
+                            const entityId = response.corsairEntityId;
+                            if (ctx.tenantId && entityId && message) {
+                                await classifyAndSaveEmail(ctx.tenantId, entityId, message);
+                            }
+                        }
+                    }
+                }
+            }
+        }),
+        googlecalendar({
+            authType: "oauth_2"
+        })
+    ],
     database: conn,
     kek: process.env.CORSAIR_KEK!,
     multiTenancy: true,

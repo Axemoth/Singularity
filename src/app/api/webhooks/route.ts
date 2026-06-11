@@ -20,7 +20,8 @@ export async function POST(request: NextRequest) {
 		body = text && text.trim() ? text : {};
 	}
 
-	const tenantId = 'dev'
+	const { searchParams } = new URL(request.url);
+	const tenantId = searchParams.get('tenantId') || 'dev';
 
 	const result = await processWebhook(corsair, headers, body, { tenantId });
 
