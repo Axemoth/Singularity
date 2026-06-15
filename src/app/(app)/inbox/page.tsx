@@ -1,9 +1,1112 @@
-export default function InboxPage() {
+"use client";
+
+import { useState, useCallback, useEffect } from "react";
+import { api } from "@/trpc/react";
+import { Button } from "@/app/_components/ui/button";
+import { Badge } from "@/app/_components/ui/badge";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface GmailMessage {
+  id: string;
+  from?: string;
+  to?: string;
+  subject?: string;
+  body?: string;
+  snippet?: string;
+  internalDate?: string;
+  labelIds?: string[];
+}
+
+interface GmailThreadData {
+  id: string;
+  snippet?: string;
+  messages?: GmailMessage[];
+}
+
+interface ThreadEntity {
+  id: string;
+  entityId: string;
+  data: unknown;
+  updatedAt: Date;
+  priority: string | null;
+  priorityReason: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function getThreadData(thread: ThreadEntity): GmailThreadData {
+  return (thread.data ?? {}) as GmailThreadData;
+}
+
+function getMessageHeader(msg: any, name: string): string | undefined {
+  if (!msg) return undefined;
+  if (msg[name.toLowerCase()]) return msg[name.toLowerCase()];
+  const headers = msg.payload?.headers ?? [];
+  return headers.find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value;
+}
+
+function formatRelativeTime(epochMs: string | undefined): string {
+  if (!epochMs) return "";
+  const date = new Date(Number(epochMs));
+  if (isNaN(date.getTime())) return "";
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "now";
+  if (diffMins < 60) return `${diffMins}m`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function parseSenderName(from: string | undefined): string {
+  if (!from) return "Unknown";
+  const match = from.match(/^(.+?)\s*</);
+  return match?.[1]?.trim()?.replace(/"/g, "") || from.split("@")[0] || "Unknown";
+}
+
+function formatFullDate(epochMs: string | undefined): string {
+  if (!epochMs) return "";
+  const date = new Date(Number(epochMs));
+  if (isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function truncate(str: string | undefined, max: number): string {
+  if (!str) return "";
+  return str.length > max ? str.slice(0, max) + "…" : str;
+}
+
+// ---------------------------------------------------------------------------
+// Skeleton Components
+// ---------------------------------------------------------------------------
+
+function ThreadListSkeleton() {
   return (
-    <div className="flex h-full items-center justify-center">
-      <div className="text-center animate-fade-in">
-        <h1 className="text-2xl font-semibold text-text-primary">Inbox</h1>
-        <p className="mt-2 text-text-secondary">Your unified inbox will appear here.</p>
+    <div className="flex flex-col gap-1 p-2">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div
+          key={i}
+          className="flex flex-col gap-2 rounded-[var(--radius-md)] p-3"
+        >
+          <div className="flex items-center justify-between">
+            <div className="h-4 w-32 rounded bg-bg-surface animate-pulse-subtle" />
+            <div className="h-3 w-10 rounded bg-bg-surface animate-pulse-subtle" />
+          </div>
+          <div className="h-3.5 w-48 rounded bg-bg-surface animate-pulse-subtle" />
+          <div className="h-3 w-full rounded bg-bg-surface animate-pulse-subtle" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-6 p-6">
+      <div className="h-7 w-72 rounded bg-bg-surface animate-pulse-subtle" />
+      <div className="flex items-center gap-3">
+        <div className="h-4 w-40 rounded bg-bg-surface animate-pulse-subtle" />
+        <div className="h-4 w-32 rounded bg-bg-surface animate-pulse-subtle" />
+      </div>
+      <div className="flex flex-col gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-4 w-full rounded bg-bg-surface animate-pulse-subtle"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Thread List Item
+// ---------------------------------------------------------------------------
+
+function ThreadListItem({
+  thread,
+  isSelected,
+  onSelect,
+}: {
+  thread: ThreadEntity;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const threadData = getThreadData(thread);
+  const firstMessage = threadData.messages?.[0];
+  const isUnread = firstMessage?.labelIds?.includes("UNREAD") ?? false;
+  
+  const fromHeader = getMessageHeader(firstMessage, "from");
+  const subjectHeader = getMessageHeader(firstMessage, "subject");
+  
+  const sender = fromHeader ? parseSenderName(fromHeader) : "Notification";
+  const subject = subjectHeader || truncate(threadData.snippet, 40) || "No Subject";
+  const snippet = truncate(threadData.snippet, 80);
+  
+  const messages = threadData.messages ?? [];
+  const latestMessage = messages[messages.length - 1];
+  const time = formatRelativeTime(latestMessage?.internalDate || thread.updatedAt.getTime().toString());
+  const priority = thread.priority as "urgent" | "normal" | "low" | null;
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`w-full text-left px-3 py-2.5 rounded-[var(--radius-md)] transition-all duration-[var(--transition-fast)] cursor-pointer group ${
+        isSelected
+          ? "bg-bg-surface border border-border-default"
+          : "border border-transparent hover:bg-bg-surface/60"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2 mb-0.5">
+        <div className="flex items-center gap-2 min-w-0">
+          {/* Priority dot */}
+          {priority === "urgent" && (
+            <span className="h-2 w-2 shrink-0 rounded-full bg-accent-danger" />
+          )}
+          {priority === "normal" && (
+            <span className="h-2 w-2 shrink-0 rounded-full bg-accent-warning" />
+          )}
+          <span
+            className={`truncate text-sm ${
+              isUnread
+                ? "font-semibold text-text-primary"
+                : "font-medium text-text-primary"
+            }`}
+          >
+            {sender}
+          </span>
+        </div>
+        <span className="shrink-0 text-[11px] text-text-tertiary tabular-nums">
+          {time}
+        </span>
+      </div>
+      <p
+        className={`truncate text-[13px] leading-snug ${
+          isUnread ? "font-medium text-text-primary" : "text-text-secondary"
+        }`}
+      >
+        {subject}
+      </p>
+      <p className="truncate text-xs text-text-tertiary mt-0.5 leading-relaxed">
+        {snippet}
+      </p>
+
+      {/* Unread indicator bar */}
+      {isUnread && !isSelected && (
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-accent-primary" />
+      )}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inline Reply Form Component
+// ---------------------------------------------------------------------------
+
+function parseSenderEmail(from: string | undefined): string {
+  if (!from) return "";
+  const match = from.match(/<([^>]+)>/);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+  return from.trim();
+}
+
+function InlineReplyForm({
+  thread,
+  latestMessage,
+  onReplySent,
+}: {
+  thread: ThreadEntity;
+  latestMessage: any;
+  onReplySent: () => void;
+}) {
+  const [isReplying, setIsReplying] = useState(false);
+  const [replyBody, setReplyBody] = useState("");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [notification, setNotification] = useState<string | null>(null);
+
+  const utils = api.useUtils();
+  const sendEmail = api.gmail.sendEmail.useMutation({
+    onSuccess: () => {
+      setReplyBody("");
+      setAiPrompt("");
+      setIsReplying(false);
+      setNotification("Reply sent successfully!");
+      setTimeout(() => setNotification(null), 3000);
+      void utils.gmail.listThreads.invalidate();
+      void utils.gmail.getThread.invalidate({ id: thread.entityId });
+      onReplySent();
+    },
+    onError: (err) => {
+      setNotification(`Error: ${err.message}`);
+    },
+  });
+
+  const chat = api.agent.chat.useMutation({
+    onSuccess: (data) => {
+      let cleanText = data.text;
+      const thinkRegex = /<think>([\s\S]*?)<\/think>/i;
+      cleanText = cleanText.replace(thinkRegex, "").trim();
+      cleanText = cleanText.replace(/^```[a-z]*\n/i, "").replace(/\n```$/, "");
+      setReplyBody(cleanText);
+    },
+    onError: (err) => {
+      setNotification(`AI drafting error: ${err.message}`);
+    },
+  });
+
+  if (!latestMessage) return null;
+
+  const originalFrom = getMessageHeader(latestMessage, "from") ?? "";
+  const originalSubject = getMessageHeader(latestMessage, "subject") ?? "No Subject";
+  const parentMessageId = getMessageHeader(latestMessage, "message-id") ?? "";
+
+  const replyToEmail = parseSenderEmail(originalFrom);
+  const replyToName = parseSenderName(originalFrom);
+
+  const handleSend = () => {
+    if (!replyBody.trim()) return;
+
+    const subject = originalSubject.toLowerCase().startsWith("re:")
+      ? originalSubject
+      : `Re: ${originalSubject}`;
+
+    sendEmail.mutate({
+      to: replyToEmail,
+      subject,
+      body: replyBody.replace(/\n/g, "<br>"),
+      threadId: thread.entityId,
+      parentMessageId,
+    });
+  };
+
+  const handleAiDraft = () => {
+    if (!aiPrompt.trim()) return;
+
+    const originalBody = latestMessage.body ?? latestMessage.snippet ?? "";
+    const contextPrompt = `You are a helpful email assistant. Your task is to draft a reply to the email below.
+Original Email Details:
+From: ${originalFrom}
+Subject: ${originalSubject}
+Body/Snippet: ${originalBody}
+
+User Reply Instructions:
+"${aiPrompt}"
+
+Please output ONLY the email reply body text. Do not output subject, signature, greeting header, or conversational filler. Output the raw reply body draft directly.`;
+
+    chat.mutate({
+      message: contextPrompt,
+      history: [],
+      context: {
+        route: "/inbox",
+      },
+    });
+  };
+
+  return (
+    <div className="mt-4 border border-border-default bg-bg-surface rounded-2xl p-5 shadow-sm text-left">
+      {notification && (
+        <div className="mb-4 text-xs font-mono p-2.5 rounded bg-bg-inset border border-border-subtle text-text-secondary">
+          {notification}
+        </div>
+      )}
+
+      {!isReplying ? (
+        <div 
+          onClick={() => setIsReplying(true)}
+          className="border border-border-subtle bg-bg-inset hover:border-border-default text-text-tertiary cursor-pointer px-4 py-3 rounded-[var(--radius-md)] text-xs flex items-center justify-between transition-colors"
+        >
+          <span>Click to reply to {replyToName || replyToEmail}...</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-accent-primary">Quick Reply</span>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4 animate-fade-in">
+          <div className="flex flex-col gap-1 text-xs border-b border-border-subtle pb-3">
+            <div>
+              <span className="text-text-tertiary font-medium">To: </span>
+              <span className="font-semibold text-text-primary">{replyToName} &lt;{replyToEmail}&gt;</span>
+            </div>
+            <div>
+              <span className="text-text-tertiary font-medium">Subject: </span>
+              <span className="text-text-secondary font-medium">
+                {originalSubject.toLowerCase().startsWith("re:") ? originalSubject : `Re: ${originalSubject}`}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex gap-2 items-center bg-bg-raised/35 border border-border-subtle rounded-xl p-2.5">
+            <div className="bg-accent-primary/10 text-accent-primary flex h-6 w-6 shrink-0 items-center justify-center rounded-lg">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.091-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.091L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.091 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.091ZM18.25 8.25 18 9.25l-.25-1a2 2 0 0 0-1.25-1.25l-1-.25 1-.25a2 2 0 0 0 1.25-1.25l.25-1 .25 1a2 2 0 0 0 1.25 1.25l1 .25-1 .25a2 2 0 0 0-1.25 1.25ZM17.5 20l-.5 1.75L16.5 20a2.5 2.5 0 0 0-1.75-1.75L13 17.75l1.75-.5A2.5 2.5 0 0 0 16.5 15.5l.5-1.75.5 1.75a2.5 2.5 0 0 0 1.75 1.75l1.75.5-1.75.5A2.5 2.5 0 0 0 17.5 20Z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              placeholder="Tell AI Co-Pilot what to say (e.g., 'agree to meet next Friday at 10 AM')..."
+              className="flex-1 bg-transparent border-none outline-none text-xs text-text-primary placeholder:text-text-tertiary"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAiDraft();
+                }
+              }}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="py-1 px-3 h-8 text-[11px] font-semibold border-accent-primary/20 hover:border-accent-primary/45 cursor-pointer"
+              onClick={handleAiDraft}
+              isLoading={chat.isPending}
+            >
+              Draft with AI
+            </Button>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <textarea
+              value={replyBody}
+              onChange={(e) => setReplyBody(e.target.value)}
+              placeholder="Write your email reply here..."
+              rows={5}
+              className="w-full resize-none border border-border-default bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary outline-none px-3.5 py-3 text-xs rounded-[var(--radius-md)] transition-colors focus:bg-bg-base/20 leading-relaxed font-medium"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 border-t border-border-subtle pt-3 mt-1">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setReplyBody("");
+                setAiPrompt("");
+                setIsReplying(false);
+              }}
+              className="py-1 px-3 text-xs font-semibold cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSend}
+              isLoading={sendEmail.isPending}
+              className="py-1 px-4 text-xs font-bold uppercase tracking-wider h-8 cursor-pointer"
+            >
+              Send Reply
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Thread Detail
+// ---------------------------------------------------------------------------
+
+function ThreadDetail({
+  thread,
+  onArchive,
+  onDelete,
+  isArchiving,
+  isDeleting,
+}: {
+  thread: ThreadEntity;
+  onArchive: () => void;
+  onDelete: () => void;
+  isArchiving: boolean;
+  isDeleting: boolean;
+}) {
+  const {
+    data: fullThread,
+    isLoading,
+    error,
+  } = api.gmail.getThread.useQuery(
+    { id: thread.entityId },
+    { enabled: !!thread.entityId }
+  );
+
+  const threadData = getThreadData(thread);
+  const firstMessage = threadData.messages?.[0];
+  const subject = getMessageHeader(firstMessage, "subject") ?? "No Subject";
+
+  // Combine messages from full thread response or fall back to cached data
+  const fullThreadData = (fullThread ?? {}) as GmailThreadData;
+  const messages: GmailMessage[] =
+    fullThreadData.messages ?? threadData.messages ?? [];
+
+  return (
+    <div className="flex h-full flex-col animate-fade-in">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between border-b border-border-subtle px-6 py-3">
+        <h2 className="text-lg font-semibold text-text-primary truncate pr-4">
+          {subject}
+        </h2>
+        <div className="flex items-center gap-2 shrink-0">
+          {thread.priority && (
+            <Badge variant="priority" priority={thread.priority as "urgent" | "normal" | "low"}>
+              {thread.priority}
+            </Badge>
+          )}
+          {thread.priorityReason && (
+            <span className="text-xs text-text-tertiary italic max-w-[200px] truncate" title={thread.priorityReason}>
+              "{thread.priorityReason}"
+            </span>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onArchive}
+            isLoading={isArchiving}
+            disabled={isArchiving || isDeleting}
+          >
+            <ArchiveIcon />
+            Archive
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={onDelete}
+            isLoading={isDeleting}
+            disabled={isArchiving || isDeleting}
+          >
+            <TrashIcon />
+            Delete
+          </Button>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto">
+        {isLoading ? (
+          <DetailSkeleton />
+        ) : error ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-sm text-accent-danger">
+              Failed to load thread. Please try again.
+            </p>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-sm text-text-tertiary">No messages found.</p>
+          </div>
+        ) : (
+          <div className="flex flex-col divide-y divide-border-subtle pb-8">
+            {messages.map((msg, idx) => (
+              <MessageCard key={msg.id ?? idx} message={msg} />
+            ))}
+            <div className="px-6 py-4 border-t border-border-subtle bg-bg-raised/10">
+              <InlineReplyForm 
+                thread={thread} 
+                latestMessage={messages[messages.length - 1]} 
+                onReplySent={() => {
+                  // list invalidations are handled in mutation onSuccess
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Message Card
+// ---------------------------------------------------------------------------
+
+function MessageCard({ message }: { message: GmailMessage }) {
+  const fromHeader = getMessageHeader(message, "from");
+  const toHeader = getMessageHeader(message, "to");
+  const sender = parseSenderName(fromHeader);
+  const date = formatFullDate(message.internalDate);
+  
+  let htmlContent = message.body;
+  if (!htmlContent && (message as any).payload) {
+    const payload = (message as any).payload;
+    if (payload.body?.data) {
+      htmlContent = Buffer.from(payload.body.data, "base64").toString("utf-8");
+    } else if (payload.parts) {
+      const findBody = (parts: any[]): string => {
+        const htmlPart = parts.find((p: any) => p.mimeType === "text/html");
+        if (htmlPart?.body?.data) {
+          return Buffer.from(htmlPart.body.data, "base64").toString("utf-8");
+        }
+        const textPart = parts.find((p: any) => p.mimeType === "text/plain");
+        if (textPart?.body?.data) {
+          return Buffer.from(textPart.body.data, "base64").toString("utf-8");
+        }
+        for (const part of parts) {
+          if (part.parts) {
+            const nested = findBody(part.parts);
+            if (nested) return nested;
+          }
+        }
+        return "";
+      };
+      htmlContent = findBody(payload.parts);
+    }
+  }
+  if (!htmlContent) {
+    htmlContent = message.snippet || "";
+  }
+
+  return (
+    <div className="px-6 py-5 animate-fade-in">
+      <div className="flex items-start justify-between gap-4 mb-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-text-primary">{sender}</p>
+          {message.to && (
+            <p className="text-xs text-text-tertiary mt-0.5 truncate">
+              To: {message.to}
+            </p>
+          )}
+        </div>
+        <span className="shrink-0 text-xs text-text-tertiary tabular-nums">
+          {date}
+        </span>
+      </div>
+      <div
+        className="prose-email text-sm text-text-secondary leading-relaxed max-w-none [&_a]:text-accent-info [&_a]:underline [&_img]:max-w-full [&_img]:h-auto [&_table]:w-full [&_blockquote]:border-l-2 [&_blockquote]:border-border-default [&_blockquote]:pl-3 [&_blockquote]:text-text-tertiary [&_pre]:bg-bg-surface [&_pre]:p-3 [&_pre]:rounded-[var(--radius-md)] [&_pre]:overflow-x-auto"
+        dangerouslySetInnerHTML={{ __html: htmlContent }}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Icons (inline SVGs)
+// ---------------------------------------------------------------------------
+
+function RefreshIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="23 4 23 10 17 10" />
+      <polyline points="1 20 1 14 7 14" />
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    </svg>
+  );
+}
+
+function ArchiveIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="21 8 21 21 3 21 3 8" />
+      <rect x="1" y="3" width="22" height="5" />
+      <line x1="10" y1="12" x2="14" y2="12" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  );
+}
+
+function InboxIcon() {
+  return (
+    <svg
+      width="40"
+      height="40"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="text-text-tertiary"
+    >
+      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+      <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Page Component
+// ---------------------------------------------------------------------------
+
+export default function InboxPage() {
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"all" | "priority" | "other" | "sent" | "drafts">("all");
+  const [priorityInput, setPriorityInput] = useState("");
+  const [isEditingRules, setIsEditingRules] = useState(false);
+
+  const utils = api.useUtils();
+
+  const { data: dbPriorityRules } = api.gmail.getPriorityRules.useQuery();
+
+  // Populate local rules when database rules load
+  useEffect(() => {
+    if (dbPriorityRules !== undefined) {
+      setPriorityInput(dbPriorityRules);
+    }
+  }, [dbPriorityRules]);
+
+  // Read ?tab parameter on load/mount/update
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab === "sent" || tab === "drafts" || tab === "all" || tab === "priority" || tab === "other") {
+        setActiveTab(tab);
+      }
+    }
+  }, [typeof window !== "undefined" ? window.location.search : ""]);
+
+  const setRulesMutation = api.gmail.setPriorityRules.useMutation({
+    onSuccess: () => {
+      void utils.gmail.listThreads.invalidate();
+      setIsEditingRules(false);
+    },
+  });
+
+  const { data: gmailStatus, isLoading: isStatusLoading } = api.gmail.getConnectionStatus.useQuery();
+
+  const {
+    data: threads,
+    isLoading: isThreadsLoading,
+    error,
+    refetch,
+  } = api.gmail.listThreads.useQuery({ refresh: false });
+
+  const isLoading = isThreadsLoading || isStatusLoading;
+
+  const archiveMutation = api.gmail.archiveThread.useMutation({
+    onSuccess: () => {
+      setSelectedThreadId(null);
+      void utils.gmail.listThreads.invalidate();
+    },
+  });
+
+  const deleteMutation = api.gmail.deleteThread.useMutation({
+    onSuccess: () => {
+      setSelectedThreadId(null);
+      void utils.gmail.listThreads.invalidate();
+    },
+  });
+
+  const selectedThread =
+    threads?.find((t) => t.id === selectedThreadId) ?? null;
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      // Invalidate the status query as well to ensure we have the latest info
+      await utils.gmail.getConnectionStatus.invalidate();
+      await utils.gmail.listThreads.invalidate();
+      await refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [utils.gmail.getConnectionStatus, utils.gmail.listThreads, refetch]);
+
+  const handleArchive = useCallback(() => {
+    if (!selectedThread) return;
+    archiveMutation.mutate({ id: selectedThread.entityId });
+  }, [selectedThread, archiveMutation]);
+
+  const handleDelete = useCallback(() => {
+    if (!selectedThread) return;
+    deleteMutation.mutate({ id: selectedThread.entityId });
+  }, [selectedThread, deleteMutation]);
+
+  const threadCount = threads?.length ?? 0;
+
+  // Helper to get actual latest message timestamp in the thread
+  const getThreadTimestamp = (t: ThreadEntity) => {
+    const threadData = getThreadData(t);
+    const messages = threadData.messages ?? [];
+    if (messages.length > 0) {
+      const dates = messages
+        .map((m) => (m.internalDate ? parseInt(m.internalDate, 10) : 0))
+        .filter((d) => !isNaN(d) && d > 0);
+      if (dates.length > 0) {
+        return Math.max(...dates);
+      }
+    }
+    return t.updatedAt ? new Date(t.updatedAt).getTime() : 0;
+  };
+
+  // Sort threads: unread first, then by priority weight, then by date/time (most recent first)
+  const getPriorityWeight = (priority: string | null) => {
+    if (priority === "urgent") return 3;
+    if (priority === "normal") return 2;
+    return 1; // low or null
+  };
+
+  const sortedAllThreads = threads
+    ? [...threads].sort((a, b) => {
+        const aUnread = getThreadData(a).messages?.[0]?.labelIds?.includes("UNREAD") ?? false;
+        const bUnread = getThreadData(b).messages?.[0]?.labelIds?.includes("UNREAD") ?? false;
+
+        // 1. Unread status first
+        if (aUnread && !bUnread) return -1;
+        if (!aUnread && bUnread) return 1;
+
+        // 2. Priority weight second
+        const aWeight = getPriorityWeight(a.priority);
+        const bWeight = getPriorityWeight(b.priority);
+        if (aWeight !== bWeight) {
+          return bWeight - aWeight;
+        }
+
+        // 3. Date third (most recent first)
+        const aTime = getThreadTimestamp(a);
+        const bTime = getThreadTimestamp(b);
+        return bTime - aTime;
+      })
+    : [];
+
+  // Filter threads for All, Priority, Other, Sent, and Drafts tabs
+  const priorityThreads = sortedAllThreads.filter(t => t.priority === "urgent" || t.priority === "normal");
+  const otherThreads = sortedAllThreads.filter(t => t.priority !== "urgent" && t.priority !== "normal");
+  
+  const sentThreads = sortedAllThreads.filter(t => {
+    const threadData = getThreadData(t);
+    return threadData.messages?.some(m => m.labelIds?.includes("SENT"));
+  });
+
+  const draftThreads = sortedAllThreads.filter(t => {
+    const threadData = getThreadData(t);
+    return threadData.messages?.some(m => m.labelIds?.includes("DRAFT"));
+  });
+
+  const visibleThreads = 
+    activeTab === "all" 
+      ? sortedAllThreads 
+      : activeTab === "priority" 
+      ? priorityThreads 
+      : activeTab === "other"
+      ? otherThreads
+      : activeTab === "sent"
+      ? sentThreads
+      : draftThreads;
+
+  return (
+    <div className="flex h-full animate-fade-in">
+      {/* ---- Left Panel: Thread List ---- */}
+      <div className="w-[380px] shrink-0 flex flex-col border-r border-border-default bg-bg-raised">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-base font-semibold text-text-primary">Inbox</h1>
+            {!isLoading && threads && threads.length > 0 && (
+              <Badge>{threadCount}</Badge>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={isRefreshing || !gmailStatus?.connected}
+            className="p-1.5 rounded-[var(--radius-sm)] text-text-secondary hover:text-text-primary hover:bg-bg-surface transition-all duration-[var(--transition-fast)] disabled:opacity-50 cursor-pointer"
+            title="Refresh inbox"
+          >
+            <RefreshIcon
+              className={isRefreshing ? "animate-spin" : ""}
+            />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        {gmailStatus?.connected && threads && threads.length > 0 && (
+          <div className="flex border-b border-border-subtle px-3 py-1 bg-bg-raised/30 gap-1.5 shrink-0 overflow-x-auto scrollbar-none">
+            <button
+              onClick={() => setActiveTab("all")}
+              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-[var(--radius-md)] cursor-pointer transition-all duration-[var(--transition-fast)] shrink-0 ${
+                activeTab === "all"
+                  ? "bg-bg-surface text-text-primary border border-border-default shadow-sm"
+                  : "text-text-tertiary hover:text-text-primary border border-transparent"
+              }`}
+            >
+              All
+              <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-text-tertiary/10 text-text-tertiary">
+                {threads.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab("priority")}
+              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-[var(--radius-md)] cursor-pointer transition-all duration-[var(--transition-fast)] shrink-0 ${
+                activeTab === "priority"
+                  ? "bg-bg-surface text-text-primary border border-border-default shadow-sm"
+                  : "text-text-tertiary hover:text-text-primary border border-transparent"
+              }`}
+            >
+              Priority
+              {priorityThreads.length > 0 && (
+                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-accent-primary/10 text-accent-primary">
+                  {priorityThreads.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("other")}
+              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-[var(--radius-md)] cursor-pointer transition-all duration-[var(--transition-fast)] shrink-0 ${
+                activeTab === "other"
+                  ? "bg-bg-surface text-text-primary border border-border-default shadow-sm"
+                  : "text-text-tertiary hover:text-text-primary border border-transparent"
+              }`}
+            >
+              Other
+              {otherThreads.length > 0 && (
+                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-text-tertiary/10 text-text-tertiary">
+                  {otherThreads.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("sent")}
+              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-[var(--radius-md)] cursor-pointer transition-all duration-[var(--transition-fast)] shrink-0 ${
+                activeTab === "sent"
+                  ? "bg-bg-surface text-text-primary border border-border-default shadow-sm"
+                  : "text-text-tertiary hover:text-text-primary border border-transparent"
+              }`}
+            >
+              Sent
+              {sentThreads.length > 0 && (
+                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-text-tertiary/10 text-text-tertiary">
+                  {sentThreads.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("drafts")}
+              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-[var(--radius-md)] cursor-pointer transition-all duration-[var(--transition-fast)] shrink-0 ${
+                activeTab === "drafts"
+                  ? "bg-bg-surface text-text-primary border border-border-default shadow-sm"
+                  : "text-text-tertiary hover:text-text-primary border border-transparent"
+              }`}
+            >
+              Drafts
+              {draftThreads.length > 0 && (
+                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-text-tertiary/10 text-text-tertiary">
+                  {draftThreads.length}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Priority Instructions Box */}
+        {activeTab === "priority" && gmailStatus?.connected && threads && (
+          <div className="px-4 py-3 border-b border-border-subtle bg-bg-raised/10 flex flex-col gap-2 shrink-0">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                Custom Priority Criteria
+              </span>
+              {!isEditingRules && dbPriorityRules && (
+                <button
+                  onClick={() => setIsEditingRules(true)}
+                  className="text-[11px] font-semibold text-accent-primary hover:underline cursor-pointer"
+                >
+                  Edit Rules
+                </button>
+              )}
+            </div>
+
+            {isEditingRules || !dbPriorityRules ? (
+              <div className="flex flex-col gap-2">
+                <textarea
+                  value={priorityInput}
+                  onChange={(e) => setPriorityInput(e.target.value)}
+                  placeholder="Describe what emails you want to see here (e.g., 'emails from Upwork, messages about billing, direct client requests'). Let the LLM handle the rest."
+                  rows={2}
+                  className="w-full text-xs bg-bg-surface border border-border-default rounded-[var(--radius-md)] p-2 text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary/60 resize-none font-medium leading-relaxed"
+                />
+                <div className="flex gap-2 justify-end">
+                  {dbPriorityRules && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 text-xs font-semibold py-1 px-2.5"
+                      onClick={() => {
+                        setPriorityInput(dbPriorityRules);
+                        setIsEditingRules(false);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="h-7 text-xs font-semibold py-1 px-2.5"
+                    onClick={() => {
+                      setRulesMutation.mutate({ rules: priorityInput });
+                    }}
+                    isLoading={setRulesMutation.isPending}
+                  >
+                    Save Rules
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-bg-surface border border-border-subtle rounded-[var(--radius-md)] p-2 text-xs text-text-secondary italic leading-relaxed shadow-sm font-medium">
+                "{dbPriorityRules}"
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Thread List */}
+        <div className="flex-1 overflow-y-auto">
+          {isLoading ? (
+            <ThreadListSkeleton />
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 px-6 text-center">
+              <p className="text-sm text-accent-danger">
+                Failed to load threads.
+              </p>
+              <p className="text-xs text-text-tertiary">
+                {error.message}
+              </p>
+              <Button variant="secondary" size="sm" onClick={() => void refetch()}>
+                Retry
+              </Button>
+            </div>
+          ) : !gmailStatus?.connected ? (
+            <div className="flex flex-col items-center justify-center h-full gap-4 px-6 text-center animate-fade-in">
+              <InboxIcon />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-text-primary">
+                  Gmail is not connected
+                </p>
+                <p className="text-xs text-text-tertiary leading-relaxed max-w-[240px]">
+                  Authorize Singularity to access your inbox and get started.
+                </p>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                className="font-semibold"
+                onClick={() => {
+                  window.location.href = "/api/connect?plugin=gmail";
+                }}
+              >
+                Connect Gmail
+              </Button>
+            </div>
+          ) : visibleThreads.length > 0 ? (
+            <div className="flex flex-col gap-0.5 p-1.5">
+              {visibleThreads.map((thread) => (
+                <ThreadListItem
+                  key={thread.id}
+                  thread={thread}
+                  isSelected={thread.id === selectedThreadId}
+                  onSelect={() => setSelectedThreadId(thread.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full gap-4 px-6 text-center animate-fade-in">
+              <InboxIcon />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-text-primary">
+                  {activeTab === "priority" 
+                    ? "Inbox Zero" 
+                    : activeTab === "sent" 
+                    ? "No sent messages" 
+                    : activeTab === "drafts" 
+                    ? "No drafts" 
+                    : "No other threads"}
+                </p>
+                <p className="text-xs text-text-tertiary leading-relaxed max-w-[240px]">
+                  {activeTab === "priority" 
+                    ? "Nice work! You have cleared your priority inbox." 
+                    : activeTab === "sent" 
+                    ? "You haven't sent any emails yet." 
+                    : activeTab === "drafts" 
+                    ? "Your drafts folder is empty." 
+                    : "No emails in this section."}
+                </p>
+              </div>
+              {activeTab === "other" && threads && threads.length === 0 && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleRefresh}
+                  isLoading={isRefreshing}
+                >
+                  Sync Inbox
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ---- Right Panel: Thread Detail ---- */}
+      <div className="flex-1 flex flex-col bg-bg-base min-w-0">
+        {selectedThread ? (
+          <ThreadDetail
+            thread={selectedThread}
+            onArchive={handleArchive}
+            onDelete={handleDelete}
+            isArchiving={archiveMutation.isPending}
+            isDeleting={deleteMutation.isPending}
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full gap-3 animate-fade-in">
+            <InboxIcon />
+            <p className="text-sm text-text-tertiary">
+              Select a thread to read
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

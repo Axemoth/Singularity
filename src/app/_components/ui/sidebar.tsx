@@ -6,12 +6,15 @@ import { Tooltip } from '@/app/_components/ui/tooltip';
 import { Avatar } from '@/app/_components/ui/avatar';
 import { useTheme } from '@/app/_components/theme-provider';
 
+import { authClient } from '@/server/better-auth/client';
+
 interface NavItem {
   label: string;
   href: string;
   shortcut?: string;
   icon: React.ReactNode;
 }
+
 
 const navItems: NavItem[] = [
   {
@@ -31,6 +34,16 @@ const navItems: NavItem[] = [
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Agent Chat',
+    href: '/agent',
+    shortcut: 'G A',
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.091-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.091L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.091 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.091ZM18.25 8.25 18 9.25l-.25-1a2 2 0 0 0-1.25-1.25l-1-.25 1-.25a2 2 0 0 0 1.25-1.25l.25-1 .25 1a2 2 0 0 0 1.25 1.25l1 .25-1 .25a2 2 0 0 0-1.25 1.25ZM17.5 20l-.5 1.75L16.5 20a2.5 2.5 0 0 0-1.75-1.75L13 17.75l1.75-.5A2.5 2.5 0 0 0 16.5 15.5l.5-1.75.5 1.75a2.5 2.5 0 0 0 1.75 1.75l1.75.5-1.75.5A2.5 2.5 0 0 0 17.5 20Z" />
       </svg>
     ),
   },
@@ -72,22 +85,23 @@ function MoonIcon() {
 export function Sidebar() {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
+  const { data: sessionData } = authClient.useSession();
 
   return (
     <aside className="flex h-screen w-16 flex-col items-center border-r border-border-subtle bg-bg-raised py-4 sticky top-0">
       {/* ─── Logo ─── */}
       <Link
         href="/inbox"
-        className="mb-4 flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-accent-primary text-white font-bold text-base select-none transition-transform duration-150 hover:scale-105 active:scale-95"
+        className="mb-4 flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-accent-primary text-text-inverse font-bold text-base select-none transition-transform duration-150 hover:scale-105 active:scale-95"
         aria-label="Singularity home"
       >
         S
       </Link>
 
-      {/* ─── Compose ─── */}
       <Tooltip content="Compose" shortcut="C" position="right">
         <button
-          className="mb-6 flex h-9 w-9 items-center justify-center rounded-full bg-accent-primary text-white shadow-[var(--shadow-md)] transition-all duration-150 hover:bg-accent-primary-hover hover:shadow-[var(--shadow-lg)] hover:scale-105 active:scale-95"
+          onClick={() => window.dispatchEvent(new CustomEvent("open-compose"))}
+          className="mb-6 flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-accent-primary text-text-inverse shadow-[var(--shadow-md)] transition-all duration-150 hover:bg-accent-primary-hover hover:shadow-[var(--shadow-lg)] hover:scale-105 active:scale-95"
           aria-label="Compose"
         >
           <ComposeIcon />
@@ -152,13 +166,14 @@ export function Sidebar() {
         </Tooltip>
 
         {/* User avatar */}
-        <Tooltip content="Account" position="right">
-          <button
-            aria-label="Account"
+        <Tooltip content="Settings" position="right">
+          <Link
+            href="/settings"
+            aria-label="Settings"
             className="mt-1 flex items-center justify-center rounded-full transition-transform duration-150 hover:scale-105 active:scale-95"
           >
-            <Avatar name="User" size="sm" />
-          </button>
+            <Avatar name={sessionData?.user?.name ?? 'User'} size="sm" />
+          </Link>
         </Tooltip>
       </div>
     </aside>

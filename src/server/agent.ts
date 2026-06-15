@@ -1,12 +1,25 @@
 import { Agent } from '@mastra/core/agent';
 import { google } from '@ai-sdk/google';
+import { createOpenAI } from '@ai-sdk/openai';
+import { env } from '@/env';
 import { MastraProvider } from '@corsair-dev/mcp';
 import { corsair } from './corsair';
+
+const deepseek = createOpenAI({
+    baseURL: 'https://api.deepseek.com',
+    apiKey: env.DEEPSEEK_API_KEY ?? '',
+});
 
 const provider = new MastraProvider();
 const tools = await provider.build({ corsair });
 
 const models = [
+    (deepseek as any).chat('deepseek-v4-pro', {
+        extraBody: {
+            thinking: { type: 'enabled' },
+            reasoning_effort: 'high',
+        },
+    }),
     google('gemini-2.5-flash'),
     google('gemini-2.5-flash-lite'),
     google('gemma-4-31b-it'),
@@ -17,7 +30,8 @@ let response;
 
 for (const model of models) {
     try {
-        console.log(`Attempting execution using model: ${model.modelId}...`);
+        const modelName = model?.modelId || 'deepseek-v4-pro';
+        console.log(`Attempting execution using model: ${modelName}...`);
         
         const agent = new Agent({
             id: 'corsair-agent',
@@ -33,7 +47,8 @@ for (const model of models) {
         );
         break;
     } catch (err: any) {
-        console.warn(`Model ${model.modelId} failed:`, err.message || err);
+        const modelName = model?.modelId || 'deepseek-v4-pro';
+        console.warn(`Model ${modelName} failed:`, err.message || err);
     }
 }
 

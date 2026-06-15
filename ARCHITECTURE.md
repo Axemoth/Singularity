@@ -72,10 +72,12 @@
 ## 2. Authentication Flow (Gmail-Only Login)
 
 ### Current State
+
 - Better Auth is configured with **GitHub OAuth** only
 - Email/password auth is enabled but not needed
 
 ### Target State
+
 - Replace GitHub OAuth with **Google OAuth**
 - Request Gmail + Calendar API scopes during login
 - User's first Gmail account is automatically connected via Corsair
@@ -111,6 +113,7 @@ User lands on Unified Inbox (all emails loaded)
 ### Config Changes Required
 
 **`src/server/better-auth/config.ts`** — Replace GitHub with Google:
+
 ```typescript
 socialProviders: {
     google: {
@@ -133,6 +136,7 @@ socialProviders: {
 ## 3. Multi-Account Model
 
 ### Concept
+
 Each **user** in the app is a **Corsair tenant**. Each tenant can link **multiple Gmail/Calendar accounts**.
 
 ```
@@ -151,13 +155,13 @@ User (Better Auth)
 
 ### How It Works
 
-| Step | Action | Corsair Call |
-|------|--------|-------------|
-| 1 | User logs in with Gmail | Automatic — primary account created |
-| 2 | User clicks "Add Account" | Redirect to Google OAuth with new account |
-| 3 | OAuth callback received | `corsair.withTenant(userId).gmail.connect(tokens)` |
-| 4 | Fetch emails from Account 2 | `corsair.withTenant(userId).gmail.api.threads.list({accountId})` |
-| 5 | Compare emails across accounts | Query `corsair_entities` table filtered by tenant |
+| Step | Action                         | Corsair Call                                                     |
+| ---- | ------------------------------ | ---------------------------------------------------------------- |
+| 1    | User logs in with Gmail        | Automatic — primary account created                              |
+| 2    | User clicks "Add Account"      | Redirect to Google OAuth with new account                        |
+| 3    | OAuth callback received        | `corsair.withTenant(userId).gmail.connect(tokens)`               |
+| 4    | Fetch emails from Account 2    | `corsair.withTenant(userId).gmail.api.threads.list({accountId})` |
+| 5    | Compare emails across accounts | Query `corsair_entities` table filtered by tenant                |
 
 ### Database Mapping
 
@@ -223,6 +227,7 @@ App queries Drizzle → renders in UI
 ```
 
 This means **all emails flow through Corsair and get cached in your local Postgres**. This enables:
+
 - Lightning-fast local search (no Gmail API round-trip)
 - Cross-account queries (JOIN across entities by tenant)
 - Offline-capable email reading
@@ -232,6 +237,7 @@ This means **all emails flow through Corsair and get cached in your local Postgr
 ## 5. Webhook Pipeline (Real-Time)
 
 ### Current State
+
 - Webhook route exists at `src/app/api/webhooks/route.ts`
 - **tenantId is hardcoded to `'dev'`** — needs to be dynamic
 
@@ -273,6 +279,7 @@ The current hardcoded `tenantId: 'dev'` needs to be replaced with dynamic lookup
 ## 6. Cross-Account Features
 
 ### Unified Inbox
+
 All emails from all connected Gmail accounts appear in a single, merged timeline, sorted by date. Each email shows which account it belongs to with a colored badge.
 
 ```
@@ -287,12 +294,15 @@ All emails from all connected Gmail accounts appear in a single, merged timeline
 ```
 
 ### Cross-Account Comparison
+
 Side-by-side view to compare conversations across accounts:
+
 - "Show me all emails from john@company.com across all my accounts"
 - Thread merging: same conversation happening on different accounts
 - Identify duplicate emails received on multiple accounts
 
 ### Unified Calendar
+
 All calendars from all accounts merged into one view with color coding per account.
 
 ---
@@ -334,12 +344,33 @@ User types in chat:
 ```
 
 ### Integration in the App
+
 The MCP agent chat will be a slide-out panel accessible from any page. The agent:
+
 - Has full access to the user's Corsair tenant
 - Can read, send, draft emails
 - Can create, update, delete calendar events
 - Can search across accounts
 - Always scoped to the logged-in user's tenant ID
+
+### Implemented Agent Chat Contract
+
+Current implementation:
+
+- `src/server/api/routers/agent.ts` exposes `agent.chat`.
+- `agent.chat` accepts the user's message plus frontend context such as the current route, selected thread ID, selected event ID, and selected entity IDs.
+- The backend still uses Mastra + Gemini + Corsair MCP tools, scoped to `ctx.session.user.id`.
+- The response now includes assistant text plus structured frontend actions.
+- `agent.confirmAction` executes approved Gmail-changing actions, currently archive and trash for selected thread IDs.
+- `src/app/_components/agent/agent-panel.tsx` renders the global chat drawer and action cards.
+- `src/app/(app)/layout.tsx` mounts the agent drawer globally for authenticated routes.
+
+Recommended next architecture step:
+
+- Persist conversations and tool runs in database tables.
+- Add streaming events for tool progress.
+- Replace broad action inference with first-party app tools such as `searchInbox`, `draftReply`, `findFreeSlots`, and `summarizeToday`.
+- Feed selected inbox/calendar state into the panel once those screens are built.
 
 ---
 
@@ -360,52 +391,52 @@ The MCP agent chat will be a slide-out panel accessible from any page. The agent
 
 ### Key UI Components
 
-| Component | Purpose |
-|-----------|---------|
-| `UnifiedInbox` | Merged email list from all accounts with priority badges |
-| `ThreadView` | Full email thread with reply/forward/archive actions |
-| `ComposeModal` | Draft & send emails (select which account to send from) |
-| `CalendarView` | Week/month view with all calendars merged |
-| `CommandPalette` | Ctrl+K powered command bar for quick actions |
-| `AgentChat` | Slide-out AI chat panel for natural language commands |
-| `AccountSwitcher` | Switch between / manage connected Gmail accounts |
-| `PriorityBadge` | LLM-assigned priority indicator (urgent/normal/low) |
-| `SearchBar` | Advanced search with filters (from, to, date, labels) |
+| Component         | Purpose                                                  |
+| ----------------- | -------------------------------------------------------- |
+| `UnifiedInbox`    | Merged email list from all accounts with priority badges |
+| `ThreadView`      | Full email thread with reply/forward/archive actions     |
+| `ComposeModal`    | Draft & send emails (select which account to send from)  |
+| `CalendarView`    | Week/month view with all calendars merged                |
+| `CommandPalette`  | Ctrl+K powered command bar for quick actions             |
+| `AgentChat`       | Slide-out AI chat panel for natural language commands    |
+| `AccountSwitcher` | Switch between / manage connected Gmail accounts         |
+| `PriorityBadge`   | LLM-assigned priority indicator (urgent/normal/low)      |
+| `SearchBar`       | Advanced search with filters (from, to, date, labels)    |
 
 ### Keyboard Shortcuts (Superhuman-style)
 
-| Key | Action |
-|-----|--------|
+| Key       | Action                           |
+| --------- | -------------------------------- |
 | `j` / `k` | Navigate down / up in email list |
-| `Enter` | Open selected email thread |
-| `Escape` | Go back to inbox |
-| `c` | Compose new email |
-| `r` | Reply to current email |
-| `f` | Forward current email |
-| `e` | Archive current email |
-| `#` | Delete / trash current email |
-| `/` | Focus search bar |
-| `Ctrl+K` | Open command palette |
-| `g i` | Go to inbox |
-| `g c` | Go to calendar |
-| `g s` | Go to settings |
+| `Enter`   | Open selected email thread       |
+| `Escape`  | Go back to inbox                 |
+| `c`       | Compose new email                |
+| `r`       | Reply to current email           |
+| `f`       | Forward current email            |
+| `e`       | Archive current email            |
+| `#`       | Delete / trash current email     |
+| `/`       | Focus search bar                 |
+| `Ctrl+K`  | Open command palette             |
+| `g i`     | Go to inbox                      |
+| `g c`     | Go to calendar                   |
+| `g s`     | Go to settings                   |
 
 ---
 
 ## 9. Current State vs Target State
 
-| Area | Current State | Target State |
-|------|--------------|-------------|
-| **Auth** | GitHub OAuth only | Google OAuth only (Gmail scopes) |
-| **Frontend** | T3 boilerplate, single page | Full Superhuman-style UI |
-| **Gmail** | Plugin installed, not wired to UI | Full inbox, compose, search, archive |
-| **Calendar** | Plugin installed, not wired to UI | Full calendar view with event management |
-| **Multi-account** | Single hardcoded 'dev' tenant | Dynamic tenant per user, multiple accounts |
-| **Webhooks** | Route exists, hardcoded tenant | Dynamic tenant, real-time UI updates |
-| **AI Agent** | Standalone script (`agent.ts`) | Integrated chat panel in the app |
-| **Search** | None | Corsair search API + local entity search |
-| **Keyboard** | None | Full Superhuman-style shortcut system |
-| **Priority** | None | LLM-powered email priority classification |
+| Area              | Current State                     | Target State                               |
+| ----------------- | --------------------------------- | ------------------------------------------ |
+| **Auth**          | GitHub OAuth only                 | Google OAuth only (Gmail scopes)           |
+| **Frontend**      | T3 boilerplate, single page       | Full Superhuman-style UI                   |
+| **Gmail**         | Plugin installed, not wired to UI | Full inbox, compose, search, archive       |
+| **Calendar**      | Plugin installed, not wired to UI | Full calendar view with event management   |
+| **Multi-account** | Single hardcoded 'dev' tenant     | Dynamic tenant per user, multiple accounts |
+| **Webhooks**      | Route exists, hardcoded tenant    | Dynamic tenant, real-time UI updates       |
+| **AI Agent**      | Standalone script (`agent.ts`)    | Integrated chat panel in the app           |
+| **Search**        | None                              | Corsair search API + local entity search   |
+| **Keyboard**      | None                              | Full Superhuman-style shortcut system      |
+| **Priority**      | None                              | LLM-powered email priority classification  |
 
 ---
 
@@ -434,6 +465,7 @@ NGROK_URL="https://your-subdomain.ngrok.io"
 ```
 
 ### Google Cloud Console Setup Required
+
 1. Create a Google Cloud project
 2. Enable Gmail API and Google Calendar API
 3. Create OAuth 2.0 Client ID (Web Application)

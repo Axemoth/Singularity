@@ -7,6 +7,8 @@ import {
   jsonb,
   text,
   timestamp,
+  vector,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const createTable = pgTableCreator((name) => `pg-drizzle_${name}`);
@@ -105,6 +107,7 @@ export const corsairAccounts = pgTable('corsair_accounts', {
     integrationId: text('integration_id').notNull().references(() => corsairIntegrations.id),
     config: jsonb('config').notNull().default({}),
     dek: text('dek'),
+    emailAddress: text('email_address'),
 });
 
 export const corsairEntities = pgTable('corsair_entities', {
@@ -117,6 +120,17 @@ export const corsairEntities = pgTable('corsair_entities', {
     version: text('version').notNull(),
     data: jsonb('data').notNull().default({}),
 });
+
+export const corsairEmbeddings = pgTable('corsair_embeddings', {
+    id: text('id').primaryKey(),
+    entityId: text('entity_id').notNull().references(() => corsairEntities.id, { onDelete: 'cascade' }),
+    embedding: vector('embedding', { dimensions: 768 }).notNull(),
+    text: text('text').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+    index('embedding_cosine_idx').using('hnsw', table.embedding.op('vector_cosine_ops'))
+]);
 
 export const corsairEvents = pgTable('corsair_events', {
     id: text('id').primaryKey(),
@@ -155,6 +169,8 @@ export const userSettings = pgTable("user_settings", {
   notificationsEnabled: boolean("notifications_enabled")
     .notNull()
     .default(true),
+  priorityInstructions: text("priority_instructions"),
+  username: text("username"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

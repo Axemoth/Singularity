@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
-import { corsairEntities, corsairAccounts, corsairIntegrations } from "@/server/db/schema";
+import { corsairEntities, corsairAccounts, corsairIntegrations, corsairEvents } from "@/server/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { syncEmbeddings } from "@/server/api/tasks/embeddings";
 
 export const calendarRouter = createTRPCRouter({
   listEvents: protectedProcedure
@@ -33,8 +34,13 @@ export const calendarRouter = createTRPCRouter({
         }
       }
 
+      // Trigger background embeddings sync asynchronously
+      void syncEmbeddings(userId).catch((err) => {
+        console.error("Background embeddings sync failed for Calendar:", err);
+      });
+
       // Query cached events from the local database
-      const events = await ctx.db
+      let events = await ctx.db
         .select({
           id: corsairEntities.id,
           entityId: corsairEntities.entityId,
@@ -53,8 +59,116 @@ export const calendarRouter = createTRPCRouter({
         )
         .orderBy(desc(corsairEntities.updatedAt));
 
+      // Auto-sync on first load if account exists but database is empty
+      if (events.length === 0 && !input.refresh) {
+        const hasAccount = await ctx.db
+          .select({ id: corsairAccounts.id })
+          .from(corsairAccounts)
+          .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+          .where(
+            and(
+              eq(corsairAccounts.tenantId, userId),
+              eq(corsairIntegrations.name, "googlecalendar")
+            )
+          )
+          .limit(1);
+
+        if (hasAccount.length > 0) {
+          try {
+            console.log(`[Calendar Auto-sync] Populating Calendar events for user ${userId}...`);
+            await tenant.googlecalendar.api.events.getMany({
+              calendarId: input.calendarId,
+              maxResults: 100,
+            });
+
+            // Query again
+            events = await ctx.db
+              .select({
+                id: corsairEntities.id,
+                entityId: corsairEntities.entityId,
+                data: corsairEntities.data,
+                updatedAt: corsairEntities.updatedAt,
+              })
+              .from(corsairEntities)
+              .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
+              .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+              .where(
+                and(
+                  eq(corsairAccounts.tenantId, userId),
+                  eq(corsairIntegrations.name, "googlecalendar"),
+                  eq(corsairEntities.entityType, "events")
+                )
+              )
+              .orderBy(desc(corsairEntities.updatedAt));
+          } catch (err: any) {
+            console.error("[Calendar Auto-sync] Failed to auto-sync Calendar events:", err);
+          }
+        }
+      }
+
       return events;
     }),
+
+  getConnectionStatus: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    const account = await ctx.db
+      .select({
+        id: corsairAccounts.id,
+        emailAddress: corsairAccounts.emailAddress,
+      })
+      .from(corsairAccounts)
+      .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+      .where(
+        and(
+          eq(corsairAccounts.tenantId, userId),
+          eq(corsairIntegrations.name, "googlecalendar")
+        )
+      )
+      .limit(1);
+
+    const [acc] = account;
+    if (acc) {
+      return {
+        connected: true,
+        emailAddress: acc.emailAddress ?? "Connected",
+      };
+    }
+    return { connected: false };
+  }),
+
+  disconnect: protectedProcedure.mutation(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+
+    const account = await ctx.db
+      .select({ id: corsairAccounts.id })
+      .from(corsairAccounts)
+      .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+      .where(
+        and(
+          eq(corsairAccounts.tenantId, userId),
+          eq(corsairIntegrations.name, "googlecalendar")
+        )
+      )
+      .limit(1);
+
+    const [acc] = account;
+    if (acc) {
+      const accountId = acc.id;
+
+      // Delete dependent corsair entities
+      await ctx.db.delete(corsairEntities).where(eq(corsairEntities.accountId, accountId));
+
+      // Delete integration events
+      await ctx.db.delete(corsairEvents).where(eq(corsairEvents.accountId, accountId));
+
+      // Delete the account
+      await ctx.db.delete(corsairAccounts).where(eq(corsairAccounts.id, accountId));
+
+      return { success: true };
+    }
+    return { success: false };
+  }),
+
 
   createEvent: protectedProcedure
     .input(

@@ -17,8 +17,8 @@ export function middleware(request: NextRequest) {
     path.startsWith("/calendar") ||
     path.startsWith("/settings");
 
-  // 1. If user is logged in and tries to access /login, redirect to /inbox
-  if (hasSessionToken && isAuthRoute) {
+  // 1. If user is logged in and tries to access /login, redirect to /inbox (skipped in dev for testing)
+  if (hasSessionToken && isAuthRoute && process.env.NODE_ENV !== "development") {
     return NextResponse.redirect(new URL("/inbox", request.url));
   }
 

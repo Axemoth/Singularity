@@ -13,8 +13,8 @@
   --text-inverse: #ffffff;
   --border-default: #dee2e6;
   --border-subtle: #e9ecef;
-  --accent-primary: #4f46e5;
-  --accent-primary-hover: #4338ca;
+  --accent-primary: #171717;
+  --accent-primary-hover: #404040;
   --accent-success: #10b981;
   --accent-warning: #f59e0b;
   --accent-danger: #ef4444;
@@ -48,8 +48,8 @@
   --text-inverse: #0f0f14;
   --border-default: #2a2a38;
   --border-subtle: #1f1f2c;
-  --accent-primary: #6366f1;
-  --accent-primary-hover: #818cf8;
+  --accent-primary: #ffffff;
+  --accent-primary-hover: #d4d4d4;
   --accent-success: #34d399;
   --accent-warning: #fbbf24;
   --accent-danger: #f87171;
@@ -88,6 +88,10 @@
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border-default) transparent;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 ::selection {
@@ -146,6 +150,24 @@ body {
 .animate-scale-in { animation: scaleIn var(--transition-base) ease-out; }
 .animate-slide-up-modal { animation: slideUpModal 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 .animate-pulse-subtle { animation: pulse-subtle 2s ease-in-out infinite; }
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.animate-shimmer { animation: shimmer 2s ease-in-out infinite; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.animate-float { animation: float 4s ease-in-out infinite; }
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.animate-gradient { animation: gradient-shift 6s ease infinite; background-size: 200% 200%; }
 
 /* Scrollbar for webkit */
 ::-webkit-scrollbar { width: 6px; height: 6px; }

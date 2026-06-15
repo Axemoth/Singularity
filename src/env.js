@@ -15,6 +15,8 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: z.string(),
     CORSAIR_KEK: z.string(),
     GOOGLE_GENERATIVE_AI_API_KEY: z.string(),
+    OPENROUTER_API_KEY: z.string(),
+    DEEPSEEK_API_KEY: z.string().optional(),
     APP_URL: z.string().url(),
     DATABASE_URL: z.string().url(),
     NODE_ENV: z
@@ -41,6 +43,8 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     CORSAIR_KEK: process.env.CORSAIR_KEK,
     GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+    DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
     APP_URL: process.env.APP_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,

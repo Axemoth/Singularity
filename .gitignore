@@ -44,3 +44,9 @@ yarn-error.log*
 
 # idea files
 .idea
+
+# ignore root-level markdown files except important ones
+/*.md
+!/README.md
+!/ARCHITECTURE.md
+!/FRONTEND_PROGRESS.md
