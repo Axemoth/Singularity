@@ -1,13 +1,8 @@
-import { redirect } from "next/navigation";
-import { getSession } from "@/server/better-auth/server";
 import LandingPage from "./_components/landing/landing-page";
 
-export default async function Home() {
-  const session = await getSession();
-
-  if (session) {
-    redirect("/inbox");
-  }
-
+// Always show the landing page at "/".
+// Session is intentionally NOT checked here — authenticated users
+// still land here first and can navigate to /inbox themselves.
+export default function Home() {
   return <LandingPage />;
 }
