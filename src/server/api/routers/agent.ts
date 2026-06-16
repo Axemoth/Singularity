@@ -174,8 +174,37 @@ export const agentRouter = createTRPCRouter({
       const userId = ctx.session.user.id;
 
       try {
+        let didExecuteWriteTool = false;
         const provider = new MastraProvider();
         const toolsList = await provider.build({ corsair: corsair.withTenant(userId) });
+
+        const wrappedMcpTools = Object.fromEntries(
+          toolsList.map((t) => {
+            const originalExecute = t.execute;
+            return [
+              t.id,
+              {
+                ...t,
+                execute: async (args: any, context: any) => {
+                  const idLower = t.id.toLowerCase();
+                  const isWriteOp = 
+                    idLower.includes("insert") || 
+                    idLower.includes("create") || 
+                    idLower.includes("delete") || 
+                    idLower.includes("update") || 
+                    idLower.includes("send") || 
+                    idLower.includes("patch") || 
+                    idLower.includes("post");
+                  if (isWriteOp) {
+                    console.log(`[mcp tool] Detected write operation for tool: ${t.id}, flagging to prevent fallback retry.`);
+                    didExecuteWriteTool = true;
+                  }
+                  return originalExecute ? originalExecute(args, context) : undefined;
+                }
+              }
+            ];
+          })
+        );
 
         const sendEmailTool = createTool({
           id: "send_email",
@@ -187,6 +216,7 @@ export const agentRouter = createTRPCRouter({
           }),
           execute: async ({ to, subject, body }) => {
             console.log(`[send_email tool] Sending email to ${to} via tenant ${userId}...`);
+            didExecuteWriteTool = true;
             const tenant = corsair.withTenant(userId);
             const raw = buildRawEmail(to, subject, body);
             const res = await tenant.gmail.api.messages.send({ raw });
@@ -204,6 +234,7 @@ export const agentRouter = createTRPCRouter({
           }),
           execute: async ({ to, subject, body }) => {
             console.log(`[create_draft tool] Creating draft for ${to} via tenant ${userId}...`);
+            didExecuteWriteTool = true;
             const tenant = corsair.withTenant(userId);
             const raw = buildRawEmail(to ?? "", subject ?? "", body);
             const res = await tenant.gmail.api.drafts.create({
@@ -378,11 +409,8 @@ CRITICAL INTERACTION INSTRUCTIONS:
               reasoning_effort: "high",
             },
           }),
-          "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
           google("gemini-2.5-flash"),
           google("gemini-2.5-flash-lite"),
-          google("gemma-4-31b-it"),
-          google("gemma-4-26b-a4b-it"),
         ];
 
         let response;
@@ -392,24 +420,24 @@ CRITICAL INTERACTION INSTRUCTIONS:
           try {
             const modelName = typeof model === "string" ? model : (model?.modelId || "deepseek-v4-pro");
             console.log(`Attempting execution in live chat using model: ${modelName}...`);
-            const agent = new Agent({
+             const agent = new Agent({
               id: "singularity-workflow-agent",
               name: "Singularity Workflow Agent",
               model: model,
               instructions: instructions,
               tools: {
-                ...Object.fromEntries(toolsList.map((t) => [t.id, t])),
+                ...wrappedMcpTools,
                 send_email: sendEmailTool,
                 create_draft: createDraftTool,
                 search_local: searchLocalTool,
               },
             });
 
-            // Set up a 25-second timeout for the generation to avoid hanging
+            // Set up a 2-minute timeout for the generation to avoid hanging
             const generatePromise = agent.generate(messagesList as any);
 
             const timeoutPromise = new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("Model execution timed out after 25 seconds.")), 25000)
+              setTimeout(() => reject(new Error("Model execution timed out after 2 minutes.")), 120000)
             );
 
             response = await Promise.race([generatePromise, timeoutPromise]);
@@ -418,6 +446,13 @@ CRITICAL INTERACTION INSTRUCTIONS:
             const modelName = typeof model === "string" ? model : (model?.modelId || "deepseek-v4-pro");
             console.warn(`Live chat model ${modelName} failed:`, err);
             lastError = err;
+            
+            // Abort fallback retry if a write action has already been performed 
+            // to avoid duplicates (e.g. sending emails twice, creating multiple events).
+            if (didExecuteWriteTool) {
+              console.warn("Write tool was already executed by the failed model. Aborting fallback loop to prevent duplicate actions.");
+              break;
+            }
           }
         }
 
