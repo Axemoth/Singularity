@@ -840,7 +840,7 @@ export default function InboxPage() {
   return (
     <div className="flex h-full animate-fade-in">
       {/* ---- Left Panel: Thread List ---- */}
-      <div className="w-[380px] shrink-0 flex flex-col border-r border-border-default bg-bg-raised">
+      <div className="w-[460px] shrink-0 flex flex-col border-r border-border-default bg-bg-raised">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
           <div className="flex items-center gap-2.5">

@@ -163,6 +163,14 @@ function UsersIcon({ className }: { className?: string }) {
   );
 }
 
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+    </svg>
+  );
+}
+
 // ─── Skeleton ──────────────────────────────────────────────────────────────────
 
 function EventSkeleton() {
@@ -545,6 +553,7 @@ export default function CalendarPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [view, setView] = useState<"list" | "week" | "month">("list");
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const utils = api.useUtils();
   const { data: calendarStatus, isLoading: isStatusLoading } = api.calendar.getConnectionStatus.useQuery();
@@ -658,16 +667,29 @@ export default function CalendarPage() {
               </span>
             )}
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleRefresh}
-            isLoading={isFetching}
-            disabled={isFetching || !calendarStatus?.connected}
-          >
-            <RefreshIcon className="h-3.5 w-3.5" />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            {calendarStatus?.connected && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setIsCreateOpen(true)}
+                className="font-bold flex items-center gap-1.5 cursor-pointer"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Create Event
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleRefresh}
+              isLoading={isFetching}
+              disabled={isFetching || !calendarStatus?.connected}
+            >
+              <RefreshIcon className="h-3.5 w-3.5" />
+              Refresh
+            </Button>
+          </div>
         </header>
 
         {/* Date Navigation & View Switcher */}
@@ -880,6 +902,367 @@ export default function CalendarPage() {
             )}
           </>
         )}
+      </div>
+
+      <CreateEventModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onEventCreated={() => {
+          void utils.calendar.listEvents.invalidate();
+        }}
+      />
+    </div>
+  );
+}
+
+function CreateEventModal({
+  isOpen,
+  onClose,
+  onEventCreated,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onEventCreated: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<"manual" | "ai">("manual");
+  
+  // Form Fields
+  const [summary, setSummary] = useState("");
+  const [description, setDescription] = useState("");
+  const [location, setLocation] = useState("");
+  
+  // Set default start/end dates to today, start time to next hour
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const [startTime, setStartTime] = useState("10:00");
+  const [endDate, setEndDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const [endTime, setEndTime] = useState("11:00");
+  
+  const [attendees, setAttendees] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  
+  // AI Form State
+  const [aiText, setAiText] = useState("");
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
+  const createMutation = api.calendar.createEvent.useMutation({
+    onSuccess: async () => {
+      onEventCreated();
+      onClose();
+      resetForm();
+    },
+    onError: (err) => {
+      setErrorMsg(err.message);
+    },
+  });
+
+  const chatMutation = api.agent.chat.useMutation({
+    onSuccess: (data) => {
+      setIsAiLoading(false);
+      try {
+        let cleanText = data.text;
+        const thinkRegex = /<think>([\s\S]*?)<\/think>/i;
+        cleanText = cleanText.replace(thinkRegex, "").trim();
+
+        const jsonMatch = cleanText.match(/```json([\s\S]*?)```/i);
+        const jsonStr = jsonMatch ? jsonMatch[1] : cleanText;
+        const parsed = JSON.parse(jsonStr!.trim());
+
+        if (parsed.summary) setSummary(parsed.summary);
+        if (parsed.description) setDescription(parsed.description);
+        if (parsed.location) setLocation(parsed.location);
+        if (parsed.startDate) setStartDate(parsed.startDate);
+        if (parsed.startTime) setStartTime(parsed.startTime);
+        if (parsed.endDate) setEndDate(parsed.endDate);
+        if (parsed.endTime) setEndTime(parsed.endTime);
+        if (parsed.attendees && Array.isArray(parsed.attendees)) {
+          setAttendees(parsed.attendees.join(", "));
+        }
+        
+        setActiveTab("manual");
+        setAiText("");
+      } catch (err) {
+        console.error("Failed to parse AI response for calendar event:", err);
+        setErrorMsg("Failed to parse AI response. Please try describing it differently or use the manual form.");
+      }
+    },
+    onError: (err) => {
+      setIsAiLoading(false);
+      setErrorMsg(`AI Drafting failed: ${err.message}`);
+    },
+  });
+
+  const resetForm = () => {
+    setSummary("");
+    setDescription("");
+    setLocation("");
+    setAttendees("");
+    setErrorMsg("");
+    setAiText("");
+    const d = new Date();
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    setStartDate(dateStr);
+    setEndDate(dateStr);
+    setStartTime("10:00");
+    setEndTime("11:00");
+  };
+
+  const handleSave = () => {
+    if (!summary) {
+      setErrorMsg("Summary is required.");
+      return;
+    }
+    setErrorMsg("");
+
+    const startISO = `${startDate}T${startTime}:00`;
+    const endISO = `${endDate}T${endTime}:00`;
+
+    const attendeeEmails = attendees
+      .split(",")
+      .map((e) => e.trim())
+      .filter((e) => e.includes("@"));
+
+    createMutation.mutate({
+      summary,
+      description: description || undefined,
+      location: location || undefined,
+      start: startISO,
+      end: endISO,
+      attendees: attendeeEmails.length > 0 ? attendeeEmails : undefined,
+    });
+  };
+
+  const handleAiDraft = () => {
+    if (!aiText.trim()) return;
+    setErrorMsg("");
+    setIsAiLoading(true);
+
+    const now = new Date();
+    const prompt = `Translate this natural language event request into a structured JSON object.
+Request: "${aiText}"
+Current local time reference: ${now.toISOString()} (Today is ${now.toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })})
+
+Output ONLY a JSON block wrapped in \`\`\`json and \`\`\` containing:
+{
+  "summary": "...",
+  "description": "...",
+  "location": "...",
+  "startDate": "YYYY-MM-DD",
+  "startTime": "HH:MM",
+  "endDate": "YYYY-MM-DD",
+  "endTime": "HH:MM",
+  "attendees": ["email1@example.com", ...]
+}
+Do not output any conversational text, notes, markdown formatting other than the json block.`;
+
+    chatMutation.mutate({
+      message: prompt,
+      history: [],
+      context: {
+        route: "/calendar",
+      },
+    });
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
+      <div className="bg-bg-raised border border-border-default rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
+        {/* Header */}
+        <div className="border-b border-border-subtle p-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-text-primary">Create Event</h2>
+          <button
+            onClick={() => {
+              resetForm();
+              onClose();
+            }}
+            className="text-text-tertiary hover:text-text-primary transition-colors cursor-pointer p-1"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Tab Switcher */}
+        <div className="p-4 pb-2 border-b border-border-subtle bg-bg-raised/10 shrink-0">
+          <div className="flex bg-bg-inset border border-border-subtle rounded-xl p-1 gap-1 w-full shadow-inner">
+            <button
+              onClick={() => setActiveTab("manual")}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg cursor-pointer transition-all duration-[var(--transition-fast)] ${
+                activeTab === "manual"
+                  ? "bg-bg-surface text-text-primary border border-border-default shadow-xs"
+                  : "text-text-tertiary hover:text-text-primary"
+              }`}
+            >
+              Manual Form
+            </button>
+            <button
+              onClick={() => setActiveTab("ai")}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg cursor-pointer transition-all duration-[var(--transition-fast)] ${
+                activeTab === "ai"
+                  ? "bg-bg-surface text-text-primary border border-border-default shadow-xs"
+                  : "text-text-tertiary hover:text-text-primary"
+              }`}
+            >
+              Draft with AI
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {errorMsg && (
+            <div className="bg-red-500/10 border border-red-500/35 text-red-400 p-3 rounded-xl text-xs font-semibold animate-fade-in leading-relaxed">
+              {errorMsg}
+            </div>
+          )}
+
+          {activeTab === "ai" ? (
+            <div className="flex flex-col gap-4 animate-fade-in">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Describe Event</label>
+                <textarea
+                  value={aiText}
+                  onChange={(e) => setAiText(e.target.value)}
+                  placeholder="e.g. Lunch with Sarah tomorrow at 1:00 PM to 2:00 PM at Olive Garden..."
+                  rows={4}
+                  className="w-full resize-none border border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary outline-none px-3.5 py-2.5 text-xs rounded-xl transition-all font-medium leading-relaxed"
+                />
+              </div>
+              <Button
+                onClick={handleAiDraft}
+                isLoading={isAiLoading}
+                disabled={isAiLoading || !aiText.trim()}
+                className="w-full font-bold uppercase tracking-wider text-xs h-10 cursor-pointer"
+              >
+                Generate Event Details
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3.5 animate-fade-in">
+              {/* Summary */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Title</label>
+                <input
+                  type="text"
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value)}
+                  placeholder="Event title"
+                  className="w-full border border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary outline-none px-3.5 py-2 text-xs rounded-xl transition-colors font-semibold"
+                />
+              </div>
+
+              {/* Date & Time Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Start Date</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full border border-border-subtle bg-bg-inset text-text-primary focus:border-accent-primary outline-none px-3 py-1.5 text-xs rounded-xl transition-colors font-medium"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Start Time</label>
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="w-full border border-border-subtle bg-bg-inset text-text-primary focus:border-accent-primary outline-none px-3 py-1.5 text-xs rounded-xl transition-colors font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">End Date</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full border border-border-subtle bg-bg-inset text-text-primary focus:border-accent-primary outline-none px-3 py-1.5 text-xs rounded-xl transition-colors font-medium"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">End Time</label>
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="w-full border border-border-subtle bg-bg-inset text-text-primary focus:border-accent-primary outline-none px-3 py-1.5 text-xs rounded-xl transition-colors font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Location */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Location</label>
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="e.g. Zoom, Office, Cafe..."
+                  className="w-full border border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary outline-none px-3.5 py-2 text-xs rounded-xl transition-colors font-medium"
+                />
+              </div>
+
+              {/* Attendees */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Attendees (Optional)</label>
+                <input
+                  type="text"
+                  value={attendees}
+                  onChange={(e) => setAttendees(e.target.value)}
+                  placeholder="e.g. sarah@example.com, bob@example.com"
+                  className="w-full border border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary outline-none px-3.5 py-2 text-xs rounded-xl transition-colors font-medium"
+                />
+              </div>
+
+              {/* Description */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Description (Optional)</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Event description..."
+                  rows={3}
+                  className="w-full resize-none border border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary outline-none px-3.5 py-2 text-xs rounded-xl transition-colors font-medium leading-relaxed"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer Actions */}
+        <div className="border-t border-border-subtle p-4 flex items-center gap-2 shrink-0 bg-bg-raised/10">
+          <Button
+            variant="secondary"
+            className="flex-1 font-bold text-xs h-9 cursor-pointer"
+            onClick={() => {
+              resetForm();
+              onClose();
+            }}
+          >
+            Cancel
+          </Button>
+          {activeTab === "manual" && (
+            <Button
+              className="flex-1 font-bold uppercase tracking-wider text-xs h-9 cursor-pointer"
+              onClick={handleSave}
+              isLoading={createMutation.isPending}
+            >
+              Save Event
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
