@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useEffect, useCallback, type FormEvent } from "react";
+import { useMemo, useRef, useState, useEffect, useCallback, type FormEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { authClient } from "@/server/better-auth/client";
@@ -115,7 +115,7 @@ function formatMessageTime(epochMs: number): string {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function AgentPage() {
+function AgentPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const utils = api.useUtils();
@@ -684,5 +684,20 @@ export default function AgentPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AgentPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center bg-bg-base text-text-secondary">
+        <div className="flex flex-col items-center gap-2">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-border-default border-t-accent-primary" />
+          <span className="text-xs font-semibold uppercase tracking-wider">Loading Agent...</span>
+        </div>
+      </div>
+    }>
+      <AgentPageContent />
+    </Suspense>
   );
 }
