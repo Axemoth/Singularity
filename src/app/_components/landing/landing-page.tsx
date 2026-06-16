@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useTheme } from "../theme-provider";
 
 /* ─────────────────────────────────────────
    Feature cards data
@@ -15,7 +16,6 @@ const features = [
     ),
     title: "Unified Inbox",
     desc: "All your Gmail threads in one place. Sent, Drafts, everything — beautifully organised.",
-    color: "from-indigo-500 to-violet-600",
   },
   {
     icon: (
@@ -25,7 +25,6 @@ const features = [
     ),
     title: "Calendar Workflow",
     desc: "See your schedule at a glance. No tab-switching, no context loss — just flow.",
-    color: "from-violet-500 to-purple-600",
   },
   {
     icon: (
@@ -36,7 +35,6 @@ const features = [
     ),
     title: "AI Co-Pilot",
     desc: "Draft emails, summarise threads, and automate actions with a powerful AI agent built in.",
-    color: "from-fuchsia-500 to-pink-600",
   },
   {
     icon: (
@@ -46,7 +44,6 @@ const features = [
     ),
     title: "Smart Compose",
     desc: "Write better emails faster. Describe what you need and let the AI compose it for you.",
-    color: "from-blue-500 to-cyan-600",
   },
   {
     icon: (
@@ -56,7 +53,6 @@ const features = [
     ),
     title: "Instant Actions",
     desc: "Reply, forward, archive or schedule — all from a single keystroke or a voice command.",
-    color: "from-amber-500 to-orange-600",
   },
   {
     icon: (
@@ -66,7 +62,6 @@ const features = [
     ),
     title: "Privacy First",
     desc: "Your data never leaves your Google account. We operate strictly within OAuth scopes.",
-    color: "from-emerald-500 to-teal-600",
   },
 ];
 
@@ -103,281 +98,484 @@ function useCountUp(target: number, duration = 1800, suffix = "") {
    Main Landing Component
 ───────────────────────────────────────── */
 export default function LandingPage() {
+  const { theme, toggleTheme } = useTheme();
+  const [scrolled, setScrolled] = useState(false);
+
+  // Stats Counters
   const stat1 = useCountUp(10, 1600, "x");
   const stat2 = useCountUp(98, 1800, "%");
   const stat3 = useCountUp(60, 1400, "%");
 
+  // Interactive mockup states
+  const [activeTab, setActiveTab] = useState<"inbox" | "calendar">("inbox");
+  const [selectedEmail, setSelectedEmail] = useState(0);
+  const [aiDraftState, setAiDraftState] = useState<"idle" | "typing" | "done">("idle");
+  const [aiText, setAiText] = useState("");
+  const typingTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const mockEmails = [
+    {
+      from: "GitHub",
+      subj: "Your deployment is ready",
+      unread: true,
+      time: "2m",
+      body: "Your project singularity is live on production! All 14 checks passed successfully. Click to inspect log details.",
+      aiReply: "Thanks for the notification. The logs look pristine, and we are seeing great performance. Keep up the excellent work!"
+    },
+    {
+      from: "Notion Support",
+      subj: "Weekly workspace digest",
+      unread: true,
+      time: "1h",
+      body: "Here are updates from your workspace. 12 pages modified by Team Singularity. Key updates: 'Landing page redesign proposal'.",
+      aiReply: "Got the updates! Thanks for compiles. I will review the proposal before Q3 planning."
+    },
+    {
+      from: "Linear",
+      subj: "Issue SNG-142 resolved",
+      unread: false,
+      time: "3h",
+      body: "Closed by lead developer. Summary: Fix agent multi-choice button compatibility and reasoning log structures.",
+      aiReply: "Excellent work on this fix. The reasoning log fix is resolving our API latency perfectly."
+    },
+    {
+      from: "Dev Team",
+      subj: "Re: Q3 planning — next steps",
+      unread: false,
+      time: "5h",
+      body: "Should we schedule the planning meeting for Tuesday morning? I can send over the Agenda doc.",
+      aiReply: "Tuesday morning works perfect. Send over the agenda document and I will add it to the calendar."
+    }
+  ];
+
+  // Trigger typing effect for the active email reply
+  const triggerAiDraft = (emailIndex: number) => {
+    if (typingTimer.current) clearInterval(typingTimer.current);
+    setAiDraftState("typing");
+    setAiText("");
+    const targetText = mockEmails[emailIndex]?.aiReply ?? "";
+    let i = 0;
+    
+    typingTimer.current = setInterval(() => {
+      if (i < targetText.length) {
+        setAiText((prev) => prev + targetText.charAt(i));
+        i++;
+      } else {
+        if (typingTimer.current) clearInterval(typingTimer.current);
+        setAiDraftState("done");
+      }
+    }, 25);
+  };
+
+  useEffect(() => {
+    setAiDraftState("idle");
+    setAiText("");
+  }, [selectedEmail]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[#0a0a0f] text-white">
-      {/* ══════════════════ GLOBAL BG MESH ══════════════════ */}
-      <div className="pointer-events-none fixed inset-0 z-0">
-        {/* top-left blob */}
-        <div className="animate-pulse-subtle absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full bg-indigo-600/20 blur-[160px]" />
-        {/* top-right blob */}
-        <div
-          className="animate-pulse-subtle absolute -right-40 top-0 h-[500px] w-[500px] rounded-full bg-violet-600/15 blur-[140px]"
-          style={{ animationDelay: "1.2s" }}
-        />
-        {/* center accent */}
-        <div
-          className="animate-pulse-subtle absolute left-1/2 top-1/3 h-[400px] w-[400px] -translate-x-1/2 rounded-full bg-fuchsia-600/10 blur-[180px]"
-          style={{ animationDelay: "2.5s" }}
-        />
-        {/* bottom blob */}
-        <div
-          className="animate-pulse-subtle absolute -bottom-40 left-1/4 h-[600px] w-[600px] rounded-full bg-blue-600/10 blur-[160px]"
-          style={{ animationDelay: "0.8s" }}
-        />
+    <div className="relative min-h-screen overflow-x-hidden bg-bg-base text-text-primary transition-colors duration-300">
+      
+      {/* ══════════════════ GLOBAL BG MESH (Monochrome subtle glow matching the site) ══════════════════ */}
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full bg-border-default/15 dark:bg-border-default/8 blur-[130px] animate-pulse-subtle" />
+        <div className="absolute -right-40 top-10 h-[500px] w-[500px] rounded-full bg-border-default/10 dark:bg-border-default/5 blur-[120px] animate-pulse-subtle" style={{ animationDelay: "1.2s" }} />
+        <div className="absolute left-1/2 top-1/3 h-[400px] w-[400px] -translate-x-1/2 rounded-full bg-border-subtle/20 dark:bg-border-subtle/10 blur-[150px] animate-pulse-subtle" style={{ animationDelay: "2.5s" }} />
       </div>
 
-      {/* ══════════════════ NAVBAR ══════════════════ */}
-      <nav className="relative z-10 flex items-center justify-between px-6 py-5 md:px-12 lg:px-20">
-        {/* Logo */}
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 via-violet-500 to-purple-600 shadow-lg shadow-indigo-500/30">
-            <span className="text-lg font-bold leading-none text-white">S</span>
+      {/* ══════════════════ STICKY GLASS NAVBAR ══════════════════ */}
+      <nav className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 border-b ${
+        scrolled 
+          ? "bg-bg-raised/75 backdrop-blur-md py-4 border-border-default shadow-sm" 
+          : "bg-transparent py-5 border-transparent"
+      }`}>
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 md:px-12 lg:px-20">
+          
+          {/* Logo */}
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-primary text-text-inverse shadow-sm">
+              <span className="text-lg font-bold leading-none">S</span>
+            </div>
+            <span className="text-lg font-semibold tracking-tight text-text-primary">
+              Singularity
+            </span>
           </div>
-          <span className="text-lg font-semibold tracking-tight text-white">
-            Singularity
-          </span>
-        </div>
 
-        {/* Nav links */}
-        <div className="hidden items-center gap-8 md:flex">
-          <a href="#features" className="text-sm text-white/60 transition-colors hover:text-white">
-            Features
-          </a>
-          <a href="#how-it-works" className="text-sm text-white/60 transition-colors hover:text-white">
-            How it works
-          </a>
-          <a href="#stats" className="text-sm text-white/60 transition-colors hover:text-white">
-            Why Singularity
-          </a>
-        </div>
+          {/* Links */}
+          <div className="hidden items-center gap-8 md:flex">
+            <a href="#features" className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors">
+              Features
+            </a>
+            <a href="#how-it-works" className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors">
+              How it works
+            </a>
+            <a href="#stats" className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors">
+              Metrics
+            </a>
+          </div>
 
-        {/* CTA */}
-        <Link
-          href="/login"
-          className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-indigo-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-indigo-500/40 active:translate-y-0"
-        >
-          Get Started Free
-        </Link>
+          {/* Actions */}
+          <div className="flex items-center gap-4">
+            
+            {/* Smooth Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-border-default bg-bg-raised text-text-secondary hover:text-text-primary hover:bg-bg-surface transition-all duration-200"
+            >
+              {theme === "dark" ? (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="h-5 w-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m0 13.5V21M5.25 5.25l1.591 1.591M17.159 17.159l1.591 1.591M3 12h2.25m13.5 0H21M5.25 18.75l1.591-1.591M17.159 6.841l1.591-1.591m-4.75 5.159a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="h-5 w-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
+                </svg>
+              )}
+            </button>
+
+            <Link
+              href="/login"
+              className="rounded-xl bg-accent-primary px-5 py-2.5 text-sm font-medium text-text-inverse shadow-sm hover:bg-accent-primary-hover hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
+            >
+              Get Started
+            </Link>
+          </div>
+        </div>
       </nav>
 
-      {/* ══════════════════ HERO ══════════════════ */}
-      <section className="relative z-10 mx-auto flex max-w-7xl flex-col items-center px-6 pb-10 pt-20 text-center md:pt-28 lg:pt-36">
+      {/* ══════════════════ HERO SECTION ══════════════════ */}
+      <section className="relative z-10 mx-auto flex max-w-7xl flex-col items-center px-6 pb-12 pt-32 text-center md:pt-40 lg:pt-48">
+        
         {/* Badge */}
-        <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-4 py-1.5 text-xs font-medium text-indigo-300">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400" />
-          Your entire communication workflow — one place
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border-default bg-bg-surface px-4 py-1.5 text-xs font-semibold tracking-wide text-text-primary">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-text-secondary" />
+          Mail & Calendar Workflow, Unified
         </div>
 
         {/* Headline */}
-        <h1 className="max-w-4xl text-5xl font-bold leading-[1.1] tracking-tight text-white md:text-6xl lg:text-7xl">
-          Email & Calendar,{" "}
-          <span className="bg-gradient-to-r from-indigo-400 via-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
-            Reimagined
+        <h1 className="max-w-4xl text-4xl font-bold leading-[1.1] tracking-tight text-text-primary sm:text-5xl md:text-6xl lg:text-7xl">
+          Singularity is your{" "}
+          <br className="hidden md:inline" />
+          <span className="bg-gradient-to-r from-text-primary via-text-secondary to-text-primary bg-clip-text text-transparent">
+            workflow in one place
           </span>
         </h1>
 
-        {/* Subheadline */}
-        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/55 md:text-xl">
-          Singularity fuses your Gmail inbox with your Google Calendar into one
-          fluid, AI-powered workspace. Stop switching tabs. Start getting things done.
+        {/* Description */}
+        <p className="mt-6 max-w-2xl text-base leading-relaxed text-text-secondary md:text-lg">
+          No more switching tabs between your email inbox and calendar. Singularity merges 
+          your Gmail messages and Google Calendar events into a single, elegant workspace powered by an AI Co-Pilot.
         </p>
 
-        {/* CTA row */}
-        <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row">
+        {/* Hero CTA buttons */}
+        <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row">
           <Link
             href="/login"
             id="hero-cta-primary"
-            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-8 py-4 text-base font-semibold text-white shadow-xl shadow-indigo-500/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-indigo-500/50"
+            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-accent-primary px-8 py-4 text-base font-semibold text-text-inverse shadow-sm hover:bg-accent-primary-hover hover:-translate-y-0.5 transition-all duration-200"
           >
             <span>Connect your Gmail</span>
-            <svg className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
             </svg>
-            {/* Shimmer overlay */}
-            <span className="animate-shimmer absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
           </Link>
           <a
             href="#features"
             id="hero-cta-secondary"
-            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-8 py-4 text-base font-medium text-white/80 backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/10 hover:text-white"
+            className="inline-flex items-center gap-2 rounded-xl border border-border-default bg-bg-raised px-8 py-4 text-base font-medium text-text-secondary hover:text-text-primary hover:bg-bg-surface hover:-translate-y-0.5 transition-all duration-200"
           >
-            See features
+            Explore features
           </a>
         </div>
 
-        {/* Social proof strip */}
-        <p className="mt-8 text-xs text-white/30">
-          Free forever · No credit card required · Works with any Gmail account
+        {/* Helper Caption */}
+        <p className="mt-6 text-xs text-text-tertiary">
+          Secure OAuth connection · Free access · No credit card
         </p>
 
-        {/* Hero image */}
-        <div className="relative mt-20 w-full max-w-5xl">
-          {/* Glow behind image */}
-          <div className="absolute inset-x-0 top-0 h-1/2 rounded-3xl bg-gradient-to-b from-indigo-600/20 to-transparent blur-3xl" />
-          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-2xl shadow-black/60 backdrop-blur-sm">
-            {/* Fake window chrome */}
-            <div className="flex items-center gap-1.5 border-b border-white/10 bg-white/5 px-4 py-3">
-              <span className="h-3 w-3 rounded-full bg-red-500/70" />
-              <span className="h-3 w-3 rounded-full bg-yellow-500/70" />
-              <span className="h-3 w-3 rounded-full bg-green-500/70" />
-              <span className="ml-3 text-xs text-white/30">singularity.app/inbox</span>
-            </div>
-            {/* App preview — inline SVG mockup */}
-            <div className="flex h-80 w-full md:h-[460px]">
-              {/* Sidebar */}
-              <div className="hidden w-56 flex-col border-r border-white/10 bg-white/3 p-4 md:flex">
-                <div className="mb-4 flex items-center gap-2">
-                  <div className="h-5 w-5 rounded bg-indigo-500/40" />
-                  <div className="h-3 w-20 rounded bg-white/10" />
-                </div>
-                {["Inbox", "Sent", "Drafts", "Calendar", "AI Chat"].map((label, i) => (
-                  <div
-                    key={label}
-                    className={`mb-1 flex items-center gap-3 rounded-lg px-3 py-2 ${i === 0 ? "bg-indigo-500/20" : ""}`}
-                  >
-                    <div className="h-3 w-3 rounded-sm bg-white/20" />
-                    <div
-                      className="h-2.5 rounded"
-                      style={{
-                        width: `${60 + i * 8}px`,
-                        background: i === 0 ? "rgba(129,140,248,0.6)" : "rgba(255,255,255,0.15)",
-                      }}
-                    />
-                  </div>
-                ))}
+        {/* ══════════════════ INTERACTIVE DEMO ══════════════════ */}
+        <div className="relative mt-16 w-full max-w-5xl">
+          <div className="absolute inset-x-0 top-0 h-1/2 rounded-3xl bg-border-default/10 blur-3xl" />
+          
+          {/* Main Mockup container */}
+          <div className="relative overflow-hidden rounded-2xl border border-border-default bg-bg-raised shadow-xl transition-all duration-300">
+            
+            {/* Browser window chrome */}
+            <div className="flex items-center justify-between border-b border-border-subtle bg-bg-surface px-4 py-3">
+              <div className="flex items-center gap-1.5">
+                <span className="h-3 w-3 rounded-full bg-border-default" />
+                <span className="h-3 w-3 rounded-full bg-border-default" />
+                <span className="h-3 w-3 rounded-full bg-border-default" />
+                <span className="ml-3 text-xs font-medium text-text-tertiary">singularity.app/workspace</span>
               </div>
 
-              {/* Email list */}
-              <div className="flex w-full flex-col gap-0 overflow-hidden border-r border-white/10 md:w-80">
-                <div className="border-b border-white/10 px-4 py-3">
-                  <div className="h-5 w-24 rounded bg-white/15" />
-                </div>
-                {[
-                  { from: "GitHub", subj: "Your deployment is ready", unread: true, time: "2m" },
-                  { from: "Notion", subj: "Weekly digest — Jun 15", unread: true, time: "1h" },
-                  { from: "Linear", subj: "Issue SNG-142 resolved", unread: false, time: "3h" },
-                  { from: "Team", subj: "Re: Q3 planning — next steps", unread: false, time: "5h" },
-                  { from: "Figma", subj: "Someone commented on your file", unread: false, time: "1d" },
-                ].map((email, i) => (
-                  <div
-                    key={i}
-                    className={`flex cursor-pointer items-start gap-3 border-b border-white/5 px-4 py-3 transition-colors hover:bg-white/5 ${i === 0 ? "bg-indigo-500/10" : ""}`}
-                  >
-                    <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500/40 to-violet-500/40 text-[10px] font-semibold text-white/80">
-                      {email.from[0]}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className={`truncate text-xs ${email.unread ? "font-semibold text-white/90" : "text-white/50"}`}>
-                          {email.from}
-                        </span>
-                        <span className="ml-2 flex-shrink-0 text-[10px] text-white/30">{email.time}</span>
-                      </div>
-                      <div className={`mt-0.5 truncate text-[11px] ${email.unread ? "text-white/70" : "text-white/35"}`}>
-                        {email.subj}
-                      </div>
-                    </div>
-                    {email.unread && (
-                      <div className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-400" />
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* AI chat panel */}
-              <div className="hidden flex-1 flex-col p-4 lg:flex">
-                <div className="mb-3 flex items-center gap-2">
-                  <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 p-1">
-                    <svg viewBox="0 0 24 24" fill="currentColor" className="h-full w-full text-white">
-                      <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                    </svg>
-                  </div>
-                  <span className="text-xs font-medium text-white/60">AI Co-Pilot</span>
-                </div>
-                <div className="flex-1 space-y-3 overflow-hidden">
-                  <div className="max-w-[75%] rounded-2xl rounded-tl-sm bg-white/10 p-3 text-[11px] text-white/70">
-                    Summarise the GitHub deployment email for me
-                  </div>
-                  <div className="ml-auto max-w-[80%] rounded-2xl rounded-tr-sm bg-gradient-to-br from-indigo-600/70 to-violet-600/70 p-3 text-[11px] text-white/90">
-                    Your deployment to production went live 2 minutes ago. All checks passed. <span className="text-indigo-200">View summary →</span>
-                  </div>
-                  <div className="max-w-[75%] rounded-2xl rounded-tl-sm bg-white/10 p-3 text-[11px] text-white/70">
-                    Draft a reply thanking the team
-                  </div>
-                  <div className="ml-auto max-w-[80%] rounded-2xl rounded-tr-sm bg-gradient-to-br from-indigo-600/70 to-violet-600/70 p-3 text-[11px] text-white/90">
-                    <span className="text-indigo-200">Drafting… </span>Thanks everyone for the quick turnaround on the deployment. Really appreciate the effort!
-                  </div>
-                </div>
-                {/* Input bar */}
-                <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                  <div className="h-2.5 flex-1 rounded bg-white/10" />
-                  <div className="h-6 w-6 rounded-lg bg-indigo-500/50" />
-                </div>
+              {/* View / Tab Switcher */}
+              <div className="flex items-center rounded-lg bg-bg-base p-1 border border-border-subtle">
+                <button
+                  onClick={() => { setActiveTab("inbox"); }}
+                  className={`rounded px-3 py-1 text-xs font-semibold transition-all ${
+                    activeTab === "inbox" 
+                      ? "bg-bg-raised text-text-primary shadow-xs" 
+                      : "text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  Gmail Inbox
+                </button>
+                <button
+                  onClick={() => { setActiveTab("calendar"); }}
+                  className={`rounded px-3 py-1 text-xs font-semibold transition-all ${
+                    activeTab === "calendar" 
+                      ? "bg-bg-raised text-text-primary shadow-xs" 
+                      : "text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  Calendar View
+                </button>
               </div>
             </div>
+
+            {/* Simulated app workspace */}
+            <div className="flex h-[460px] w-full bg-bg-base text-left">
+              
+              {/* Mockup Sidebar */}
+              <div className="hidden w-52 flex-col border-r border-border-subtle bg-bg-raised p-4 sm:flex">
+                <div className="mb-6 flex items-center gap-2 px-2">
+                  <div className="h-6 w-6 rounded bg-bg-surface border border-border-default flex items-center justify-center text-text-primary font-bold">
+                    S
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">Workspace</span>
+                </div>
+
+                <div className="space-y-1">
+                  {[
+                    { label: "Inbox", icon: "📥", tab: "inbox" },
+                    { label: "Calendar", icon: "📅", tab: "calendar" },
+                  ].map((item) => (
+                    <button
+                      key={item.label}
+                      onClick={() => { setActiveTab(item.tab as "inbox" | "calendar"); }}
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${
+                        activeTab === item.tab 
+                          ? "bg-bg-surface text-text-primary border border-border-default shadow-xs" 
+                          : "text-text-secondary hover:bg-bg-surface hover:text-text-primary"
+                      }`}
+                    >
+                      <span>{item.icon}</span>
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                  <div className="pt-4 pb-2 px-3 text-[10px] font-bold tracking-wider text-text-tertiary uppercase">AI assistant</div>
+                  <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold text-text-secondary hover:bg-bg-surface hover:text-text-primary">
+                    <span>✨</span>
+                    <span>AI Chat</span>
+                  </button>
+                  <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold text-text-secondary hover:bg-bg-surface hover:text-text-primary">
+                    <span>⚙️</span>
+                    <span>Settings</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* DYNAMIC CONTENT CONTAINER */}
+              {activeTab === "inbox" ? (
+                <>
+                  {/* Email List Column */}
+                  <div className="flex w-full flex-col border-r border-border-subtle bg-bg-raised md:w-80">
+                    <div className="border-b border-border-subtle px-4 py-3.5 flex items-center justify-between">
+                      <span className="text-xs font-bold text-text-primary">Primary Inbox</span>
+                      <span className="rounded bg-bg-surface border border-border-default px-2 py-0.5 text-[10px] font-semibold text-text-primary">2 unread</span>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto divide-y divide-border-subtle/50">
+                      {mockEmails.map((email, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => { setSelectedEmail(idx); }}
+                          className={`flex cursor-pointer items-start gap-3 px-4 py-3 transition-colors ${
+                            selectedEmail === idx 
+                              ? "bg-bg-surface border-l-2 border-accent-primary" 
+                              : "hover:bg-bg-surface/50"
+                          }`}
+                        >
+                          <div className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-bg-surface border border-border-default text-xs font-bold text-text-primary`}>
+                            {email.from[0]}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className={`truncate text-xs ${email.unread ? "font-semibold text-text-primary" : "text-text-secondary"}`}>
+                                {email.from}
+                              </span>
+                              <span className="text-[10px] text-text-tertiary">{email.time}</span>
+                            </div>
+                            <span className={`block truncate text-xs ${email.unread ? "text-text-secondary font-medium" : "text-text-tertiary"}`}>
+                              {email.subj}
+                            </span>
+                          </div>
+                          {email.unread && (
+                            <div className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent-primary" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Interactive Details + AI replies */}
+                  <div className="hidden flex-1 flex-col bg-bg-base p-5 md:flex">
+                    {/* Header */}
+                    <div className="border-b border-border-subtle pb-4">
+                      <h3 className="text-sm font-bold text-text-primary">{mockEmails[selectedEmail]?.subj}</h3>
+                      <p className="text-xs text-text-secondary mt-1">From: <span className="font-semibold">{mockEmails[selectedEmail]?.from}</span></p>
+                    </div>
+
+                    {/* Body */}
+                    <div className="flex-1 py-4 text-xs text-text-secondary leading-relaxed overflow-y-auto">
+                      {mockEmails[selectedEmail]?.body}
+                    </div>
+
+                    {/* Dynamic AI Co-Pilot block */}
+                    <div className="rounded-xl border border-border-default bg-bg-raised p-4 shadow-sm">
+                      <div className="flex items-center justify-between pb-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-text-primary">✨ AI Smart Reply</span>
+                        </div>
+
+                        {aiDraftState === "idle" && (
+                          <button
+                            onClick={() => triggerAiDraft(selectedEmail)}
+                            className="rounded-lg bg-accent-primary px-3 py-1.5 text-xs font-semibold text-text-inverse hover:bg-accent-primary-hover transition-colors"
+                          >
+                            Draft Reply
+                          </button>
+                        )}
+                      </div>
+
+                      {aiDraftState !== "idle" && (
+                        <div className="rounded-lg bg-bg-surface p-3 border border-border-subtle text-xs text-text-primary min-h-[50px] font-sans">
+                          {aiText}
+                          {aiDraftState === "typing" && (
+                            <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-accent-primary animate-pulse align-middle" />
+                          )}
+                        </div>
+                      )}
+
+                      {aiDraftState === "done" && (
+                        <div className="mt-2.5 flex items-center justify-between">
+                          <span className="text-[10px] text-accent-success font-semibold flex items-center gap-1">
+                            ✓ Ready to send
+                          </span>
+                          <button 
+                            onClick={() => setAiDraftState("idle")} 
+                            className="text-[10px] text-text-tertiary hover:text-text-primary font-medium"
+                          >
+                            Reset
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                // CALENDAR WORKFLOW VIEW
+                <div className="flex w-full flex-col bg-bg-raised p-6 overflow-hidden">
+                  <div className="flex items-center justify-between border-b border-border-subtle pb-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-text-primary">Google Calendar</h3>
+                      <p className="text-xs text-text-tertiary">Unified daily schedule</p>
+                    </div>
+                    <span className="rounded bg-bg-surface border border-border-default px-3 py-1 text-xs font-bold text-text-primary">
+                      Tuesday, Jun 16
+                    </span>
+                  </div>
+
+                  {/* Hourly mock blocks */}
+                  <div className="flex-1 overflow-y-auto py-4 space-y-3">
+                    {[
+                      { time: "09:00 AM", event: "Weekly Development Alignment", tag: "Calendar", color: "border-text-secondary bg-bg-surface/50 text-text-primary" },
+                      { time: "11:00 AM", event: "Client Feedback Call", tag: "Email Invite Sync", color: "border-text-primary bg-bg-surface text-text-primary" },
+                      { time: "12:30 PM", event: "Team Lunch & Sync", tag: "Calendar", color: "border-text-secondary bg-bg-surface/50 text-text-primary" },
+                      { time: "02:00 PM", event: "Deep Work: Landing Page builds", tag: "Focus Time", color: "border-text-primary bg-bg-surface text-text-primary font-semibold" },
+                    ].map((item, idx) => (
+                      <div key={idx} className={`flex items-start gap-4 rounded-xl border-l-4 p-3 shadow-xs ${item.color} border-border-default`}>
+                        <div className="w-20 text-xs font-bold opacity-80">{item.time}</div>
+                        <div className="flex-1">
+                          <h4 className="text-xs font-bold">{item.event}</h4>
+                          <span className="inline-block mt-1 rounded bg-bg-raised px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-text-secondary border border-border-default">
+                            {item.tag}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </div>
+          
+          <div className="mt-4 text-center text-xs text-text-tertiary italic">
+            💡 Switch tabs or select emails to test the workflow demo!
           </div>
         </div>
       </section>
 
-      {/* ══════════════════ STATS ══════════════════ */}
+      {/* ══════════════════ STATS / METRICS SECTION ══════════════════ */}
       <section id="stats" className="relative z-10 mx-auto mt-24 max-w-4xl px-6 md:px-12">
-        <div className="grid grid-cols-1 divide-y divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <div className="grid grid-cols-1 divide-y divide-border-subtle/80 overflow-hidden rounded-2xl border border-border-default bg-bg-raised shadow-xs sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           {[
-            { value: stat1, label: "Faster email triage with AI" },
-            { value: stat2, label: "Reduction in tab-switching" },
-            { value: stat3, label: "Less time writing replies" },
+            { value: stat1, label: "Triage Speedup with AI" },
+            { value: stat2, label: "Tab-Switch Reduction" },
+            { value: stat3, label: "Writing Overhead Saved" },
           ].map(({ value, label }) => (
             <div key={label} className="flex flex-col items-center px-8 py-10">
               <span
                 ref={value.ref}
-                className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-5xl font-bold text-transparent"
+                className="bg-gradient-to-r from-text-primary to-text-secondary bg-clip-text text-5xl font-extrabold text-transparent"
               >
                 {value.display}
               </span>
-              <span className="mt-2 text-center text-sm text-white/50">{label}</span>
+              <span className="mt-2 text-center text-sm font-semibold text-text-secondary">{label}</span>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ══════════════════ FEATURES ══════════════════ */}
+      {/* ══════════════════ FEATURES GRID ══════════════════ */}
       <section id="features" className="relative z-10 mx-auto mt-32 max-w-7xl px-6 md:px-12 lg:px-20">
-        {/* Section header */}
+        
         <div className="mb-16 text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-4 py-1.5 text-xs font-medium text-violet-300">
-            Everything you need
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border-default bg-bg-surface px-4 py-1.5 text-xs font-bold text-text-primary">
+            Work Smarter
           </div>
-          <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
-            Built for people who{" "}
-            <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
-              live in their inbox
+          <h2 className="text-3xl font-bold tracking-tight text-text-primary sm:text-4xl md:text-5xl">
+            Fusing mail and calendar into{" "}
+            <span className="bg-gradient-to-r from-text-primary via-text-secondary to-text-primary bg-clip-text text-transparent">
+              one seamless workflow
             </span>
           </h2>
-          <p className="mx-auto mt-4 max-w-xl text-white/50">
-            Every feature in Singularity is designed around one idea — your time is precious.
+          <p className="mx-auto mt-4 max-w-xl text-sm text-text-secondary">
+            Never click back-and-forth between tabs again. Live, track, and draft with high performance.
           </p>
         </div>
 
-        {/* Feature grid */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((f, i) => (
             <div
               key={f.title}
-              className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/8 hover:shadow-2xl hover:shadow-black/40"
-              style={{ animationDelay: `${i * 80}ms` }}
+              className="group relative overflow-hidden rounded-2xl border border-border-default bg-bg-raised p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-accent-primary hover:shadow-lg"
             >
-              {/* Icon */}
-              <div className={`mb-5 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${f.color} text-white shadow-lg`}>
+              <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-bg-surface border border-border-default text-text-primary shadow-xs">
                 {f.icon}
               </div>
-              <h3 className="mb-2 text-base font-semibold text-white">{f.title}</h3>
-              <p className="text-sm leading-relaxed text-white/50">{f.desc}</p>
-              {/* Hover glow */}
-              <div className={`pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-gradient-to-br ${f.color} opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-20`} />
+              <h3 className="mb-2 text-base font-bold text-text-primary">{f.title}</h3>
+              <p className="text-sm leading-relaxed text-text-secondary">{f.desc}</p>
             </div>
           ))}
         </div>
@@ -386,107 +584,89 @@ export default function LandingPage() {
       {/* ══════════════════ HOW IT WORKS ══════════════════ */}
       <section id="how-it-works" className="relative z-10 mx-auto mt-32 max-w-4xl px-6 md:px-12">
         <div className="mb-16 text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1.5 text-xs font-medium text-blue-300">
-            Get started in 60 seconds
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border-default bg-bg-surface px-4 py-1.5 text-xs font-bold text-text-primary">
+            Frictionless Setup
           </div>
-          <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
-            Three steps to{" "}
-            <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-              inbox zero
-            </span>
+          <h2 className="text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">
+            Get started in 3 simple steps
           </h2>
         </div>
 
         <div className="relative space-y-6">
-          {/* Vertical line */}
-          <div className="absolute left-6 top-8 h-[calc(100%-4rem)] w-px bg-gradient-to-b from-indigo-500/50 via-violet-500/30 to-transparent" />
+          <div className="absolute left-6 top-8 h-[calc(100%-4rem)] w-px bg-border-default" />
 
           {[
             {
               step: "01",
               title: "Connect your Google account",
-              desc: "One click. We request only the Gmail and Calendar scopes we need — nothing more.",
-              color: "from-indigo-500 to-violet-600",
+              desc: "Quickly sign in with Google. We request secure OAuth access exclusively for email and calendar functionalities.",
             },
             {
               step: "02",
-              title: "Your inbox loads instantly",
-              desc: "Singularity fetches and intelligently organises your threads, labels, and calendar events in real time.",
-              color: "from-violet-500 to-purple-600",
+              title: "Sync inbox and calendar",
+              desc: "Singularity instantly populates your primary mail threads, drafts, sent messages, and upcoming schedule events.",
             },
             {
               step: "03",
-              title: "Let the AI do the heavy lifting",
-              desc: "Ask it to draft, summarise, schedule, or archive. The AI Co-Pilot handles the mundane so you can focus on what matters.",
-              color: "from-fuchsia-500 to-pink-600",
+              title: "Command with AI Co-Pilot",
+              desc: "Draft replies, write, schedule, or read digests in seconds using inline AI agent capabilities.",
             },
-          ].map(({ step, title, desc, color }) => (
-            <div key={step} className="relative flex items-start gap-6 pl-0">
-              {/* Step indicator */}
-              <div className={`relative z-10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${color} text-sm font-bold text-white shadow-lg`}>
+          ].map(({ step, title, desc }) => (
+            <div key={step} className="relative flex items-start gap-6">
+              <div className="relative z-10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-accent-primary text-sm font-bold text-text-inverse shadow-sm">
                 {step}
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
-                <h3 className="mb-1.5 text-base font-semibold text-white">{title}</h3>
-                <p className="text-sm leading-relaxed text-white/50">{desc}</p>
+              <div className="rounded-2xl border border-border-default bg-bg-raised p-5 shadow-xs flex-1">
+                <h3 className="mb-1.5 text-sm font-bold text-text-primary">{title}</h3>
+                <p className="text-xs leading-relaxed text-text-secondary">{desc}</p>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ══════════════════ CTA SECTION ══════════════════ */}
+      {/* ══════════════════ CTA CARD ══════════════════ */}
       <section className="relative z-10 mx-auto mt-32 max-w-4xl px-6 pb-32 md:px-12">
-        <div className="relative overflow-hidden rounded-3xl border border-indigo-500/30 bg-gradient-to-br from-indigo-950/80 via-violet-950/60 to-purple-950/80 p-12 text-center backdrop-blur-xl">
-          {/* Background orbs */}
-          <div className="pointer-events-none absolute -left-20 -top-20 h-64 w-64 rounded-full bg-indigo-600/30 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-violet-600/20 blur-3xl" />
+        <div className="relative overflow-hidden rounded-3xl border border-border-default bg-bg-raised p-12 text-center shadow-md">
+          <div className="pointer-events-none absolute -left-20 -top-20 h-64 w-64 rounded-full bg-border-default/10 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-border-subtle/10 blur-3xl" />
 
-          <h2 className="relative text-4xl font-bold tracking-tight text-white md:text-5xl">
-            Take back your{" "}
-            <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
-              inbox
-            </span>
+          <h2 className="relative text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">
+            Reclaim your focus.
           </h2>
-          <p className="relative mx-auto mt-4 max-w-lg text-white/55">
-            Join people who have made Singularity their single source of truth for
-            email and calendar. It only takes a minute to get started.
+          <p className="relative mx-auto mt-4 max-w-md text-sm text-text-secondary leading-relaxed">
+            Unify your communication hub today. Experience next-generation productivity with Singularity.
           </p>
 
-          <div className="relative mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+          <div className="relative mt-8 flex justify-center">
             <Link
               href="/login"
               id="cta-final-btn"
-              className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-8 py-4 text-base font-semibold text-white shadow-xl shadow-indigo-600/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-indigo-600/50"
+              className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-accent-primary px-8 py-4 text-base font-semibold text-text-inverse shadow-md hover:bg-accent-primary-hover hover:-translate-y-0.5 transition-all duration-200"
             >
-              <span>Get started — it's free</span>
-              <svg className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <span>Get started for free</span>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
               </svg>
-              <span className="animate-shimmer absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
             </Link>
           </div>
-
-          <p className="relative mt-5 text-xs text-white/25">
-            No credit card · No vendor lock-in · Cancel anytime
-          </p>
         </div>
       </section>
 
       {/* ══════════════════ FOOTER ══════════════════ */}
-      <footer className="relative z-10 border-t border-white/10 px-6 py-10 md:px-12">
+      <footer className="relative z-10 border-t border-border-subtle bg-bg-raised px-6 py-10 md:px-12">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600">
-              <span className="text-sm font-bold text-white">S</span>
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-primary text-text-inverse">
+              <span className="text-sm font-bold">S</span>
             </div>
-            <span className="text-sm font-medium text-white/60">Singularity</span>
+            <span className="text-sm font-semibold text-text-primary">Singularity</span>
           </div>
-          <p className="text-xs text-white/30">
-            © {new Date().getFullYear()} Singularity. Your mail and calendar workflow, unified.
+          <p className="text-xs text-text-tertiary">
+            © {new Date().getFullYear()} Singularity. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
-            <Link href="/login" className="text-xs text-white/40 transition-colors hover:text-white/70">
+            <Link href="/login" className="text-xs font-semibold text-text-secondary hover:text-text-primary transition-colors">
               Sign In
             </Link>
           </div>
