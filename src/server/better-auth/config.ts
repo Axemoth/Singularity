@@ -31,7 +31,7 @@ export const auth = betterAuth({
         checkout({
           products: [
             {
-              productId: "pdt_0NhAlnKliQs6ArMGzCaEV",
+              productId: "pdt_0NhC6bRf99ugDrKx11htS",
               slug: "premium-plan",
             },
           ],
