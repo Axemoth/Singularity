@@ -115,7 +115,10 @@ export default function LoginForm() {
           )}
 
           <p className="mt-6 text-center text-xs text-text-tertiary">
-            By signing in you agree to connect your Gmail & Google Calendar.
+            By signing in, you agree to our{" "}
+            <Link href="/terms" className="underline hover:text-text-secondary transition-colors">Terms of Service</Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="underline hover:text-text-secondary transition-colors">Privacy Policy</Link>.
             <br />
             We only request the permissions we need.
           </p>

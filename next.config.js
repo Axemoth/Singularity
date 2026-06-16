@@ -6,7 +6,6 @@ import "./src/env.js";
 
 /** @type {import("next").NextConfig} */
 const config = {
-  output: "standalone",
   serverExternalPackages: ["@mastra/core", "@corsair-dev/mcp", "express"],
   eslint: {
     ignoreDuringBuilds: true,

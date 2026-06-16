@@ -669,6 +669,12 @@ export default function LandingPage() {
             <Link href="/login" className="text-xs font-semibold text-text-secondary hover:text-text-primary transition-colors">
               Sign In
             </Link>
+            <Link href="/privacy" className="text-xs font-semibold text-text-secondary hover:text-text-primary transition-colors">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="text-xs font-semibold text-text-secondary hover:text-text-primary transition-colors">
+              Terms of Service
+            </Link>
           </div>
         </div>
       </footer>
