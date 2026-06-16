@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "../theme-provider";
+import { authClient } from "@/server/better-auth/client";
 
 /* ─────────────────────────────────────────
    Feature cards data
@@ -100,6 +101,67 @@ function useCountUp(target: number, duration = 1800, suffix = "") {
 export default function LandingPage() {
   const { theme, toggleTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
+
+  // Auth & Billing States
+  const { data: sessionData } = authClient.useSession();
+  const [subscription, setSubscription] = useState<any>(null);
+  const [isBillingLoading, setIsBillingLoading] = useState(false);
+
+  useEffect(() => {
+    if (sessionData?.user) {
+      setIsBillingLoading(true);
+      authClient.dodopayments.customer.subscriptions.list({
+        query: { limit: 10 }
+      })
+      .then(({ data, error }: any) => {
+        if (data && data.items) {
+          const activeSub = data.items.find((sub: any) => sub.status === "active");
+          setSubscription(activeSub || null);
+        }
+        setIsBillingLoading(false);
+      })
+      .catch((err: any) => {
+        console.error("Error fetching subscriptions on landing:", err);
+        setIsBillingLoading(false);
+      });
+    }
+  }, [sessionData?.user]);
+
+  const handleUpgrade = async () => {
+    if (!sessionData?.user) {
+      window.location.href = "/login?redirect=/";
+      return;
+    }
+    try {
+      const { data, error } = await authClient.dodopayments.checkoutSession({
+        slug: "premium-plan",
+      });
+      if (error) {
+        alert("Billing setup failed: " + (error.message || "Unknown error"));
+        return;
+      }
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (err: any) {
+      alert("Error: " + (err.message || err));
+    }
+  };
+
+  const handleOpenBillingPortal = async () => {
+    try {
+      const { data, error } = await authClient.dodopayments.customer.portal();
+      if (error) {
+        alert("Failed to open billing portal: " + (error.message || "Unknown error"));
+        return;
+      }
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (err: any) {
+      alert("Error: " + (err.message || err));
+    }
+  };
 
   // Stats Counters
   const stat1 = useCountUp(10, 1600, "x");
@@ -578,6 +640,148 @@ export default function LandingPage() {
               <p className="text-sm leading-relaxed text-text-secondary">{f.desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ══════════════════ PRICING SECTION ══════════════════ */}
+      <section id="pricing" className="relative z-10 mx-auto mt-32 max-w-7xl px-6 md:px-12 lg:px-20">
+        <div className="mb-16 text-center">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border-default bg-bg-surface px-4 py-1.5 text-xs font-bold text-text-primary">
+            Simple, Transparent Pricing
+          </div>
+          <h2 className="text-3xl font-bold tracking-tight text-text-primary sm:text-4xl md:text-5xl">
+            Choose the plan that{" "}
+            <span className="bg-gradient-to-r from-text-primary via-text-secondary to-text-primary bg-clip-text text-transparent">
+              fits your workflow
+            </span>
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-sm text-text-secondary">
+            Unify your communications and schedule today. Upgrade to unlock full AI automation.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+          {/* Free Plan */}
+          <div className="flex flex-col rounded-3xl border border-border-default bg-bg-raised p-8 shadow-sm justify-between transition-all duration-300 hover:-translate-y-1">
+            <div>
+              <h3 className="text-lg font-bold text-text-primary">Free Tier</h3>
+              <p className="mt-2 text-xs text-text-tertiary">For individuals getting started.</p>
+              <div className="mt-4 flex items-baseline text-text-primary">
+                <span className="text-4xl font-extrabold tracking-tight">₹0</span>
+                <span className="ml-1 text-sm font-semibold text-text-secondary">/month</span>
+              </div>
+              <ul className="mt-6 space-y-4 text-xs text-text-secondary">
+                <li className="flex items-center gap-2">
+                  <span className="text-accent-success">✓</span> Unified Gmail Inbox
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-accent-success">✓</span> Google Calendar Sync
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-accent-success">✓</span> Standard view options
+                </li>
+              </ul>
+            </div>
+            <div className="mt-8">
+              <Link
+                href="/login"
+                className="block w-full text-center rounded-xl bg-bg-surface border border-border-default py-2.5 text-xs font-semibold text-text-primary hover:bg-bg-base transition-colors"
+              >
+                Get Started
+              </Link>
+            </div>
+          </div>
+
+          {/* Premium Plan */}
+          <div className="relative flex flex-col rounded-3xl border-2 border-accent-primary bg-bg-raised p-8 shadow-md justify-between transition-all duration-300 hover:-translate-y-1">
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-accent-primary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-text-inverse shadow-sm">
+              Popular — 49% Off
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-text-primary">Premium</h3>
+              <p className="mt-2 text-xs text-text-tertiary">For power users looking to automate their routine.</p>
+              <div className="mt-4 flex flex-col text-text-primary">
+                <div className="flex items-baseline">
+                  <span className="text-4xl font-extrabold tracking-tight">₹304.98</span>
+                  <span className="ml-1 text-sm font-semibold text-text-secondary">/month</span>
+                </div>
+                <span className="text-[11px] text-accent-primary font-semibold line-through mt-0.5">
+                  Regular ₹598.00/month
+                </span>
+              </div>
+              <ul className="mt-6 space-y-4 text-xs text-text-secondary">
+                <li className="flex items-center gap-2">
+                  <span className="text-accent-primary">✨</span> Advanced AI Co-Pilot
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-accent-primary">✨</span> Careful & Autonomous Modes
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-accent-primary">✨</span> Full Hourly Day View Timeline
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-accent-primary">✨</span> Click-to-Create pre-population
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-accent-primary">✨</span> Local Vector Search (Coming soon)
+                </li>
+              </ul>
+            </div>
+            <div className="mt-8">
+              {isBillingLoading ? (
+                <div className="w-full h-10 rounded-xl bg-bg-surface animate-pulse-subtle" />
+              ) : subscription ? (
+                <button
+                  onClick={handleOpenBillingPortal}
+                  className="block w-full text-center rounded-xl bg-bg-surface border border-border-default py-2.5 text-xs font-semibold text-text-primary hover:bg-bg-base transition-colors cursor-pointer"
+                >
+                  Manage Subscription
+                </button>
+              ) : (
+                <button
+                  onClick={handleUpgrade}
+                  className="block w-full text-center rounded-xl bg-accent-primary py-2.5 text-xs font-semibold text-text-inverse hover:bg-accent-primary-hover transition-all cursor-pointer"
+                >
+                  {sessionData?.user ? "Upgrade to Premium" : "Get Premium"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Business Plan */}
+          <div className="flex flex-col rounded-3xl border border-border-default bg-bg-raised p-8 shadow-sm justify-between transition-all duration-300 hover:-translate-y-1">
+            <div>
+              <h3 className="text-lg font-bold text-text-primary">Business</h3>
+              <p className="mt-2 text-xs text-text-tertiary">For teams and organizations.</p>
+              <div className="mt-4 flex items-baseline text-text-primary">
+                <span className="text-4xl font-extrabold tracking-tight">Custom</span>
+              </div>
+              <ul className="mt-6 space-y-4 text-xs text-text-secondary">
+                <li className="flex items-center gap-2">
+                  <span className="text-indigo-500">💼</span> Shared team calendars
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-indigo-500">💼</span> Enterprise-grade AI customization
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-indigo-500">💼</span> Higher rate limits and SLA
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-indigo-500">💼</span> Dedicated support channel
+                </li>
+              </ul>
+            </div>
+            <div className="mt-8">
+              <a
+                href="https://x.com/Axemoth"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full text-center rounded-xl bg-bg-surface border border-border-default py-2.5 text-xs font-semibold text-text-primary hover:bg-bg-base transition-colors"
+              >
+                Contact Sales
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 
