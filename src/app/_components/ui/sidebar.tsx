@@ -92,10 +92,10 @@ export function Sidebar() {
       {/* ─── Logo ─── */}
       <Link
         href="/inbox"
-        className="mb-4 flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-accent-primary text-text-inverse font-bold text-base select-none transition-transform duration-150 hover:scale-105 active:scale-95"
+        className="mb-4 flex h-9 w-9 overflow-hidden items-center justify-center rounded-[var(--radius-md)] bg-accent-primary text-text-inverse select-none transition-transform duration-150 hover:scale-105 active:scale-95"
         aria-label="Singularity home"
       >
-        S
+        <img src="/logo.png" alt="Singularity Logo" className="h-full w-full object-cover" />
       </Link>
 
       <Tooltip content="Compose" shortcut="C" position="right">

@@ -61,9 +61,9 @@ export default function LoginForm() {
 
           {/* Logo */}
           <div className="relative flex flex-col items-center">
-            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-accent-primary text-text-inverse shadow-md">
+            <div className="relative flex h-16 w-16 overflow-hidden items-center justify-center rounded-2xl bg-accent-primary text-text-inverse shadow-md">
               <span className="animate-shimmer absolute inset-0 -skew-x-12 rounded-2xl bg-gradient-to-r from-transparent via-text-inverse/10 to-transparent" />
-              <span className="relative text-3xl font-bold leading-none tracking-tight">S</span>
+              <img src="/logo.png" alt="Singularity Logo" className="relative z-10 h-full w-full object-cover" />
             </div>
 
             <h1 className="mt-6 text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">Singularity</h1>

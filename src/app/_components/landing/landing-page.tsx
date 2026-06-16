@@ -200,8 +200,8 @@ export default function LandingPage() {
           
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-primary text-text-inverse shadow-sm">
-              <span className="text-lg font-bold leading-none">S</span>
+            <div className="flex h-9 w-9 overflow-hidden items-center justify-center rounded-xl bg-accent-primary text-text-inverse shadow-sm">
+              <img src="/logo.png" alt="Singularity Logo" className="h-full w-full object-cover" />
             </div>
             <span className="text-lg font-semibold tracking-tight text-text-primary">
               Singularity
@@ -657,8 +657,8 @@ export default function LandingPage() {
       <footer className="relative z-10 border-t border-border-subtle bg-bg-raised px-6 py-10 md:px-12">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-primary text-text-inverse">
-              <span className="text-sm font-bold">S</span>
+            <div className="flex h-7 w-7 overflow-hidden items-center justify-center rounded-lg bg-accent-primary text-text-inverse">
+              <img src="/logo.png" alt="Singularity Logo" className="h-full w-full object-cover" />
             </div>
             <span className="text-sm font-semibold text-text-primary">Singularity</span>
           </div>
