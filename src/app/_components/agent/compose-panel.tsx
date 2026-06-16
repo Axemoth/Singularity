@@ -260,6 +260,7 @@ export function ComposePanel() {
   // Right column AI copilot state
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
+  const [isReasoningEnabled, setIsReasoningEnabled] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
@@ -497,6 +498,7 @@ If you are only asking a question or cannot draft the email yet, do NOT output t
       context: {
         route: pathname,
       },
+      reasoningEnabled: isReasoningEnabled,
     });
   };
 
@@ -763,7 +765,7 @@ If you are only asking a question or cannot draft the email yet, do NOT output t
             </div>
 
             {/* Input Form */}
-            <form onSubmit={handleChatSubmit} className="flex gap-2 items-end">
+            <form onSubmit={handleChatSubmit} className="flex flex-col gap-2 rounded-xl border border-border-default bg-bg-inset p-2 focus-within:border-accent-primary transition-colors focus-within:bg-bg-base">
               <textarea
                 ref={chatInputRef}
                 value={aiInput}
@@ -776,15 +778,43 @@ If you are only asking a question or cannot draft the email yet, do NOT output t
                 }}
                 rows={2}
                 placeholder="Ask AI to write, rewrite, or polish your email..."
-                className="border border-border-default bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary min-h-[44px] flex-1 resize-none rounded-[var(--radius-md)] px-3 py-2 text-xs transition-colors outline-none focus:bg-bg-base"
+                className="bg-transparent text-text-primary placeholder:text-text-tertiary w-full resize-none px-2 py-1 text-xs outline-none border-none focus:ring-0"
               />
-              <Button
-                type="submit"
-                isLoading={chat.isPending}
-                className="h-[44px] px-4 cursor-pointer font-semibold uppercase tracking-wider text-[10px]"
-              >
-                Send
-              </Button>
+              <div className="flex items-center justify-between px-1 border-t border-border-subtle/50 pt-2">
+                {/* Deepthink Toggle */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsReasoningEnabled(!isReasoningEnabled)}
+                    title="Use Flash model for fast response and Pro model for more in depth response"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10.5px] font-semibold transition-all cursor-pointer ${
+                      isReasoningEnabled
+                        ? "bg-accent-primary/10 text-accent-primary border border-accent-primary/25"
+                        : "text-text-tertiary hover:text-text-secondary border border-transparent"
+                    }`}
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.467 5.99 5.99 0 0 0-1.925 3.546 5.974 5.974 0 0 1-2.133-1A3.75 3.75 0 0 0 12 18Z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364.364l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547Z" />
+                    </svg>
+                    Deepthink
+                  </button>
+                  <span className="text-[10px] text-text-tertiary hidden sm:inline-block leading-none">
+                    {isReasoningEnabled 
+                      ? "Pro model: in-depth response" 
+                      : "Flash model: fast response"}
+                  </span>
+                </div>
+
+                <Button
+                  type="submit"
+                  isLoading={chat.isPending}
+                  size="sm"
+                  className="font-semibold px-4 py-1.5 text-xs"
+                >
+                  Send
+                </Button>
+              </div>
             </form>
           </div>
         </section>

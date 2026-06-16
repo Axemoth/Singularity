@@ -587,6 +587,50 @@ export const gmailRouter = createTRPCRouter({
       }
     }),
 
+  getModelMode: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    try {
+      const [settings] = await ctx.db
+        .select({ modelMode: userSettings.modelMode })
+        .from(userSettings)
+        .where(eq(userSettings.userId, userId))
+        .limit(1);
+      return settings?.modelMode ?? "careful";
+    } catch (err: any) {
+      console.error("Failed to get model mode settings:", err);
+      return "careful";
+    }
+  }),
+
+  setModelMode: protectedProcedure
+    .input(z.object({ mode: z.enum(["careful", "autonomous"]) }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      try {
+        await ctx.db
+          .insert(userSettings)
+          .values({
+            userId,
+            modelMode: input.mode,
+            updatedAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: userSettings.userId,
+            set: {
+              modelMode: input.mode,
+              updatedAt: new Date(),
+            },
+          });
+        return { success: true };
+      } catch (err: any) {
+        console.error("Failed to set model mode:", err);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to update model mode: ${err.message || err}`,
+        });
+      }
+    }),
+
   getContacts: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
     try {

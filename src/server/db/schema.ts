@@ -171,6 +171,7 @@ export const userSettings = pgTable("user_settings", {
     .default(true),
   priorityInstructions: text("priority_instructions"),
   username: text("username"),
+  modelMode: text("model_mode").notNull().default("careful"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

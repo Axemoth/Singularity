@@ -168,12 +168,23 @@ export const agentRouter = createTRPCRouter({
           )
           .optional(),
         context: agentContextSchema,
+        reasoningEnabled: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
       try {
+        const { userSettings } = await import("@/server/db/schema");
+        const { eq } = await import("drizzle-orm");
+
+        const [settings] = await ctx.db
+          .select({ modelMode: userSettings.modelMode })
+          .from(userSettings)
+          .where(eq(userSettings.userId, userId))
+          .limit(1);
+        const modelMode = settings?.modelMode ?? "careful";
+
         let didExecuteWriteTool = false;
         const provider = new MastraProvider();
         const toolsList = await provider.build({ corsair: corsair.withTenant(userId) });
@@ -354,7 +365,7 @@ export const agentRouter = createTRPCRouter({
           },
         });
 
-        // System instructions (completely static to maximize DeepSeek prompt caching)
+        // System instructions (completely static to maximize DeepSeek/Gemini prompt caching)
         const instructions = `You have access to Corsair tools. Use list_operations to discover available APIs, get_schema to understand required arguments, and run_script to execute them.
 The 'corsair' variable is already pre-scoped to your active tenant, so you must NOT call '.withTenant()' yourself. Simply run operations directly on 'corsair', e.g. const res = await corsair.gmail.api.threads.list({}); return res;
 
@@ -364,17 +375,28 @@ For sending emails, ALWAYS use the first-party 'send_email' tool instead of atte
 For saving drafts, ALWAYS use the first-party 'create_draft' tool.
 
 CRITICAL INTERACTION INSTRUCTIONS:
-1. Clarifying Questions: If there is ANY ambiguity, if you need clarification (e.g. deciding which email to reply to when multiple exist, deciding what content or tone to use, confirming dates, or choosing actions), or if you are midway through planning but lack specific details, do NOT guess. You must immediately stop your planning/execution and output a clear, user-friendly question to the user asking for the missing information. Asking clarifying questions is highly encouraged and preferred over making incorrect actions.
-2. Semantic Email Search: When the user asks to search emails or calendar events (e.g. 'find flight bookings from last month', 'show invoices from AWS', or 'unread emails from boss'), always use 'search_local' first. 
+1. Model Behavior Mode: You are currently running in **${modelMode === "careful" ? "CAREFUL (REVIEW)" : "AUTONOMOUS (AUTOPILOT)"}** mode.
+   ${
+     modelMode === "careful"
+       ? `For sending emails: Even if the user says "send it" or "send email", do NOT call the "send_email" tool directly. Instead, you MUST create a draft using the "create_draft" tool first, and then tell the user you've saved it as a draft for their review. Alternatively, ask the user to confirm the action before calling send_email. You are in "Careful / Review Mode" by default.
+For calendar events: Do not execute write script actions directly. Proactively ask the user for confirmation first.`
+       : `For sending emails: If the user gives a clear instruction to send (e.g. "send this email" or "send it"), you can call the "send_email" tool directly to execute the action immediately.
+For calendar events: If the instructions are clear, you can execute the write script actions directly without asking for an extra confirmation button.
+HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule a meeting" without time, or "email John" without body/subject), you MUST still stop and ask clarifying questions using multiple-choice options. You are in "Autonomous Mode".`
+   }
+2. Clarifying Questions & Proactive MCQs: If there is ANY ambiguity, or if you need clarification (e.g., when given abstract requests like "schedule zoom event at 18 june" without time/location, or "email John" without subject/body), do NOT guess and do NOT ask open-ended questions. Instead, immediately propose specific options (e.g., times, location options, template tones, or subjects) as multiple-choice buttons at the end of your response so the user can select them with a single click. Proactively organize multiple missing parameters into structured options. This applies even in Autonomous mode!
+3. Multi-choice Options Format: When asking clarifying options, format each choice exactly as '[Option: Option Text]' on a new line at the very end of your response.
+   Example:
+   "I see you want to schedule a Zoom event on June 18. What time would you prefer?"
+   [Option: June 18 at 10:00 AM]
+   [Option: June 18 at 2:00 PM]
+   [Option: June 18 at 4:30 PM]
+   [Option: Specify custom time]
+4. Semantic Email Search: When the user asks to search emails or calendar events (e.g. 'find flight bookings from last month', 'show invoices from AWS', or 'unread emails from boss'), always use 'search_local' first. 
    - Parse the search results returned (which contain sender, subject, snippet, and epoch ms timestamps).
    - In your thinking, filter and sort these results to match the user's constraints (e.g. filtering out items that are not from AWS or not within the last month).
    - Format the results beautifully in your response using markdown: use bold headers for subjects, italics for senders and dates (convert epoch ms to readable dates like 'June 12, 2026'), and use blockquotes (e.g. '> snippet...') for the content snippet to display them like rich cards in the chat UI.
-3. Tool Confirmations: After successfully calling 'send_email' or 'create_draft', you MUST always output an explicit, friendly confirmation message to the user confirming the action was successful (e.g. 'I have successfully sent the email to [recipient] with the subject "[subject]".' or 'I have saved your draft for [recipient] with the subject "[subject]".'). Do NOT output an empty response.
-4. Multi-choice Options: If you want to ask the user's opinion, options, or choices mid-chat (e.g., asking how they want to rewrite an email, or asking to select between choices), format each choice as '[Option: Option Text]' on a new line at the very end of your response. For example:
-   'What tone would you prefer for this email?
-   [Option: Professional and formal]
-   [Option: Casual and friendly]
-   [Option: Direct and short]'`;
+5. Tool Confirmations: After successfully calling 'send_email' or 'create_draft', you MUST always output an explicit, friendly confirmation message to the user confirming the action was successful (e.g. 'I have successfully sent the email to [recipient] with the subject "[subject]".' or 'I have saved your draft for [recipient] with the subject "[subject]".'). Do NOT output an empty response.`;
         const contextPrompt = buildContextPrompt(input.context);
 
         const historyMessages = (input.history ?? []).map((msg) => {
@@ -402,16 +424,28 @@ CRITICAL INTERACTION INSTRUCTIONS:
 
         const messagesList = [...historyMessages, promptMsg];
 
-        const models = [
-          (deepseek as any).chat("deepseek-v4-pro", {
-            extraBody: {
-              thinking: { type: "enabled" },
-              reasoning_effort: "high",
-            },
-          }),
-          google("gemini-2.5-flash"),
-          google("gemini-2.5-flash-lite"),
-        ];
+        const models = input.reasoningEnabled
+          ? [
+              (deepseek as any).chat("deepseek-v4-pro", {
+                extraBody: {
+                  thinking: { type: "enabled" },
+                  reasoning_effort: "high",
+                },
+              }),
+              google("gemini-2.5-flash"),
+              google("gemini-2.5-flash-lite"),
+            ]
+          : [
+              (deepseek as any).chat("deepseek-v4-flash"),
+              google("gemini-2.5-flash"),
+              google("gemini-2.5-flash-lite"),
+              (deepseek as any).chat("deepseek-v4-pro", {
+                extraBody: {
+                  thinking: { type: "enabled" },
+                  reasoning_effort: "high",
+                },
+              }),
+            ];
 
         let response;
         let lastError: unknown = null;

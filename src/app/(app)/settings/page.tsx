@@ -80,6 +80,9 @@ export default function SettingsPage() {
   const { data: dbUsername } = api.gmail.getUsername.useQuery(undefined, {
     enabled: !!sessionData?.user,
   });
+  const { data: dbModelMode } = api.gmail.getModelMode.useQuery(undefined, {
+    enabled: !!sessionData?.user,
+  });
 
   // Effects to sync settings input
   useEffect(() => {
@@ -107,6 +110,12 @@ export default function SettingsPage() {
     onSuccess: () => {
       void utils.gmail.getUsername.invalidate();
       setIsEditingUsername(false);
+    },
+  });
+
+  const setModelModeMutation = api.gmail.setModelMode.useMutation({
+    onSuccess: () => {
+      void utils.gmail.getModelMode.invalidate();
     },
   });
 
@@ -338,6 +347,68 @@ export default function SettingsPage() {
                   <div className="bg-bg-surface/50 border border-border-subtle rounded-[var(--radius-md)] p-3 text-xs text-text-secondary italic leading-relaxed font-medium">
                     "{dbPriorityRules}"
                   </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Model Behavior Settings Card */}
+        {sessionData?.user && (
+          <div className="glass rounded-2xl border border-border-default overflow-hidden animate-fade-in">
+            <div className="border-b border-border-subtle p-5 bg-bg-raised/40">
+              <h2 className="text-base font-semibold text-text-primary">AI Agent Behavior</h2>
+              <p className="text-xs text-text-tertiary mt-0.5">
+                Configure how the AI agent handles actions like sending emails or scheduling events.
+              </p>
+            </div>
+
+            <div className="p-5 flex flex-col gap-4">
+              <div className="flex flex-col gap-3">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                  Operation Mode
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Careful Mode */}
+                  <button
+                    type="button"
+                    onClick={() => setModelModeMutation.mutate({ mode: "careful" })}
+                    className={`flex flex-col text-left p-4 rounded-xl border transition-all cursor-pointer bg-bg-surface/30 ${
+                      dbModelMode === "careful"
+                        ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                        : "border-border-default text-text-secondary hover:bg-bg-surface/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-semibold text-sm">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                      Careful Mode (Review Drafts)
+                    </div>
+                    <p className="text-[11px] text-text-tertiary mt-1.5 leading-relaxed">
+                      Default. The agent will always ask for your review or save a draft in Gmail before executing any write actions. Ideal for safety.
+                    </p>
+                  </button>
+
+                  {/* Autonomous Mode */}
+                  <button
+                    type="button"
+                    onClick={() => setModelModeMutation.mutate({ mode: "autonomous" })}
+                    className={`flex flex-col text-left p-4 rounded-xl border transition-all cursor-pointer bg-bg-surface/30 ${
+                      dbModelMode === "autonomous"
+                        ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                        : "border-border-default text-text-secondary hover:bg-bg-surface/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-semibold text-sm">
+                      <span className="h-2 w-2 rounded-full bg-indigo-500" />
+                      Autonomous Mode (Autopilot)
+                    </div>
+                    <p className="text-[11px] text-text-tertiary mt-1.5 leading-relaxed">
+                      The agent will execute write actions (sending emails, scheduling calendar events) directly when instructed. It will still ask questions if requirements are vague or ambiguous.
+                    </p>
+                  </button>
+                </div>
+                {setModelModeMutation.isPending && (
+                  <p className="text-[10px] text-accent-primary animate-pulse mt-1 font-medium">Updating agent settings...</p>
                 )}
               </div>
             </div>

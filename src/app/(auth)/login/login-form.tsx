@@ -12,22 +12,6 @@ export default function LoginForm() {
     });
   };
 
-  const handleDevLogin = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    try {
-      const res = await fetch("/api/auth/dev-login", {
-        method: "POST",
-      });
-      if (res.ok) {
-        window.location.href = "/inbox";
-      } else {
-        alert("Dev login failed: " + (await res.text()));
-      }
-    } catch (err) {
-      alert("Error logging in: " + err);
-    }
-  };
-
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-bg-base text-text-primary transition-colors duration-300">
       
@@ -91,28 +75,6 @@ export default function LoginForm() {
               Continue with Google
             </button>
           </form>
-
-          {/* Dev bypass */}
-          {process.env.NODE_ENV === "development" && (
-            <>
-              <div className="my-4 flex items-center gap-3">
-                <div className="h-px flex-1 bg-border-default" />
-                <span className="text-xs text-text-tertiary">dev only</span>
-                <div className="h-px flex-1 bg-border-default" />
-              </div>
-              <button
-                type="button"
-                id="dev-login-btn"
-                onClick={handleDevLogin}
-                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-accent-primary px-5 py-3 text-sm font-semibold text-text-inverse hover:bg-accent-primary-hover transition-all duration-200"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
-                </svg>
-                Developer Bypass
-              </button>
-            </>
-          )}
 
           <p className="mt-6 text-center text-xs text-text-tertiary">
             By signing in, you agree to our{" "}
