@@ -261,6 +261,8 @@ export function ComposePanel() {
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
   const [isReasoningEnabled, setIsReasoningEnabled] = useState(false);
+  const [customInputMsgId, setCustomInputMsgId] = useState<string | null>(null);
+  const [customInputVal, setCustomInputVal] = useState("");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
@@ -706,17 +708,60 @@ If you are only asking a question or cannot draft the email yet, do NOT output t
 
                   {/* Option Buttons */}
                   {options.length > 0 && message.role === "assistant" && (
-                    <div className="flex flex-wrap gap-2 mt-2 max-w-[90%]">
-                      {options.map((opt, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => submitAiMessage(opt)}
-                          className="border border-accent-primary text-accent-primary hover:bg-accent-primary/10 bg-bg-surface rounded-full px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
-                        >
-                          {opt}
-                        </button>
-                      ))}
+                    <div className="flex flex-wrap gap-2 mt-2 max-w-[90%] items-center">
+                      {options.map((opt, idx) => {
+                        const isCustom = opt.toLowerCase().includes("custom") || opt.toLowerCase().includes("specify");
+                        if (isCustom && customInputMsgId === message.id) {
+                          return (
+                            <div key={idx} className="flex gap-2 items-center bg-bg-surface border border-accent-primary/45 rounded-xl p-1 animate-fade-in w-full max-w-sm">
+                              <input
+                                type="text"
+                                value={customInputVal}
+                                onChange={(e) => setCustomInputVal(e.target.value)}
+                                placeholder="Type your custom response..."
+                                className="bg-transparent text-xs text-text-primary px-2 py-1 outline-none border-none flex-1 min-w-0"
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    submitAiMessage(customInputVal);
+                                    setCustomInputMsgId(null);
+                                    setCustomInputVal("");
+                                  }
+                                }}
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  submitAiMessage(customInputVal);
+                                  setCustomInputMsgId(null);
+                                  setCustomInputVal("");
+                                }}
+                                className="bg-accent-primary text-text-inverse text-xs px-3 py-1.5 rounded-lg font-semibold cursor-pointer shrink-0"
+                              >
+                                Submit
+                              </button>
+                            </div>
+                          );
+                        }
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              if (isCustom) {
+                                setCustomInputMsgId(message.id);
+                                setCustomInputVal("");
+                              } else {
+                                submitAiMessage(opt);
+                              }
+                            }}
+                            className="border border-accent-primary text-accent-primary hover:bg-accent-primary/10 bg-bg-surface rounded-full px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
 

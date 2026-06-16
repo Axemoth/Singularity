@@ -365,6 +365,100 @@ export const agentRouter = createTRPCRouter({
           },
         });
 
+        const searchContactsTool = createTool({
+          id: "search_contacts",
+          description: "Search for contacts (name and email) in the local cache to resolve email addresses.",
+          inputSchema: z.object({
+            query: z.string().describe("The name or part of the email address to search for (e.g., 'Dipti')"),
+          }),
+          execute: async ({ query }) => {
+            console.log(`[search_contacts tool] Searching contacts for query: "${query}" via tenant ${userId}...`);
+            try {
+              const { corsairEntities, corsairAccounts } = await import("@/server/db/schema");
+              const { eq, and } = await import("drizzle-orm");
+
+              const threads = await ctx.db
+                .select({ data: corsairEntities.data })
+                .from(corsairEntities)
+                .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
+                .where(
+                  and(
+                    eq(corsairAccounts.tenantId, userId),
+                    eq(corsairEntities.entityType, "threads")
+                  )
+                );
+
+              const contactMap = new Map<string, { name: string; email: string; count: number }>();
+
+              const getHeaderValue = (msg: any, name: string): string | undefined => {
+                if (!msg) return undefined;
+                if (msg[name.toLowerCase()]) return msg[name.toLowerCase()];
+                const headers = msg.payload?.headers ?? [];
+                return headers.find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value;
+              };
+
+              const processHeader = (headerValue: string) => {
+                if (!headerValue) return;
+                const parts = headerValue.split(",");
+                for (const part of parts) {
+                  const trimmed = part.trim();
+                  if (!trimmed) continue;
+                  
+                  let name = "";
+                  let email = "";
+                  const match = trimmed.match(/^(.*?)\s*<(.*?)>$/);
+                  if (match) {
+                    name = match[1]?.replace(/^["']|["']$/g, "").trim() ?? "";
+                    email = match[2]?.trim().toLowerCase() ?? "";
+                  } else if (trimmed.includes("@")) {
+                    email = trimmed.toLowerCase();
+                    name = trimmed.split("@")[0] ?? "";
+                  }
+
+                  if (email && email.includes("@")) {
+                    const existing = contactMap.get(email);
+                    if (existing) {
+                      existing.count += 1;
+                      if (name && !existing.name) {
+                        existing.name = name;
+                      }
+                    } else {
+                      contactMap.set(email, { name, email, count: 1 });
+                    }
+                  }
+                }
+              };
+
+              for (const t of threads) {
+                const threadData = t.data as any;
+                const messages = threadData?.messages ?? [];
+                for (const msg of messages) {
+                  const fromVal = getHeaderValue(msg, "from");
+                  if (fromVal) processHeader(fromVal);
+                  
+                  const toVal = getHeaderValue(msg, "to");
+                  if (toVal) processHeader(toVal);
+                }
+              }
+
+              const normalizedQuery = query.toLowerCase();
+              const results = Array.from(contactMap.values())
+                .filter(
+                  (c) =>
+                    c.name.toLowerCase().includes(normalizedQuery) ||
+                    c.email.toLowerCase().includes(normalizedQuery)
+                )
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 10);
+
+              return results;
+            } catch (err: any) {
+              console.error("Failed to search contacts:", err);
+              return { error: `Failed to search contacts: ${err.message || err}` };
+            }
+          },
+        });
+
         // System instructions (completely static to maximize DeepSeek/Gemini prompt caching)
         const instructions = `You have access to Corsair tools. Use list_operations to discover available APIs, get_schema to understand required arguments, and run_script to execute them.
 The 'corsair' variable is already pre-scoped to your active tenant, so you must NOT call '.withTenant()' yourself. Simply run operations directly on 'corsair', e.g. const res = await corsair.gmail.api.threads.list({}); return res;
@@ -384,15 +478,16 @@ For calendar events: Do not execute write script actions directly. Proactively a
 For calendar events: If the instructions are clear, you can execute the write script actions directly without asking for an extra confirmation button.
 HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule a meeting" without time, or "email John" without body/subject), you MUST still stop and ask clarifying questions using multiple-choice options. You are in "Autonomous Mode".`
    }
-2. Clarifying Questions & Proactive MCQs: If there is ANY ambiguity, or if you need clarification (e.g., when given abstract requests like "schedule zoom event at 18 june" without time/location, or "email John" without subject/body), do NOT guess and do NOT ask open-ended questions. Instead, immediately propose specific options (e.g., times, location options, template tones, or subjects) as multiple-choice buttons at the end of your response so the user can select them with a single click. Proactively organize multiple missing parameters into structured options. This applies even in Autonomous mode!
-3. Multi-choice Options Format: When asking clarifying options, format each choice exactly as '[Option: Option Text]' on a new line at the very end of your response.
+2. Resolving Names in Local Cache First: When the user specifies a contact name (e.g., "Dipti", "John", "Sarah") without an email address, you MUST immediately call the 'search_contacts' tool with the name as the query. Try to locate their email address in the contacts cache first. If found, proceed using that email address directly. Do NOT ask the user for their email address unless no matches are found in the cache or multiple different people share the same name.
+3. Clarifying Questions & Proactive MCQs: If there is ANY ambiguity, or if you need clarification (e.g., when given abstract requests like "schedule zoom event at 18 june" without time/location, or "email John" without subject/body), do NOT guess and do NOT ask open-ended questions. Instead, immediately propose specific options (e.g., times, location options, template tones, or subjects) as multiple-choice buttons at the end of your response so the user can select them with a single click. Proactively organize multiple missing parameters into structured options. This applies even in Autonomous mode!
+4. Multi-choice Options Format: When asking clarifying options, you MUST format each choice exactly as '[Option: Option Text]' on a new line at the very end of your response. Always include a custom option (e.g. '[Option: Specify custom time]' or '[Option: Specify custom recipient]') so the user can enter a custom text response.
    Example:
    "I see you want to schedule a Zoom event on June 18. What time would you prefer?"
    [Option: June 18 at 10:00 AM]
    [Option: June 18 at 2:00 PM]
    [Option: June 18 at 4:30 PM]
    [Option: Specify custom time]
-4. Semantic Email Search: When the user asks to search emails or calendar events (e.g. 'find flight bookings from last month', 'show invoices from AWS', or 'unread emails from boss'), always use 'search_local' first. 
+5. Semantic Email Search: When the user asks to search emails or calendar events (e.g. 'find flight bookings from last month', 'show invoices from AWS', or 'unread emails from boss'), always use 'search_local' first. 
    - Parse the search results returned (which contain sender, subject, snippet, and epoch ms timestamps).
    - In your thinking, filter and sort these results to match the user's constraints (e.g. filtering out items that are not from AWS or not within the last month).
    - Format the results beautifully in your response using markdown: use bold headers for subjects, italics for senders and dates (convert epoch ms to readable dates like 'June 12, 2026'), and use blockquotes (e.g. '> snippet...') for the content snippet to display them like rich cards in the chat UI.
@@ -464,6 +559,7 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
                 send_email: sendEmailTool,
                 create_draft: createDraftTool,
                 search_local: searchLocalTool,
+                search_contacts: searchContactsTool,
               },
             });
 

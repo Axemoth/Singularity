@@ -113,6 +113,19 @@ function formatMessageTime(epochMs: number): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
+function parseOptionsAndCleanText(text: string) {
+  const options: string[] = [];
+  const regex = /\[(?:Option|Choice|Select):\s*(.*?)\]/gi;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    if (match[1]) {
+      options.push(match[1].trim());
+    }
+  }
+  const cleanText = text.replace(regex, "").trim();
+  return { cleanText, options };
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 function AgentPageContent() {
@@ -126,6 +139,9 @@ function AgentPageContent() {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  const [isReasoningEnabled, setIsReasoningEnabled] = useState(false);
+  const [customInputMsgId, setCustomInputMsgId] = useState<string | null>(null);
+  const [customInputVal, setCustomInputVal] = useState("");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -396,8 +412,9 @@ function AgentPageContent() {
       context: {
         route: "/agent",
       },
+      reasoningEnabled: isReasoningEnabled,
     });
-  }, [input, activeThreadId, activeThread, threads, chatMutation, saveThreadsToStorage]);
+  }, [input, activeThreadId, activeThread, threads, chatMutation, saveThreadsToStorage, isReasoningEnabled]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -559,6 +576,8 @@ function AgentPageContent() {
                 !prevMsg ||
                 new Date(message.timestamp).toDateString() !== new Date(prevMsg.timestamp).toDateString();
 
+              const { cleanText, options } = parseOptionsAndCleanText(message.text);
+
               return (
                 <div key={message.id} className="space-y-2.5">
                   {showDateSep && (
@@ -588,10 +607,70 @@ function AgentPageContent() {
                     >
                       <FormattedMessage
                         role={message.role}
-                        text={message.text}
+                        text={cleanText}
                         reasoning={message.reasoning}
                       />
                     </div>
+
+                    {/* Option Buttons */}
+                    {options.length > 0 && message.role === "assistant" && (
+                      <div className="flex flex-wrap gap-2 mt-2 max-w-[90%] items-center">
+                        {options.map((opt, idx) => {
+                          const isCustom = opt.toLowerCase().includes("custom") || opt.toLowerCase().includes("specify");
+                          if (isCustom && customInputMsgId === message.id) {
+                            return (
+                              <div key={idx} className="flex gap-2 items-center bg-bg-surface border border-accent-primary/45 rounded-xl p-1 animate-fade-in w-full max-w-sm">
+                                <input
+                                  type="text"
+                                  value={customInputVal}
+                                  onChange={(e) => setCustomInputVal(e.target.value)}
+                                  placeholder="Type your custom response..."
+                                  className="bg-transparent text-xs text-text-primary px-2 py-1 outline-none border-none flex-1 min-w-0"
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      submitMessage(customInputVal);
+                                      setCustomInputMsgId(null);
+                                      setCustomInputVal("");
+                                    }
+                                  }}
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    submitMessage(customInputVal);
+                                    setCustomInputMsgId(null);
+                                    setCustomInputVal("");
+                                  }}
+                                  className="bg-accent-primary text-text-inverse text-xs px-3 py-1.5 rounded-lg font-semibold cursor-pointer shrink-0"
+                                >
+                                  Submit
+                                </button>
+                              </div>
+                            );
+                          }
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                      if (isCustom) {
+                                        setCustomInputMsgId(message.id);
+                                        setCustomInputVal("");
+                                      } else {
+                                        submitMessage(opt);
+                                      }
+                                    }}
+                              className="border border-accent-primary text-accent-primary hover:bg-accent-primary/10 bg-bg-surface rounded-full px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                            >
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
                     <span className="text-[10px] text-text-tertiary mt-1 px-1 tabular-nums">
                       {formatMessageTime(message.timestamp)}
                     </span>
@@ -657,7 +736,7 @@ function AgentPageContent() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="flex gap-3 items-end">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-xl border border-border-default bg-bg-inset p-2.5 focus-within:border-accent-primary transition-colors focus-within:bg-bg-base">
               <textarea
                 ref={inputRef}
                 value={input}
@@ -670,15 +749,43 @@ function AgentPageContent() {
                 }}
                 rows={2}
                 placeholder="Ask the agent to summarize emails, schedule events..."
-                className="border border-border-default bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary min-h-[50px] flex-1 resize-none rounded-xl px-4 py-3.5 text-sm transition-colors outline-none focus:bg-bg-base"
+                className="bg-transparent text-text-primary placeholder:text-text-tertiary w-full resize-none px-2 py-1 text-sm outline-none border-none focus:ring-0"
               />
-              <Button
-                type="submit"
-                isLoading={chatMutation.isPending}
-                className="h-[50px] px-6 cursor-pointer font-semibold uppercase tracking-wider text-xs rounded-xl"
-              >
-                Send
-              </Button>
+              <div className="flex items-center justify-between px-1 border-t border-border-subtle/50 pt-2.5">
+                {/* Deepthink Toggle */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsReasoningEnabled(!isReasoningEnabled)}
+                    title="Use Flash model for fast response and Pro model for more in depth response"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      isReasoningEnabled
+                        ? "bg-accent-primary/10 text-accent-primary border border-accent-primary/25"
+                        : "text-text-tertiary hover:text-text-secondary border border-transparent"
+                    }`}
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.467 5.99 5.99 0 0 0-1.925 3.546 5.974 5.974 0 0 1-2.133-1A3.75 3.75 0 0 0 12 18Z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364.364l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547Z" />
+                    </svg>
+                    Deepthink
+                  </button>
+                  <span className="text-[10.5px] text-text-tertiary hidden sm:inline-block leading-none">
+                    {isReasoningEnabled 
+                      ? "Pro model: in-depth response" 
+                      : "Flash model: fast response"}
+                  </span>
+                </div>
+
+                <Button
+                  type="submit"
+                  isLoading={chatMutation.isPending}
+                  size="sm"
+                  className="font-semibold px-5 py-2"
+                >
+                  Send
+                </Button>
+              </div>
             </form>
           </div>
         </div>
