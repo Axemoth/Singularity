@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/trpc/react";
 import { Button } from "@/app/_components/ui/button";
 import { Badge } from "@/app/_components/ui/badge";
@@ -312,9 +312,11 @@ function DateGroupSection({ group }: { group: DateGroup }) {
 function WeekView({
   currentDate,
   eventsByDate,
+  onDateClick,
 }: {
   currentDate: Date;
   eventsByDate: Map<string, CalendarEvent[]>;
+  onDateClick: (date: string) => void;
 }) {
   const startOfWeek = useMemo(() => {
     const d = new Date(currentDate);
@@ -355,7 +357,13 @@ function WeekView({
         return (
           <div
             key={key}
-            className={`min-w-[155px] flex-1 bg-bg-raised border rounded-[var(--radius-lg)] p-3 flex flex-col gap-3 min-h-[400px] shadow-sm ${
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest("a") || (e.target as HTMLElement).closest("button")) {
+                return;
+              }
+              onDateClick(key);
+            }}
+            className={`group min-w-[155px] flex-1 bg-bg-raised border rounded-[var(--radius-lg)] p-3 flex flex-col gap-3 min-h-[400px] shadow-sm cursor-pointer hover:bg-bg-surface/40 hover:border-border-default transition-all duration-[var(--transition-fast)] ${
               isToday ? "border-accent-primary bg-bg-surface/30" : "border-border-subtle"
             }`}
           >
@@ -404,8 +412,9 @@ function WeekView({
                   );
                 })
               ) : (
-                <div className="flex-1 flex items-center justify-center">
+                <div className="flex-1 flex flex-col items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
                   <span className="text-[10px] text-text-tertiary italic">No events</span>
+                  <PlusIcon className="h-4 w-4 text-text-tertiary hidden group-hover:block animate-fade-in" />
                 </div>
               )}
             </div>
@@ -421,9 +430,11 @@ function WeekView({
 function MonthView({
   currentDate,
   eventsByDate,
+  onDateClick,
 }: {
   currentDate: Date;
   eventsByDate: Map<string, CalendarEvent[]>;
+  onDateClick: (date: string) => void;
 }) {
   const monthCells = useMemo(() => {
     const year = currentDate.getFullYear();
@@ -499,9 +510,15 @@ function MonthView({
           return (
             <div
               key={`${key}-${idx}`}
-              className={`min-h-[95px] p-2 flex flex-col gap-1.5 transition-colors duration-[var(--transition-fast)] ${
-                cell.isCurrentMonth ? "bg-bg-raised" : "bg-bg-base/30 opacity-60"
-              } ${isToday ? "bg-accent-primary/5" : ""}`}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest("a") || (e.target as HTMLElement).closest("button")) {
+                  return;
+                }
+                onDateClick(key);
+              }}
+              className={`min-h-[95px] p-2 flex flex-col gap-1.5 transition-colors duration-[var(--transition-fast)] cursor-pointer hover:bg-bg-surface/40 hover:border-border-default border border-transparent ${
+                cell.isCurrentMonth ? "bg-bg-raised" : "bg-bg-base/20 opacity-60"
+              } ${isToday ? "bg-accent-primary/5 border-accent-primary/20" : ""}`}
             >
               <div className="flex justify-end shrink-0">
                 <span
@@ -547,13 +564,133 @@ function MonthView({
   );
 }
 
+// ─── Day View ──────────────────────────────────────────────────────────────────
+
+function DayView({
+  currentDate,
+  eventsByDate,
+  onSlotClick,
+}: {
+  currentDate: Date;
+  eventsByDate: Map<string, CalendarEvent[]>;
+  onSlotClick: (date: string, time: string) => void;
+}) {
+  const getDayKey = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  const key = getDayKey(currentDate);
+  const dayEvents = eventsByDate.get(key) ?? [];
+
+  // Generate 24 hours
+  const hours = Array.from({ length: 24 }).map((_, i) => {
+    const hour = i;
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+    const label = `${displayHour} ${ampm}`;
+    const timeStr = `${String(hour).padStart(2, "0")}:00`;
+    return { hour, label, timeStr };
+  });
+
+  return (
+    <div className="bg-bg-raised border border-border-subtle rounded-[var(--radius-lg)] overflow-hidden shadow-sm animate-fade-in flex flex-col max-h-[600px]">
+      {/* Day view header */}
+      <div className="p-4 border-b border-border-subtle bg-bg-surface/30 flex items-center justify-between shrink-0">
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary">
+            {currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+          </h3>
+          <p className="text-xs text-text-tertiary">
+            {dayEvents.length} event{dayEvents.length !== 1 ? "s" : ""} scheduled
+          </p>
+        </div>
+      </div>
+
+      {/* Hourly Timeline */}
+      <div className="flex-1 overflow-y-auto divide-y divide-border-subtle/40 pr-1">
+        {hours.map(({ hour, label, timeStr }) => {
+          const hourEvents = dayEvents.filter((event) => {
+            const startStr = event.data?.start?.dateTime;
+            if (!startStr) return false;
+            const startDate = new Date(startStr);
+            return startDate.getHours() === hour;
+          });
+
+          return (
+            <div
+              key={hour}
+              className="group flex min-h-[64px] transition-colors duration-[var(--transition-fast)] hover:bg-bg-surface/20"
+            >
+              {/* Hour Label */}
+              <div className="w-16 shrink-0 py-2 px-3 text-right text-[10px] font-bold text-text-tertiary border-r border-border-subtle/30 select-none">
+                {label}
+              </div>
+
+              {/* Slots/Events Content area */}
+              <div
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest("a") || (e.target as HTMLElement).closest("button")) {
+                    return;
+                  }
+                  onSlotClick(key, timeStr);
+                }}
+                className="flex-1 p-2 flex gap-2 overflow-x-auto scrollbar-none cursor-pointer relative"
+              >
+                {hourEvents.length > 0 ? (
+                  hourEvents.map((event) => {
+                    const title = event.data.summary || "Untitled Event";
+                    const timeRange = formatEventTime(event.data.start, event.data.end);
+                    return (
+                      <a
+                        key={event.id}
+                        href={event.data.htmlLink ?? undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 min-w-[200px] max-w-md p-2 bg-bg-surface hover:bg-bg-inset border border-border-subtle hover:border-border-default rounded-[var(--radius-sm)] transition-all duration-[var(--transition-fast)] text-left shadow-xs flex flex-col justify-between"
+                      >
+                        <div className="text-xs font-semibold text-text-primary truncate">
+                          {title}
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-[9px] text-accent-info font-bold">
+                            {timeRange}
+                          </span>
+                          {event.data.location && (
+                            <span className="text-[9px] text-text-tertiary truncate max-w-[120px]">
+                              📍 {event.data.location}
+                            </span>
+                          )}
+                        </div>
+                      </a>
+                    );
+                  })
+                ) : (
+                  <div className="w-full h-full flex items-center justify-start opacity-0 group-hover:opacity-100 transition-opacity pl-2 select-none">
+                    <span className="text-[10px] text-accent-primary font-bold flex items-center gap-1">
+                      <PlusIcon className="h-3 w-3" />
+                      Add event at {label}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CalendarPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [view, setView] = useState<"list" | "week" | "month">("list");
+  const [view, setView] = useState<"list" | "day" | "week" | "month">("list");
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedTime, setSelectedTime] = useState<string>("");
 
   const utils = api.useUtils();
   const { data: calendarStatus, isLoading: isStatusLoading } = api.calendar.getConnectionStatus.useQuery();
@@ -633,6 +770,8 @@ export default function CalendarPage() {
       newDate.setMonth(currentDate.getMonth() - 1);
     } else if (view === "week") {
       newDate.setDate(currentDate.getDate() - 7);
+    } else if (view === "day") {
+      newDate.setDate(currentDate.getDate() - 1);
     }
     setCurrentDate(newDate);
   };
@@ -643,6 +782,8 @@ export default function CalendarPage() {
       newDate.setMonth(currentDate.getMonth() + 1);
     } else if (view === "week") {
       newDate.setDate(currentDate.getDate() + 7);
+    } else if (view === "day") {
+      newDate.setDate(currentDate.getDate() + 1);
     }
     setCurrentDate(newDate);
   };
@@ -672,7 +813,11 @@ export default function CalendarPage() {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => setIsCreateOpen(true)}
+                onClick={() => {
+                  setSelectedDate("");
+                  setSelectedTime("");
+                  setIsCreateOpen(true);
+                }}
                 className="font-bold flex items-center gap-1.5 cursor-pointer"
               >
                 <PlusIcon className="h-4 w-4" />
@@ -724,6 +869,8 @@ export default function CalendarPage() {
                 <span className="text-sm font-semibold text-text-primary ml-2 tabular-nums">
                   {view === "month"
                     ? currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+                    : view === "day"
+                    ? currentDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })
                     : (() => {
                         const start = new Date(currentDate);
                         start.setDate(currentDate.getDate() - currentDate.getDay());
@@ -758,6 +905,16 @@ export default function CalendarPage() {
                 }`}
               >
                 List
+              </button>
+              <button
+                onClick={() => setView("day")}
+                className={`px-3 py-1 text-xs font-semibold rounded-[var(--radius-sm)] cursor-pointer transition-all duration-[var(--transition-fast)] ${
+                  view === "day"
+                    ? "bg-bg-surface text-text-primary border border-border-default shadow-xs"
+                    : "text-text-tertiary hover:text-text-primary"
+                }`}
+              >
+                Day
               </button>
               <button
                 onClick={() => setView("week")}
@@ -884,12 +1041,40 @@ export default function CalendarPage() {
               </div>
             )}
 
+            {view === "day" && (
+              <DayView
+                currentDate={currentDate}
+                eventsByDate={eventsByDate}
+                onSlotClick={(date, time) => {
+                  setSelectedDate(date);
+                  setSelectedTime(time);
+                  setIsCreateOpen(true);
+                }}
+              />
+            )}
+
             {view === "week" && (
-              <WeekView currentDate={currentDate} eventsByDate={eventsByDate} />
+              <WeekView
+                currentDate={currentDate}
+                eventsByDate={eventsByDate}
+                onDateClick={(date) => {
+                  setSelectedDate(date);
+                  setSelectedTime("");
+                  setIsCreateOpen(true);
+                }}
+              />
             )}
 
             {view === "month" && (
-              <MonthView currentDate={currentDate} eventsByDate={eventsByDate} />
+              <MonthView
+                currentDate={currentDate}
+                eventsByDate={eventsByDate}
+                onDateClick={(date) => {
+                  setSelectedDate(date);
+                  setSelectedTime("");
+                  setIsCreateOpen(true);
+                }}
+              />
             )}
 
             {groups.length === 0 && (
@@ -910,6 +1095,8 @@ export default function CalendarPage() {
         onEventCreated={() => {
           void utils.calendar.listEvents.invalidate();
         }}
+        defaultDate={selectedDate}
+        defaultTime={selectedTime}
       />
     </div>
   );
@@ -919,10 +1106,14 @@ function CreateEventModal({
   isOpen,
   onClose,
   onEventCreated,
+  defaultDate,
+  defaultTime,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onEventCreated: () => void;
+  defaultDate?: string;
+  defaultTime?: string;
 }) {
   const [activeTab, setActiveTab] = useState<"manual" | "ai">("manual");
   
@@ -948,6 +1139,31 @@ function CreateEventModal({
   
   // AI Form State
   const [aiText, setAiText] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      if (defaultDate) {
+        setStartDate(defaultDate);
+        setEndDate(defaultDate);
+      } else {
+        const d = new Date();
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        setStartDate(dateStr);
+        setEndDate(dateStr);
+      }
+
+      if (defaultTime) {
+        setStartTime(defaultTime);
+        const [h, m] = defaultTime.split(":").map(Number);
+        const nextH = (h! + 1) % 24;
+        const endTimeStr = `${String(nextH).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+        setEndTime(endTimeStr);
+      } else {
+        setStartTime("10:00");
+        setEndTime("11:00");
+      }
+    }
+  }, [isOpen, defaultDate, defaultTime]);
   const [isAiLoading, setIsAiLoading] = useState(false);
 
   const createMutation = api.calendar.createEvent.useMutation({
