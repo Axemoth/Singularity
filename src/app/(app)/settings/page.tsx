@@ -17,6 +17,62 @@ export default function SettingsPage() {
   const [usernameInput, setUsernameInput] = useState("");
   const [isEditingUsername, setIsEditingUsername] = useState(false);
 
+  // Billing State
+  const [subscription, setSubscription] = useState<any>(null);
+  const [isBillingLoading, setIsBillingLoading] = useState(false);
+
+  useEffect(() => {
+    if (sessionData?.user) {
+      setIsBillingLoading(true);
+      authClient.dodopayments.customer.subscriptions.list({
+        query: { limit: 10 }
+      })
+      .then(({ data, error }: any) => {
+        if (data && data.items) {
+          const activeSub = data.items.find((sub: any) => sub.status === "active");
+          setSubscription(activeSub || null);
+        }
+        setIsBillingLoading(false);
+      })
+      .catch((err: any) => {
+        console.error("Error fetching subscriptions:", err);
+        setIsBillingLoading(false);
+      });
+    }
+  }, [sessionData?.user]);
+
+  const handleUpgrade = async () => {
+    try {
+      const { data, error } = await authClient.dodopayments.checkoutSession({
+        slug: "premium-plan",
+      });
+      if (error) {
+        alert("Billing setup failed: " + (error.message || "Unknown error"));
+        return;
+      }
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (err: any) {
+      alert("Error: " + (err.message || err));
+    }
+  };
+
+  const handleOpenBillingPortal = async () => {
+    try {
+      const { data, error } = await authClient.dodopayments.customer.portal();
+      if (error) {
+        alert("Failed to open billing portal: " + (error.message || "Unknown error"));
+        return;
+      }
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (err: any) {
+      alert("Error: " + (err.message || err));
+    }
+  };
+
   // Queries for settings
   const { data: dbPriorityRules } = api.gmail.getPriorityRules.useQuery(undefined, {
     enabled: !!sessionData?.user,
@@ -283,6 +339,66 @@ export default function SettingsPage() {
                     "{dbPriorityRules}"
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Billing / Subscription Card */}
+        {sessionData?.user && (
+          <div className="glass rounded-2xl border border-border-default overflow-hidden animate-fade-in">
+            <div className="border-b border-border-subtle p-5 bg-bg-raised/40">
+              <h2 className="text-base font-semibold text-text-primary">Subscription & Billing</h2>
+              <p className="text-xs text-text-tertiary mt-0.5">
+                Manage your billing tier, invoices, and payment methods.
+              </p>
+            </div>
+
+            <div className="p-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">
+                    {isBillingLoading ? (
+                      <span className="inline-block h-4 w-28 rounded bg-bg-surface animate-pulse-subtle" />
+                    ) : subscription ? (
+                      "Singularity Premium"
+                    ) : (
+                      "Free Tier"
+                    )}
+                  </h3>
+                  <p className="text-xs text-text-tertiary mt-1 leading-relaxed">
+                    {isBillingLoading ? (
+                      <span className="inline-block h-3.5 w-48 rounded bg-bg-surface animate-pulse-subtle" />
+                    ) : subscription ? (
+                      `Next billing date: ${new Date(subscription.next_billing_date).toLocaleDateString()}`
+                    ) : (
+                      "Upgrade to unlock full AI Co-Pilot integrations, Gmail, and Calendar sync limits."
+                    )}
+                  </p>
+                </div>
+                <div className="shrink-0 sm:w-auto w-full flex gap-2.5">
+                  {isBillingLoading ? (
+                    <div className="h-8 w-24 rounded bg-bg-surface animate-pulse-subtle" />
+                  ) : subscription ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="cursor-pointer font-semibold sm:w-auto w-full"
+                      onClick={handleOpenBillingPortal}
+                    >
+                      Manage Billing
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      className="cursor-pointer font-semibold sm:w-auto w-full"
+                      onClick={handleUpgrade}
+                    >
+                      Upgrade to Premium
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
