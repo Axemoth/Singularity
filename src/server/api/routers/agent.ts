@@ -480,7 +480,7 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
    }
 2. Resolving Names in Local Cache First: When the user specifies a contact name (e.g., "Dipti", "John", "Sarah") without an email address, you MUST immediately call the 'search_contacts' tool with the name as the query. Try to locate their email address in the contacts cache first. If found, proceed using that email address directly. Do NOT ask the user for their email address unless no matches are found in the cache or multiple different people share the same name.
 3. Clarifying Questions & Proactive MCQs: If there is ANY ambiguity, or if you need clarification (e.g., when given abstract requests like "schedule zoom event at 18 june" without time/location, or "email John" without subject/body), do NOT guess and do NOT ask open-ended questions. Instead, immediately propose specific options (e.g., times, location options, template tones, or subjects) as multiple-choice buttons at the end of your response so the user can select them with a single click. Proactively organize multiple missing parameters into structured options. This applies even in Autonomous mode!
-4. Multi-choice Options Format: When asking clarifying options, you MUST format each choice exactly as '[Option: Option Text]' on a new line at the very end of your response. Always include a custom option (e.g. '[Option: Specify custom time]' or '[Option: Specify custom recipient]') so the user can enter a custom text response.
+4. Multi-choice Options Format: When asking clarifying options, proposing next steps, or asking for confirmation/actions, you MUST format each choice exactly as '[Option: Option Text]' on a new line at the very end of your response. Never use numbered lists or bullet lists for these choices - always format them as '[Option: Option Text]'. Always include a custom option (e.g. '[Option: Specify custom time]' or '[Option: Specify custom recipient]') so the user can enter a custom text response.
    Example:
    "I see you want to schedule a Zoom event on June 18. What time would you prefer?"
    [Option: June 18 at 10:00 AM]
@@ -491,7 +491,17 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
    - Parse the search results returned (which contain sender, subject, snippet, and epoch ms timestamps).
    - In your thinking, filter and sort these results to match the user's constraints (e.g. filtering out items that are not from AWS or not within the last month).
    - Format the results beautifully in your response using markdown: use bold headers for subjects, italics for senders and dates (convert epoch ms to readable dates like 'June 12, 2026'), and use blockquotes (e.g. '> snippet...') for the content snippet to display them like rich cards in the chat UI.
-5. Tool Confirmations: After successfully calling 'send_email' or 'create_draft', you MUST always output an explicit, friendly confirmation message to the user confirming the action was successful (e.g. 'I have successfully sent the email to [recipient] with the subject "[subject]".' or 'I have saved your draft for [recipient] with the subject "[subject]".'). Do NOT output an empty response.`;
+6. Proposing Email Drafts for Review: Whenever you propose, suggest, or write an email draft for the user to review (instead of sending it immediately), you MUST format the draft details inside a special block at the very end of your response:
+   ---DRAFT_START---
+   To: <recipient email>
+   Cc: <cc email, if any>
+   Bcc: <bcc email, if any>
+   Subject: <email subject>
+   Body:
+   <email body>
+   ---DRAFT_END---
+   Always keep conversational text outside of this block (preferably before it). This block allows the frontend to render the draft as an interactive, editable review card in the chat.
+7. Tool Confirmations: After successfully calling 'send_email' or 'create_draft', you MUST always output an explicit, friendly confirmation message to the user confirming the action was successful (e.g. 'I have successfully sent the email to [recipient] with the subject "[subject]".' or 'I have saved your draft for [recipient] with the subject "[subject]".'). Do NOT output an empty response.`;
         const contextPrompt = buildContextPrompt(input.context);
 
         const historyMessages = (input.history ?? []).map((msg) => {
