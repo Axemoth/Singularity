@@ -130,6 +130,51 @@ export const calendarRouter = createTRPCRouter({
       return events;
     }),
 
+  syncCalendar: protectedProcedure.mutation(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+
+    // Query all connected calendar accounts for this user
+    const accounts = await ctx.db
+      .select({
+        id: corsairAccounts.id,
+        tenantId: corsairAccounts.tenantId,
+        emailAddress: corsairAccounts.emailAddress,
+      })
+      .from(corsairAccounts)
+      .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+      .where(
+        and(
+          or(
+            eq(corsairAccounts.tenantId, userId),
+            like(corsairAccounts.tenantId, `${userId}_%`)
+          ),
+          eq(corsairIntegrations.name, "googlecalendar")
+        )
+      );
+
+    console.log(`[Calendar Manual Sync] Syncing ${accounts.length} accounts for user ${userId}...`);
+
+    for (const account of accounts) {
+      const tenant = corsair.withTenant(account.tenantId);
+      try {
+        console.log(`[Calendar Manual Sync] Syncing account ${account.emailAddress}...`);
+        await tenant.googlecalendar.api.events.getMany({
+          calendarId: "primary",
+          maxResults: 100,
+        });
+      } catch (err: any) {
+        console.error(`Failed to sync calendar events for ${account.emailAddress}:`, err);
+      }
+    }
+
+    // Trigger background embeddings sync asynchronously
+    void syncEmbeddings(userId).catch((err) => {
+      console.error("Background embeddings sync failed for Calendar after manual sync:", err);
+    });
+
+    return { success: true };
+  }),
+
   getConnectionStatus: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
     const accounts = await ctx.db

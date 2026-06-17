@@ -314,6 +314,79 @@ export const gmailRouter = createTRPCRouter({
       return uniqueThreads;
     }),
 
+  syncInbox: protectedProcedure.mutation(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+
+    // Query all connected Gmail accounts for this user
+    const accounts = await ctx.db
+      .select({
+        id: corsairAccounts.id,
+        tenantId: corsairAccounts.tenantId,
+        emailAddress: corsairAccounts.emailAddress,
+      })
+      .from(corsairAccounts)
+      .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+      .where(
+        and(
+          or(
+            eq(corsairAccounts.tenantId, userId),
+            like(corsairAccounts.tenantId, `${userId}_%`)
+          ),
+          eq(corsairIntegrations.name, "gmail")
+        )
+      );
+
+    console.log(`[Gmail Manual Sync] Syncing ${accounts.length} accounts for user ${userId}...`);
+
+    for (const account of accounts) {
+      const tenant = corsair.withTenant(account.tenantId);
+      try {
+        console.log(`[Gmail Manual Sync] Syncing account ${account.emailAddress}...`);
+        const res = await tenant.gmail.api.threads.list({});
+        const threadsList = res.threads ?? [];
+
+        // Pre-fetch details for the top 20 threads to populate subject and sender
+        const top20 = threadsList.slice(0, 20);
+        await Promise.all(
+          top20.map(async (t) => {
+            if (t.id) {
+              try {
+                const fullThread = await tenant.gmail.api.threads.get({ id: t.id });
+                // Cache full thread data in corsairEntities
+                await ctx.db
+                  .update(corsairEntities)
+                  .set({
+                    data: fullThread,
+                    updatedAt: new Date(),
+                  })
+                  .where(
+                    and(
+                      eq(corsairEntities.entityId, t.id),
+                      eq(corsairEntities.entityType, "threads")
+                    )
+                  );
+              } catch (e) {
+                console.error(`[Manual Sync Pre-fetch] Failed to pre-fetch thread ${t.id}:`, e);
+              }
+            }
+          })
+        );
+      } catch (err: any) {
+        console.error(`Manual sync failed for ${account.emailAddress}:`, err);
+      }
+    }
+
+    // Trigger background tasks asynchronously
+    void syncEmbeddings(userId).catch((err) => {
+      console.error("Background embeddings sync failed for Gmail:", err);
+    });
+    void syncPriorities(userId).catch((err) => {
+      console.error("Background priority sync failed for Gmail:", err);
+    });
+
+    return { success: true };
+  }),
+
   getConnectionStatus: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
     const accounts = await ctx.db

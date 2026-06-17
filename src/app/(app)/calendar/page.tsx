@@ -773,10 +773,19 @@ export default function CalendarPage() {
 
   const totalEvents = events?.length ?? 0;
 
+  const syncCalendar = api.calendar.syncCalendar.useMutation({
+    onSuccess: () => {
+      void utils.calendar.listEvents.invalidate();
+    },
+  });
+
   const handleRefresh = async () => {
-    await utils.calendar.getConnectionStatus.invalidate();
-    await utils.calendar.listEvents.invalidate();
-    refetch();
+    try {
+      await utils.calendar.getConnectionStatus.invalidate();
+      await syncCalendar.mutateAsync();
+    } catch (err) {
+      console.error("[Refresh] Calendar sync failed:", err);
+    }
   };
 
   const handlePrev = () => {

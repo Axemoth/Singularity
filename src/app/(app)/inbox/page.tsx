@@ -33,6 +33,7 @@ interface ThreadEntity {
   updatedAt: Date;
   priority: string | null;
   priorityReason: string | null;
+  emailAddress?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -192,6 +193,14 @@ function ThreadListItem({
           >
             {sender}
           </span>
+          {thread.emailAddress && (
+            <span 
+              className="text-[9px] px-1.5 py-0.5 bg-bg-base/85 text-text-tertiary border border-border-subtle/50 rounded-md font-medium truncate max-w-[120px] shrink-0"
+              title={thread.emailAddress}
+            >
+              {thread.emailAddress}
+            </span>
+          )}
         </div>
         <span className="shrink-0 text-[11px] text-text-tertiary tabular-nums">
           {time}
@@ -744,17 +753,24 @@ export default function InboxPage() {
   const selectedThread =
     threads?.find((t) => t.id === selectedThreadId) ?? null;
 
+  const syncInbox = api.gmail.syncInbox.useMutation({
+    onSuccess: () => {
+      void utils.gmail.listThreads.invalidate();
+    },
+  });
+
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
       // Invalidate the status query as well to ensure we have the latest info
       await utils.gmail.getConnectionStatus.invalidate();
-      await utils.gmail.listThreads.invalidate();
-      await refetch();
+      await syncInbox.mutateAsync();
+    } catch (err) {
+      console.error("[Refresh] Live sync failed:", err);
     } finally {
       setIsRefreshing(false);
     }
-  }, [utils.gmail.getConnectionStatus, utils.gmail.listThreads, refetch]);
+  }, [utils.gmail.getConnectionStatus, syncInbox]);
 
   const handleArchive = useCallback(() => {
     if (!selectedThread) return;
@@ -849,7 +865,7 @@ export default function InboxPage() {
   return (
     <div className="flex h-full animate-fade-in">
       {/* ---- Left Panel: Thread List ---- */}
-      <div className="w-[460px] shrink-0 flex flex-col border-r border-border-default bg-bg-raised">
+      <div className="w-[520px] shrink-0 flex flex-col border-r border-border-default bg-bg-raised">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
           <div className="flex items-center gap-2.5">
