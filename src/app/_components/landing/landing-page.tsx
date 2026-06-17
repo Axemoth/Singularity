@@ -40,6 +40,33 @@ const features = [
   {
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21l3.75-3.75" />
+      </svg>
+    ),
+    title: "Smart Prioritizer",
+    desc: "AI classifies every email as Urgent, Normal, or Low. Learns from your manual overrides with a feedback loop.",
+  },
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+      </svg>
+    ),
+    title: "Spam Guard",
+    desc: "Phishing and junk mail auto-detected and moved to Gmail spam. Important emails are never misclassified.",
+  },
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    title: "Deadline Alerts",
+    desc: "AI scans emails for actionable deadlines and auto-escalates priority as the due date approaches.",
+  },
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
       </svg>
     ),
@@ -54,6 +81,15 @@ const features = [
     ),
     title: "Instant Actions",
     desc: "Reply, forward, archive or schedule - type '/' for quick command autocompletes like /prioritize or /draft.",
+  },
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5" />
+      </svg>
+    ),
+    title: "AI That Learns You",
+    desc: "Discovers your writing tone, greeting style, reply speed, and calendar habits. Grows smarter with every interaction.",
   },
   {
     icon: (
@@ -169,11 +205,47 @@ export default function LandingPage() {
   const stat3 = useCountUp(60, 1400, "%");
 
   // Interactive mockup states
-  const [activeTab, setActiveTab] = useState<"inbox" | "calendar">("inbox");
+  const [activeTab, setActiveTab] = useState<"inbox" | "calendar" | "habits">("inbox");
   const [selectedEmail, setSelectedEmail] = useState(0);
   const [aiDraftState, setAiDraftState] = useState<"idle" | "typing" | "done">("idle");
   const [aiText, setAiText] = useState("");
   const typingTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Prioritizer demo states
+  const [prioriDemo, setPrioriDemo] = useState<{ classified: boolean; animating: boolean }>({
+    classified: false,
+    animating: false,
+  });
+  const prioriEmails = [
+    { from: "CTO", subj: "Q3 OKRs - Review ASAP", snippet: "Please review the attached OKRs before tomorrow's board meeting.", priority: "urgent" as const, reason: "Deadline mentioned + high-interaction sender", isSpam: false },
+    { from: "billing@stripe.com", subj: "Invoice #4821 - Payment Received", snippet: "Your payment of ₹2,400.00 has been processed successfully.", priority: "low" as const, reason: "Automated billing receipt", isSpam: false },
+    { from: "unknown@win-prizes.xyz", subj: "🎉 You WON a FREE iPhone!", snippet: "Click here to claim your prize NOW before it expires!!!", priority: "low" as const, reason: "Phishing / unsolicited spam", isSpam: true },
+    { from: "Design Lead", subj: "Figma link: Updated dashboard mockups", snippet: "Hey, shared the latest iteration. Let me know your thoughts.", priority: "normal" as const, reason: "Colleague collaboration thread", isSpam: false },
+    { from: "GitHub", subj: "[singularity] PR #87 merged", snippet: "Pull request 'feat: deadline alerts' has been merged to main.", priority: "low" as const, reason: "Automated CI notification", isSpam: false },
+  ];
+
+  const runPrioriDemo = () => {
+    setPrioriDemo({ classified: false, animating: true });
+    setTimeout(() => {
+      setPrioriDemo({ classified: true, animating: false });
+    }, 1800);
+  };
+
+  // AI Learning timeline animation
+  const [learningStep, setLearningStep] = useState(0);
+  const learningTimeline = [
+    { day: "Day 1", event: "Connects Gmail & Calendar", detail: "AI indexes your inbox and calendar events", icon: "🔗" },
+    { day: "Day 3", event: "Discovers writing style", detail: "Detects casual greetings, concise replies, \"Best\" sign-offs", icon: "✍️" },
+    { day: "Week 1", event: "Maps your network", detail: "Identifies top 5 co-workers by interaction frequency", icon: "👥" },
+    { day: "Week 2", event: "Learns calendar patterns", detail: "Prefers 30-min meetings, peak hours 10 AM–12 PM", icon: "📅" },
+    { day: "Month 1", event: "Fully personalized", detail: "AI drafts match your voice. Priority accuracy > 95%", icon: "🧠" },
+  ];
+
+  // AI Habits simulator states
+  const [habitsTone, setHabitsTone] = useState<"friendly" | "professional">("friendly");
+  const [habitsStyle, setHabitsStyle] = useState<"concise" | "detailed">("concise");
+  const [habitsGreeting, setHabitsGreeting] = useState<"casual" | "formal">("casual");
+  const [habitsSignoff, setHabitsSignoff] = useState<"casual" | "formal">("casual");
 
   const mockEmails = [
     {
@@ -275,11 +347,14 @@ export default function LandingPage() {
             <a href="#features" className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors">
               Features
             </a>
+            <a href="#prioritizer-demo" className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors">
+              Smart Prioritizer
+            </a>
+            <a href="#ai-growth" className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors">
+              AI Growth
+            </a>
             <a href="#how-it-works" className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors">
               How it works
-            </a>
-            <a href="#stats" className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors">
-              Metrics
             </a>
           </div>
 
@@ -380,10 +455,10 @@ export default function LandingPage() {
               </div>
 
               {/* View / Tab Switcher */}
-              <div className="flex items-center rounded-lg bg-bg-base p-1 border border-border-subtle">
+              <div className="flex items-center rounded-lg bg-bg-base p-1 border border-border-subtle flex-wrap sm:flex-nowrap gap-1">
                 <button
                   onClick={() => { setActiveTab("inbox"); }}
-                  className={`rounded px-3 py-1 text-xs font-semibold transition-all ${
+                  className={`rounded px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
                     activeTab === "inbox" 
                       ? "bg-bg-raised text-text-primary shadow-xs" 
                       : "text-text-secondary hover:text-text-primary"
@@ -393,13 +468,23 @@ export default function LandingPage() {
                 </button>
                 <button
                   onClick={() => { setActiveTab("calendar"); }}
-                  className={`rounded px-3 py-1 text-xs font-semibold transition-all ${
+                  className={`rounded px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
                     activeTab === "calendar" 
                       ? "bg-bg-raised text-text-primary shadow-xs" 
                       : "text-text-secondary hover:text-text-primary"
                   }`}
                 >
                   Calendar View
+                </button>
+                <button
+                  onClick={() => { setActiveTab("habits"); }}
+                  className={`rounded px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                    activeTab === "habits" 
+                      ? "bg-bg-raised text-text-primary shadow-xs" 
+                      : "text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  AI Persona & Habits
                 </button>
               </div>
             </div>
@@ -408,7 +493,7 @@ export default function LandingPage() {
             <div className="flex h-[460px] w-full bg-bg-base text-left">
               
               {/* Mockup Sidebar */}
-              <div className="hidden w-52 flex-col border-r border-border-subtle bg-bg-raised p-4 sm:flex">
+              <div className="hidden w-52 flex-col border-r border-border-subtle bg-bg-raised p-4 sm:flex shrink-0">
                 <div className="mb-6 flex items-center gap-2 px-2">
                   <div className="h-6 w-6 rounded bg-bg-surface border border-border-default flex items-center justify-center text-text-primary font-bold">
                     S
@@ -420,11 +505,12 @@ export default function LandingPage() {
                   {[
                     { label: "Inbox", icon: "📥", tab: "inbox" },
                     { label: "Calendar", icon: "📅", tab: "calendar" },
+                    { label: "AI Habits", icon: "🧠", tab: "habits" },
                   ].map((item) => (
                     <button
                       key={item.label}
-                      onClick={() => { setActiveTab(item.tab as "inbox" | "calendar"); }}
-                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${
+                      onClick={() => { setActiveTab(item.tab as "inbox" | "calendar" | "habits"); }}
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
                         activeTab === item.tab 
                           ? "bg-bg-surface text-text-primary border border-border-default shadow-xs" 
                           : "text-text-secondary hover:bg-bg-surface hover:text-text-primary"
@@ -447,10 +533,10 @@ export default function LandingPage() {
               </div>
 
               {/* DYNAMIC CONTENT CONTAINER */}
-              {activeTab === "inbox" ? (
+              {activeTab === "inbox" && (
                 <>
                   {/* Email List Column */}
-                  <div className="flex w-full flex-col border-r border-border-subtle bg-bg-raised md:w-80">
+                  <div className="flex w-full flex-col border-r border-border-subtle bg-bg-raised md:w-80 shrink-0">
                     <div className="border-b border-border-subtle px-4 py-3.5 flex items-center justify-between">
                       <span className="text-xs font-bold text-text-primary">Primary Inbox</span>
                       <span className="rounded bg-bg-surface border border-border-default px-2 py-0.5 text-[10px] font-semibold text-text-primary">2 unread</span>
@@ -490,9 +576,9 @@ export default function LandingPage() {
                   </div>
 
                   {/* Interactive Details + AI replies */}
-                  <div className="hidden flex-1 flex-col bg-bg-base p-5 md:flex">
+                  <div className="hidden flex-1 flex-col bg-bg-base p-5 md:flex overflow-hidden">
                     {/* Header */}
-                    <div className="border-b border-border-subtle pb-4">
+                    <div className="border-b border-border-subtle pb-4 shrink-0">
                       <h3 className="text-sm font-bold text-text-primary">{mockEmails[selectedEmail]?.subj}</h3>
                       <p className="text-xs text-text-secondary mt-1">From: <span className="font-semibold">{mockEmails[selectedEmail]?.from}</span></p>
                     </div>
@@ -503,7 +589,7 @@ export default function LandingPage() {
                     </div>
 
                     {/* Dynamic AI Co-Pilot block */}
-                    <div className="rounded-xl border border-border-default bg-bg-raised p-4 shadow-sm">
+                    <div className="rounded-xl border border-border-default bg-bg-raised p-4 shadow-sm shrink-0">
                       <div className="flex items-center justify-between pb-3">
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-bold text-text-primary">✨ AI Smart Reply</span>
@@ -512,7 +598,7 @@ export default function LandingPage() {
                         {aiDraftState === "idle" && (
                           <button
                             onClick={() => triggerAiDraft(selectedEmail)}
-                            className="rounded-lg bg-accent-primary px-3 py-1.5 text-xs font-semibold text-text-inverse hover:bg-accent-primary-hover transition-colors"
+                            className="rounded-lg bg-accent-primary px-3 py-1.5 text-xs font-semibold text-text-inverse hover:bg-accent-primary-hover transition-colors cursor-pointer"
                           >
                             Draft Reply
                           </button>
@@ -535,7 +621,7 @@ export default function LandingPage() {
                           </span>
                           <button 
                             onClick={() => setAiDraftState("idle")} 
-                            className="text-[10px] text-text-tertiary hover:text-text-primary font-medium"
+                            className="text-[10px] text-text-tertiary hover:text-text-primary font-medium cursor-pointer"
                           >
                             Reset
                           </button>
@@ -544,10 +630,12 @@ export default function LandingPage() {
                     </div>
                   </div>
                 </>
-              ) : (
+              )}
+
+              {activeTab === "calendar" && (
                 // CALENDAR WORKFLOW VIEW
                 <div className="flex w-full flex-col bg-bg-raised p-6 overflow-hidden">
-                  <div className="flex items-center justify-between border-b border-border-subtle pb-4">
+                  <div className="flex items-center justify-between border-b border-border-subtle pb-4 shrink-0">
                     <div>
                       <h3 className="text-sm font-bold text-text-primary">Google Calendar</h3>
                       <p className="text-xs text-text-tertiary">Unified daily schedule</p>
@@ -575,6 +663,167 @@ export default function LandingPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "habits" && (
+                <div className="flex flex-1 overflow-hidden">
+                  
+                  {/* Left Column: Habits controls */}
+                  <div className="flex w-full flex-col border-r border-border-subtle bg-bg-raised md:w-80 overflow-y-auto p-4 gap-4 shrink-0">
+                    <div className="border-b border-border-subtle pb-2.5">
+                      <span className="text-xs font-bold text-text-primary">Interactive AI Trainer</span>
+                      <p className="text-[10px] text-text-tertiary mt-0.5">Toggle preferences to see how the AI adapts live.</p>
+                    </div>
+
+                    {/* Tone Select */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">Tone & Style</span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          onClick={() => setHabitsTone("friendly")}
+                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
+                            habitsTone === "friendly"
+                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                              : "border-border-default text-text-secondary hover:bg-bg-surface"
+                          }`}
+                        >
+                          Friendly
+                        </button>
+                        <button
+                          onClick={() => setHabitsTone("professional")}
+                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
+                            habitsTone === "professional"
+                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                              : "border-border-default text-text-secondary hover:bg-bg-surface"
+                          }`}
+                        >
+                          Professional
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Length Select */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">Draft Length</span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          onClick={() => setHabitsStyle("concise")}
+                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
+                            habitsStyle === "concise"
+                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                              : "border-border-default text-text-secondary hover:bg-bg-surface"
+                          }`}
+                        >
+                          Concise
+                        </button>
+                        <button
+                          onClick={() => setHabitsStyle("detailed")}
+                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
+                            habitsStyle === "detailed"
+                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                              : "border-border-default text-text-secondary hover:bg-bg-surface"
+                          }`}
+                        >
+                          Detailed
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Greeting Select */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">Greeting</span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          onClick={() => setHabitsGreeting("casual")}
+                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
+                            habitsGreeting === "casual"
+                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                              : "border-border-default text-text-secondary hover:bg-bg-surface"
+                          }`}
+                        >
+                          Casual ("Hi")
+                        </button>
+                        <button
+                          onClick={() => setHabitsGreeting("formal")}
+                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
+                            habitsGreeting === "formal"
+                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                              : "border-border-default text-text-secondary hover:bg-bg-surface"
+                          }`}
+                        >
+                          Formal ("Dear")
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Signoff Select */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">Sign-off</span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          onClick={() => setHabitsSignoff("casual")}
+                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
+                            habitsSignoff === "casual"
+                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                              : "border-border-default text-text-secondary hover:bg-bg-surface"
+                          }`}
+                        >
+                          Casual ("Best")
+                        </button>
+                        <button
+                          onClick={() => setHabitsSignoff("formal")}
+                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
+                            habitsSignoff === "formal"
+                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                              : "border-border-default text-text-secondary hover:bg-bg-surface"
+                          }`}
+                        >
+                          Formal ("Sincerely")
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Live Output */}
+                  <div className="hidden flex-1 flex-col bg-bg-base p-5 md:flex overflow-hidden">
+                    <div className="border-b border-border-subtle pb-3 shrink-0">
+                      <h3 className="text-xs font-bold text-text-primary">AI Copilot Draft Editor</h3>
+                      <p className="text-[10px] text-text-secondary mt-0.5">Scoped to Acme Integration email template</p>
+                    </div>
+
+                    <div className="flex-1 py-4 overflow-y-auto">
+                      <div className="rounded-xl border border-border-default bg-bg-surface/50 p-4 font-mono text-[11px] leading-relaxed text-text-primary whitespace-pre-wrap min-h-[160px]">
+                        {(() => {
+                          const greeting = habitsGreeting === "casual" ? "Hi Team Acme," : "Dear Acme Partnership Board,";
+                          
+                          let body = "";
+                          if (habitsStyle === "concise") {
+                            body = habitsTone === "friendly" 
+                              ? "We'd love to integrate our email workflows with your API! Let's schedule a quick sync." 
+                              : "We formally propose integrating our email workflows with your API. Let us know when you can review the technical specs.";
+                          } else {
+                            body = habitsTone === "friendly"
+                              ? "I hope you are having an amazing week! We have been looking closely at the Acme API capabilities and believe a direct integration with Singularity would be a game-changer for both our users. It would allow seamless cross-platform syncs in under 2 seconds. Let's find 15 mins to discuss this!"
+                              : "We are writing to formally propose a workflow integration between Singularity and the Acme API. Our research indicates that a combined solution would significantly reduce synchronization latency for enterprise customers. We have attached the technical specifications below for your engineering review.";
+                          }
+
+                          const signoff = habitsSignoff === "casual" ? "Best,\nRushil" : "Sincerely,\nRushil Parmar\nSingularity Team";
+
+                          return `${greeting}\n\n${body}\n\n${signoff}`;
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Simulated Context Pill */}
+                    <div className="rounded-lg bg-bg-raised border border-border-subtle px-3 py-2 text-[10px] flex items-center justify-between shrink-0">
+                      <span className="text-text-secondary font-medium">✨ AI Adaptation Status</span>
+                      <span className="text-accent-success font-semibold flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-accent-success animate-pulse-subtle" />
+                        Autodiscovered habits applied
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -627,11 +876,13 @@ export default function LandingPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
           {features.map((f, i) => (
             <div
               key={f.title}
-              className="group relative overflow-hidden rounded-2xl border border-border-default bg-bg-raised p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-accent-primary hover:shadow-lg"
+              className={`group relative overflow-hidden rounded-2xl border border-border-default bg-bg-raised p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-accent-primary hover:shadow-lg ${
+                i < 2 ? "lg:col-span-2 sm:col-span-1" : "lg:col-span-1 sm:col-span-1"
+              } ${i >= 2 && i < 5 ? "" : ""}`}
             >
               <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-bg-surface border border-border-default text-text-primary shadow-xs">
                 {f.icon}
@@ -641,6 +892,359 @@ export default function LandingPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* ══════════════════ INTERACTIVE: SMART PRIORITIZER DEMO ══════════════════ */}
+      <section id="prioritizer-demo" className="relative z-10 mx-auto mt-32 max-w-5xl px-6 md:px-12">
+        <div className="mb-12 text-center">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border-default bg-bg-surface px-4 py-1.5 text-xs font-bold text-text-primary">
+            🛡️ Smart Inbox Triage
+          </div>
+          <h2 className="text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">
+            Watch AI classify your inbox{" "}
+            <span className="bg-gradient-to-r from-text-primary via-text-secondary to-text-primary bg-clip-text text-transparent">
+              in real-time
+            </span>
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-sm text-text-secondary">
+            Every email gets an AI-powered priority badge, spam detection, and a transparent reason for the classification.
+          </p>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-border-default bg-bg-raised shadow-xl">
+          {/* Header bar */}
+          <div className="flex items-center justify-between border-b border-border-subtle bg-bg-surface px-5 py-3.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-text-primary">📥 Inbox Preview</span>
+              <span className="rounded bg-bg-base border border-border-default px-2 py-0.5 text-[10px] font-semibold text-text-secondary">
+                {prioriEmails.length} emails
+              </span>
+            </div>
+            <button
+              onClick={runPrioriDemo}
+              disabled={prioriDemo.animating}
+              className={`rounded-lg px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                prioriDemo.animating
+                  ? "bg-bg-surface text-text-tertiary border border-border-default"
+                  : prioriDemo.classified
+                    ? "bg-bg-surface text-text-primary border border-border-default hover:bg-bg-base"
+                    : "bg-accent-primary text-text-inverse hover:bg-accent-primary-hover shadow-sm"
+              }`}
+            >
+              {prioriDemo.animating ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-text-tertiary border-t-text-primary" />
+                  Classifying…
+                </span>
+              ) : prioriDemo.classified ? (
+                "↻ Re-classify"
+              ) : (
+                "✨ Classify Inbox"
+              )}
+            </button>
+          </div>
+
+          {/* Email rows */}
+          <div className="divide-y divide-border-subtle/50">
+            {prioriEmails.map((email, idx) => (
+              <div
+                key={idx}
+                className={`flex items-center gap-4 px-5 py-3.5 transition-all duration-500 ${
+                  prioriDemo.animating
+                    ? "opacity-60"
+                    : prioriDemo.classified && email.isSpam
+                      ? "bg-accent-danger/3 opacity-70"
+                      : ""
+                }`}
+                style={{
+                  transitionDelay: prioriDemo.classified ? `${idx * 200}ms` : "0ms",
+                }}
+              >
+                {/* Sender avatar */}
+                <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-xs font-bold border ${
+                  prioriDemo.classified && email.isSpam
+                    ? "bg-accent-danger/10 border-accent-danger/30 text-accent-danger"
+                    : "bg-bg-surface border-border-default text-text-primary"
+                }`}>
+                  {email.from[0]}
+                </div>
+
+                {/* Email info */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-semibold ${prioriDemo.classified && email.isSpam ? "text-text-tertiary line-through" : "text-text-primary"}`}>
+                      {email.from}
+                    </span>
+                    {prioriDemo.classified && email.isSpam && (
+                      <span className="rounded bg-accent-danger/15 px-1.5 py-0.5 text-[9px] font-bold text-accent-danger animate-in fade-in">
+                        ⚠ SPAM
+                      </span>
+                    )}
+                  </div>
+                  <p className={`truncate text-xs ${prioriDemo.classified && email.isSpam ? "text-text-tertiary line-through" : "text-text-secondary"}`}>
+                    {email.subj}
+                  </p>
+                </div>
+
+                {/* Priority badge */}
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  {prioriDemo.classified ? (
+                    <>
+                      <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold transition-all duration-300 ${
+                        email.isSpam
+                          ? "bg-accent-danger/10 text-accent-danger border border-accent-danger/20"
+                          : email.priority === "urgent"
+                            ? "bg-accent-danger/10 text-accent-danger border border-accent-danger/20"
+                            : email.priority === "normal"
+                              ? "bg-accent-primary/10 text-accent-primary border border-accent-primary/20"
+                              : "bg-bg-surface text-text-tertiary border border-border-default"
+                      }`}>
+                        {email.isSpam ? "Spam" : email.priority === "urgent" ? "🔴 Urgent" : email.priority === "normal" ? "🟡 Normal" : "⚪ Low"}
+                      </span>
+                      <span className="text-[9px] text-text-tertiary max-w-[160px] text-right hidden sm:block">
+                        {email.reason}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="rounded-full bg-bg-surface border border-border-default px-2.5 py-0.5 text-[10px] font-medium text-text-tertiary">
+                      Unclassified
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Summary footer */}
+          {prioriDemo.classified && (
+            <div className="flex items-center justify-between border-t border-border-subtle bg-bg-surface px-5 py-3">
+              <div className="flex items-center gap-4 text-[10px] font-semibold">
+                <span className="flex items-center gap-1 text-accent-danger">🔴 1 Urgent</span>
+                <span className="flex items-center gap-1 text-accent-primary">🟡 1 Normal</span>
+                <span className="flex items-center gap-1 text-text-tertiary">⚪ 2 Low</span>
+                <span className="flex items-center gap-1 text-accent-danger">⚠ 1 Spam blocked</span>
+              </div>
+              <span className="text-[10px] text-accent-success font-semibold flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-accent-success animate-pulse-subtle" />
+                Classification complete
+              </span>
+            </div>
+          )}
+        </div>
+
+        <p className="mt-4 text-center text-xs text-text-tertiary italic">
+          💡 Click &quot;Classify Inbox&quot; to see AI triage in action — spam gets flagged, priorities get assigned.
+        </p>
+      </section>
+
+      {/* ══════════════════ INTERACTIVE: AI THAT GROWS WITH YOU ══════════════════ */}
+      <section id="ai-growth" className="relative z-10 mx-auto mt-32 max-w-5xl px-6 md:px-12">
+        <div className="mb-12 text-center">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border-default bg-bg-surface px-4 py-1.5 text-xs font-bold text-text-primary">
+            🧠 Adaptive Intelligence
+          </div>
+          <h2 className="text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">
+            An AI that{" "}
+            <span className="bg-gradient-to-r from-text-primary via-text-secondary to-text-primary bg-clip-text text-transparent">
+              grows with you
+            </span>
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-sm text-text-secondary">
+            From day one, Singularity starts learning your communication style, network, and calendar habits. No configuration needed.
+          </p>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-border-default bg-bg-raised shadow-xl">
+          {/* Timeline header */}
+          <div className="flex items-center justify-between border-b border-border-subtle bg-bg-surface px-5 py-3.5">
+            <span className="text-xs font-bold text-text-primary">📈 Learning Progress Timeline</span>
+            <span className="rounded bg-bg-base border border-border-default px-2 py-0.5 text-[10px] font-semibold text-text-secondary">
+              Click milestones to explore
+            </span>
+          </div>
+
+          <div className="flex flex-col md:flex-row">
+            {/* Left: Timeline steps */}
+            <div className="w-full md:w-72 border-b md:border-b-0 md:border-r border-border-subtle bg-bg-raised p-4 shrink-0">
+              <div className="relative space-y-1">
+                {/* Vertical line */}
+                <div className="absolute left-[15px] top-4 h-[calc(100%-2rem)] w-px bg-border-default" />
+
+                {learningTimeline.map((step, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setLearningStep(idx)}
+                    className={`relative flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-all cursor-pointer ${
+                      learningStep === idx
+                        ? "bg-bg-surface border border-border-default shadow-xs"
+                        : "hover:bg-bg-surface/50"
+                    }`}
+                  >
+                    <div className={`relative z-10 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-sm transition-all ${
+                      learningStep === idx
+                        ? "bg-accent-primary text-text-inverse shadow-sm"
+                        : idx <= learningStep
+                          ? "bg-accent-success/15 text-accent-success border border-accent-success/30"
+                          : "bg-bg-surface border border-border-default text-text-tertiary"
+                    }`}>
+                      {idx <= learningStep && idx !== learningStep ? "✓" : step.icon}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">{step.day}</span>
+                      </div>
+                      <span className={`text-xs font-semibold ${learningStep === idx ? "text-text-primary" : "text-text-secondary"}`}>
+                        {step.event}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: Detail view */}
+            <div className="flex-1 p-6 flex flex-col justify-between bg-bg-base min-h-[300px]">
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-primary/10 text-xl border border-accent-primary/20">
+                    {learningTimeline[learningStep]?.icon}
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-accent-primary uppercase tracking-wider">{learningTimeline[learningStep]?.day}</span>
+                    <h3 className="text-sm font-bold text-text-primary">{learningTimeline[learningStep]?.event}</h3>
+                  </div>
+                </div>
+                <p className="text-xs text-text-secondary leading-relaxed mb-6">
+                  {learningTimeline[learningStep]?.detail}
+                </p>
+
+                {/* Contextual detail card for each step */}
+                {learningStep === 0 && (
+                  <div className="rounded-xl border border-border-default bg-bg-raised p-4 space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-text-secondary font-medium">Gmail Inbox</span>
+                      <span className="text-accent-success font-bold">✓ Connected</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-text-secondary font-medium">Google Calendar</span>
+                      <span className="text-accent-success font-bold">✓ Connected</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-text-secondary font-medium">Emails indexed</span>
+                      <span className="text-text-primary font-bold">1,247</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-text-secondary font-medium">Events synced</span>
+                      <span className="text-text-primary font-bold">89</span>
+                    </div>
+                  </div>
+                )}
+
+                {learningStep === 1 && (
+                  <div className="rounded-xl border border-border-default bg-bg-raised p-4 space-y-2.5">
+                    {[
+                      { label: "Greeting Style", value: "Casual (\"Hi\", \"Hey\")" },
+                      { label: "Reply Length", value: "Concise — avg. 3 sentences" },
+                      { label: "Sign-off", value: "\"Best\" or \"Thanks\"" },
+                      { label: "Tone", value: "Friendly & direct" },
+                    ].map((h) => (
+                      <div key={h.label} className="flex items-center justify-between text-xs">
+                        <span className="text-text-secondary font-medium">{h.label}</span>
+                        <span className="rounded bg-bg-surface border border-border-default px-2 py-0.5 text-[10px] font-semibold text-text-primary">{h.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {learningStep === 2 && (
+                  <div className="rounded-xl border border-border-default bg-bg-raised p-4 space-y-2.5">
+                    {[
+                      { name: "Sarah K.", count: "47 threads", role: "Design Lead" },
+                      { name: "Raj M.", count: "38 threads", role: "CTO" },
+                      { name: "Alex P.", count: "31 threads", role: "Product Manager" },
+                      { name: "Dev Team", count: "28 threads", role: "Group Thread" },
+                      { name: "Maya L.", count: "19 threads", role: "Marketing" },
+                    ].map((c) => (
+                      <div key={c.name} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className="h-6 w-6 rounded-lg bg-bg-surface border border-border-default flex items-center justify-center text-[10px] font-bold text-text-primary">
+                            {c.name[0]}
+                          </div>
+                          <span className="font-semibold text-text-primary">{c.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-text-tertiary">{c.role}</span>
+                          <span className="rounded bg-bg-surface border border-border-default px-1.5 py-0.5 text-[9px] font-bold text-text-secondary">{c.count}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {learningStep === 3 && (
+                  <div className="rounded-xl border border-border-default bg-bg-raised p-4 space-y-2.5">
+                    {[
+                      { label: "Preferred Duration", value: "30 minutes" },
+                      { label: "Peak Meeting Hours", value: "10:00 AM – 12:00 PM" },
+                      { label: "Busiest Day", value: "Tuesday" },
+                      { label: "Average Meetings/Week", value: "8" },
+                    ].map((h) => (
+                      <div key={h.label} className="flex items-center justify-between text-xs">
+                        <span className="text-text-secondary font-medium">{h.label}</span>
+                        <span className="rounded bg-bg-surface border border-border-default px-2 py-0.5 text-[10px] font-semibold text-text-primary">{h.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {learningStep === 4 && (
+                  <div className="rounded-xl border border-border-default bg-bg-raised p-4 space-y-3">
+                    <div className="text-xs text-text-secondary font-medium mb-2">AI Personalization Score</div>
+                    <div className="flex items-end gap-1">
+                      {[15, 32, 48, 67, 95].map((v, i) => (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                          <div
+                            className={`w-full rounded-t-md transition-all ${
+                              i === 4 ? "bg-accent-primary" : "bg-border-default"
+                            }`}
+                            style={{ height: `${v}px` }}
+                          />
+                          <span className="text-[8px] text-text-tertiary font-bold">{["D1", "D3", "W1", "W2", "M1"][i]}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between text-xs mt-2">
+                      <span className="text-text-tertiary">Priority Accuracy</span>
+                      <span className="text-accent-success font-bold text-sm">95%</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-text-tertiary">Draft Match Rate</span>
+                      <span className="text-accent-success font-bold text-sm">92%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Progress bar */}
+              <div className="mt-6">
+                <div className="flex items-center justify-between text-[10px] font-semibold text-text-tertiary mb-2">
+                  <span>Personalization Progress</span>
+                  <span className="text-text-primary">{Math.round(((learningStep + 1) / learningTimeline.length) * 100)}%</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-bg-surface border border-border-subtle overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-accent-primary transition-all duration-500"
+                    style={{ width: `${((learningStep + 1) / learningTimeline.length) * 100}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p className="mt-4 text-center text-xs text-text-tertiary italic">
+          💡 Click each milestone to see what the AI learns at every stage.
+        </p>
       </section>
 
       {/* ══════════════════ PRICING SECTION ══════════════════ */}
@@ -676,6 +1280,12 @@ export default function LandingPage() {
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-accent-success">✓</span> Google Calendar Sync
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-accent-success">✓</span> Smart Prioritizer & Spam Guard
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-accent-success">✓</span> AI Habit Learning & Persona
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-accent-success">✓</span> Keyboard / Slash Commands
@@ -729,10 +1339,10 @@ export default function LandingPage() {
                   <span className="text-accent-primary">✨</span> Careful & Autonomous Modes
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-accent-primary">✨</span> Workspace Settings Layout
+                  <span className="text-accent-primary">✨</span> Deadline Auto-Escalation
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-accent-primary">✨</span> Keyboard / Slash Commands
+                  <span className="text-accent-primary">✨</span> Priority Digests & Smart Alerts
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-accent-primary">✨</span> Full Hourly Day View Timeline
