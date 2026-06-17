@@ -5,6 +5,7 @@ import { api } from "@/trpc/react";
 import { Button } from "@/app/_components/ui/button";
 import { Badge } from "@/app/_components/ui/badge";
 import { SearchInput } from "@/app/_components/ui/search-input";
+import { useToast } from "@/app/_components/ui/toast";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -343,85 +344,100 @@ function WeekView({
   const todayStr = getDayKey(new Date());
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-none animate-fade-in -mx-6 px-6 md:mx-0 md:px-0">
-      {weekDays.map((day) => {
-        const key = getDayKey(day);
-        const dayEvents = eventsByDate.get(key) ?? [];
-        const isToday = key === todayStr;
-        const dayName = day.toLocaleDateString("en-US", { weekday: "short" });
-        const dateNum = day.getDate();
+    <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0 scrollbar-none">
+      <div className="grid grid-cols-7 gap-3 min-w-[900px] md:min-w-0 pb-2 animate-fade-in">
+        {weekDays.map((day) => {
+          const key = getDayKey(day);
+          const dayEvents = eventsByDate.get(key) ?? [];
+          const isToday = key === todayStr;
+          const dayName = day.toLocaleDateString("en-US", { weekday: "short" });
+          const dateNum = day.getDate();
 
-        const sortedEvents = [...dayEvents].sort(
-          (a, b) => getEventSortTime(a) - getEventSortTime(b)
-        );
+          const sortedEvents = [...dayEvents].sort(
+            (a, b) => getEventSortTime(a) - getEventSortTime(b)
+          );
 
-        return (
-          <div
-            key={key}
-            onClick={(e) => {
-              if ((e.target as HTMLElement).closest("a") || (e.target as HTMLElement).closest("button")) {
-                return;
-              }
-              onDateClick(key);
-            }}
-            className={`group min-w-[155px] flex-1 bg-bg-raised border rounded-[var(--radius-lg)] p-3 flex flex-col gap-3 min-h-[400px] shadow-sm cursor-pointer hover:bg-bg-surface/40 hover:border-border-default transition-all duration-[var(--transition-fast)] ${
-              isToday ? "border-accent-primary bg-bg-surface/30" : "border-border-subtle"
-            }`}
-          >
-            {/* Header */}
-            <div className="flex flex-col items-center gap-1 pb-2 border-b border-border-subtle shrink-0">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
-                {dayName}
-              </span>
-              <span
-                className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full ${
-                  isToday
-                    ? "bg-accent-primary text-text-inverse"
-                    : "text-text-primary"
-                }`}
-              >
-                {dateNum}
-              </span>
-            </div>
-
-            {/* Events */}
-            <div className="flex-1 flex flex-col gap-2 overflow-y-auto max-h-[350px]">
-              {sortedEvents.length > 0 ? (
-                sortedEvents.map((event) => {
-                  const title = event.data.summary || "Untitled Event";
-                  const time = formatEventTime(event.data.start, event.data.end);
-                  return (
-                    <a
-                      key={event.id}
-                      href={event.data.htmlLink ?? undefined}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block p-2 bg-bg-surface hover:bg-bg-inset border border-border-subtle hover:border-border-default rounded-[var(--radius-sm)] transition-all duration-[var(--transition-fast)] text-left"
-                    >
-                      <div className="text-[9px] text-accent-info font-bold mb-0.5">
-                        {time}
-                      </div>
-                      <div className="text-xs font-semibold text-text-primary leading-tight line-clamp-2" title={title}>
-                        {title}
-                      </div>
-                      {event.data.location && (
-                        <div className="text-[9px] text-text-tertiary mt-1 truncate" title={event.data.location}>
-                          📍 {event.data.location}
-                        </div>
-                      )}
-                    </a>
-                  );
-                })
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                  <span className="text-[10px] text-text-tertiary italic">No events</span>
-                  <PlusIcon className="h-4 w-4 text-text-tertiary hidden group-hover:block animate-fade-in" />
-                </div>
+          return (
+            <div
+              key={key}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest("a") || (e.target as HTMLElement).closest("button")) {
+                  return;
+                }
+                onDateClick(key);
+              }}
+              className={`group relative flex flex-col gap-3 min-h-[420px] p-3 rounded-[var(--radius-md)] border bg-bg-raised/40 transition-all duration-[var(--transition-base)] hover:bg-bg-raised hover:shadow-md cursor-pointer ${
+                isToday
+                  ? "border-accent-info/40 bg-accent-info/[0.02]"
+                  : "border-border-subtle/50"
+              }`}
+            >
+              {isToday && (
+                <div className="absolute top-0 left-0 right-0 h-[3px] bg-accent-info rounded-t-[var(--radius-md)]" />
               )}
+
+              {/* Header */}
+              <div className="flex flex-col items-center gap-1 pb-2 border-b border-border-subtle/40 shrink-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                  {dayName}
+                </span>
+                <span
+                  className={`text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full transition-colors ${
+                    isToday
+                      ? "bg-accent-info text-text-inverse shadow-xs"
+                      : "text-text-primary group-hover:text-accent-info"
+                  }`}
+                >
+                  {dateNum}
+                </span>
+              </div>
+
+              {/* Events */}
+              <div className="flex-1 flex flex-col gap-2 overflow-y-auto max-h-[340px] scrollbar-none pr-0.5">
+                {sortedEvents.length > 0 ? (
+                  sortedEvents.map((event) => {
+                    const title = event.data.summary || "Untitled Event";
+                    const time = formatEventTime(event.data.start, event.data.end);
+                    return (
+                      <a
+                        key={event.id}
+                        href={event.data.htmlLink ?? undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group/card block p-2.5 bg-bg-surface/50 hover:bg-bg-surface border border-border-subtle/60 hover:border-border-default rounded-[var(--radius-sm)] transition-all duration-[var(--transition-fast)] text-left shadow-2xs hover:shadow-xs relative overflow-hidden"
+                      >
+                        {/* Left border indicator */}
+                        <div className="absolute top-0 left-0 bottom-0 w-[3px] bg-accent-info/70 group-hover/card:bg-accent-info" />
+                        <div className="pl-1.5">
+                          <div className="text-[10px] text-accent-info font-bold mb-1 tracking-wide">
+                            {time}
+                          </div>
+                          <div className="text-xs font-semibold text-text-primary leading-snug line-clamp-2" title={title}>
+                            {title}
+                          </div>
+                          {event.data.location && (
+                            <div className="text-[10px] text-text-tertiary mt-1.5 flex items-center gap-1 truncate" title={event.data.location}>
+                              <span>📍</span>
+                              <span className="truncate">{event.data.location}</span>
+                            </div>
+                          )}
+                        </div>
+                      </a>
+                    );
+                  })
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-1.5 opacity-40 group-hover:opacity-100 transition-all duration-[var(--transition-base)] select-none">
+                    <span className="text-[10px] text-text-tertiary font-medium">No events</span>
+                    <div className="h-6 w-6 rounded-full border border-dashed border-border-default/80 flex items-center justify-center group-hover:bg-bg-surface group-hover:border-solid transition-colors">
+                      <PlusIcon className="h-3.5 w-3.5 text-text-tertiary" />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -648,20 +664,25 @@ function DayView({
                         href={event.data.htmlLink ?? undefined}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 min-w-[200px] max-w-md p-2 bg-bg-surface hover:bg-bg-inset border border-border-subtle hover:border-border-default rounded-[var(--radius-sm)] transition-all duration-[var(--transition-fast)] text-left shadow-xs flex flex-col justify-between"
+                        className="group/card flex-1 min-w-[220px] max-w-md p-2.5 bg-bg-surface/50 hover:bg-bg-surface border border-border-subtle/60 hover:border-border-default rounded-[var(--radius-sm)] transition-all duration-[var(--transition-fast)] text-left shadow-2xs hover:shadow-xs relative overflow-hidden flex flex-col justify-between"
                       >
-                        <div className="text-xs font-semibold text-text-primary truncate">
-                          {title}
-                        </div>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-[9px] text-accent-info font-bold">
-                            {timeRange}
-                          </span>
-                          {event.data.location && (
-                            <span className="text-[9px] text-text-tertiary truncate max-w-[120px]">
-                              📍 {event.data.location}
+                        {/* Left border indicator */}
+                        <div className="absolute top-0 left-0 bottom-0 w-[3px] bg-accent-info/70 group-hover/card:bg-accent-info" />
+                        <div className="pl-1.5">
+                          <div className="text-xs font-semibold text-text-primary truncate">
+                            {title}
+                          </div>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <span className="text-[10px] text-accent-info font-bold tracking-wide">
+                              {timeRange}
                             </span>
-                          )}
+                            {event.data.location && (
+                              <span className="text-[10px] text-text-tertiary truncate max-w-[140px] flex items-center gap-0.5">
+                                <span>📍</span>
+                                <span className="truncate">{event.data.location}</span>
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </a>
                     );
@@ -686,6 +707,7 @@ function DayView({
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CalendarPage() {
+  const toast = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [view, setView] = useState<"list" | "day" | "week" | "month">("list");
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
@@ -779,12 +801,17 @@ export default function CalendarPage() {
     },
   });
 
+  const isRefreshing = isFetching || syncCalendar.isPending;
+
   const handleRefresh = async () => {
     try {
       await utils.calendar.getConnectionStatus.invalidate();
       await syncCalendar.mutateAsync();
-    } catch (err) {
+      await refetch();
+      toast("Calendar synced!", "success");
+    } catch (err: any) {
       console.error("[Refresh] Calendar sync failed:", err);
+      toast(`Sync failed: ${err.message || err}`, "error");
     }
   };
 
@@ -852,8 +879,8 @@ export default function CalendarPage() {
               variant="secondary"
               size="sm"
               onClick={handleRefresh}
-              isLoading={isFetching}
-              disabled={isFetching || !calendarStatus?.connected}
+              isLoading={isRefreshing}
+              disabled={isRefreshing || !calendarStatus?.connected}
             >
               <RefreshIcon className="h-3.5 w-3.5" />
               Refresh
@@ -862,7 +889,7 @@ export default function CalendarPage() {
         </header>
 
         {/* Date Navigation & View Switcher */}
-        {!isLoading && !isError && calendarStatus?.connected && totalEvents > 0 && (
+        {!isLoading && !isError && calendarStatus?.connected && totalEvents > 0 && searchQuery.trim() === "" && (
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in">
             {view !== "list" ? (
               <div className="flex items-center gap-2">
@@ -1071,7 +1098,7 @@ export default function CalendarPage() {
             <p className="mb-4 text-xs text-text-tertiary leading-relaxed">
               Connected as {calendarStatus?.accounts?.[0]?.emailAddress || "Connected"}. Sync your calendar to import events.
             </p>
-            <Button variant="secondary" size="sm" onClick={handleRefresh} isLoading={isFetching}>
+            <Button variant="secondary" size="sm" onClick={handleRefresh} isLoading={isRefreshing}>
               <RefreshIcon className="h-3.5 w-3.5" />
               Sync Calendar
             </Button>
@@ -1081,57 +1108,86 @@ export default function CalendarPage() {
         {/* Views */}
         {!isLoading && !isError && totalEvents > 0 && (
           <>
-            {view === "list" && groups.length > 0 && (
-              <div className="space-y-8">
-                {groups.map((group) => (
-                  <DateGroupSection key={group.dateKey} group={group} />
-                ))}
+            {searchQuery.trim() !== "" ? (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b border-border-subtle/40 pb-3 animate-fade-in">
+                  <h2 className="text-sm font-semibold text-text-primary">
+                    Search Results for "{searchQuery}"
+                  </h2>
+                  <span className="text-xs text-text-tertiary tabular-nums">
+                    {Array.from(eventsByDate.values()).flat().length} match(es) found
+                  </span>
+                </div>
+                {groups.length > 0 ? (
+                  <div className="space-y-8 animate-fade-in">
+                    {groups.map((group) => (
+                      <DateGroupSection key={group.dateKey} group={group} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="animate-fade-in rounded-[var(--radius-md)] border border-border-subtle bg-bg-raised p-8 text-center">
+                    <p className="text-sm font-medium text-text-primary">No results found</p>
+                    <p className="text-xs text-text-tertiary mt-1">
+                      No calendar events match "{searchQuery}"
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
+            ) : (
+              <>
+                {view === "list" && (
+                  <div className="space-y-8 animate-fade-in">
+                    {groups.length > 0 ? (
+                      groups.map((group) => (
+                        <DateGroupSection key={group.dateKey} group={group} />
+                      ))
+                    ) : (
+                      <div className="rounded-[var(--radius-md)] border border-border-subtle bg-bg-raised p-8 text-center">
+                        <p className="text-sm font-medium text-text-primary">No events scheduled</p>
+                        <p className="text-xs text-text-tertiary mt-1">
+                          You have no events in your calendar.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-            {view === "day" && (
-              <DayView
-                currentDate={currentDate}
-                eventsByDate={eventsByDate}
-                onSlotClick={(date, time) => {
-                  setSelectedDate(date);
-                  setSelectedTime(time);
-                  setIsCreateOpen(true);
-                }}
-              />
-            )}
+                {view === "day" && (
+                  <DayView
+                    currentDate={currentDate}
+                    eventsByDate={eventsByDate}
+                    onSlotClick={(date, time) => {
+                      setSelectedDate(date);
+                      setSelectedTime(time);
+                      setIsCreateOpen(true);
+                    }}
+                  />
+                )}
 
-            {view === "week" && (
-              <WeekView
-                currentDate={currentDate}
-                eventsByDate={eventsByDate}
-                onDateClick={(date) => {
-                  setSelectedDate(date);
-                  setSelectedTime("");
-                  setIsCreateOpen(true);
-                }}
-              />
-            )}
+                {view === "week" && (
+                  <WeekView
+                    currentDate={currentDate}
+                    eventsByDate={eventsByDate}
+                    onDateClick={(date) => {
+                      setSelectedDate(date);
+                      setSelectedTime("");
+                      setIsCreateOpen(true);
+                    }}
+                  />
+                )}
 
-            {view === "month" && (
-              <MonthView
-                currentDate={currentDate}
-                eventsByDate={eventsByDate}
-                onDateClick={(date) => {
-                  setSelectedDate(date);
-                  setSelectedTime("");
-                  setIsCreateOpen(true);
-                }}
-              />
-            )}
-
-            {groups.length === 0 && (
-              <div className="animate-fade-in rounded-[var(--radius-md)] border border-border-subtle bg-bg-raised p-8 text-center">
-                <p className="text-sm font-medium text-text-primary">No results found</p>
-                <p className="text-xs text-text-tertiary mt-1">
-                  No calendar events match "{searchQuery}"
-                </p>
-              </div>
+                {view === "month" && (
+                  <MonthView
+                    currentDate={currentDate}
+                    eventsByDate={eventsByDate}
+                    onDateClick={(date) => {
+                      setSelectedDate(date);
+                      setSelectedTime("");
+                      setIsCreateOpen(true);
+                    }}
+                  />
+                )}
+              </>
             )}
           </>
         )}
