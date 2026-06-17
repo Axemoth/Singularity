@@ -537,6 +537,54 @@ Please output ONLY the email reply body text. Do not output subject, signature, 
 // AI Summary Strip
 // ---------------------------------------------------------------------------
 
+function cleanSummaryText(text: string): string {
+  // 1. Remove <think> blocks
+  let clean = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+  // 2. Extract starting from the actual summary header if present
+  // Matches "**Summary:**", "Summary:", "**Summary**", etc.
+  const summaryHeaderRegex = /(?:\*\*\s*)?summary\s*(?:\*\*)?\s*:\s*/i;
+  const headerMatch = clean.match(summaryHeaderRegex);
+  if (headerMatch && headerMatch.index !== undefined) {
+    clean = clean.substring(headerMatch.index);
+  } else {
+    // If no explicit header, strip typical conversational preambles
+    // E.g. "Let me search locally..." or "Based on the email content..."
+    const preambleRegex = /^(?:let me|i'll|i will|i am|based on|according to|looking at|searching|here['']s what|allow me|this is).*/i;
+    const lines = clean.split('\n');
+    let startIdx = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]?.trim();
+      if (!line) continue;
+      if (preambleRegex.test(line)) {
+        startIdx = i + 1;
+      } else {
+        break;
+      }
+    }
+    clean = lines.slice(startIdx).join('\n').trim();
+  }
+
+  // 3. Remove conversational postamble (questions, offers of action) at the end of the text
+  // We search for matches to typical ending phrases and strip from the first one that is at the end of the text.
+  const postambleRegex = /\b(?:would you like me to|would you like|should i|do you want me to|do you want|let me know if|is there anything|feel free|can i help|what action|how would you)\b/gi;
+  const matches = [...clean.matchAll(postambleRegex)];
+  for (const match of matches) {
+    if (match && match.index !== undefined) {
+      const remainingText = clean.substring(match.index);
+      const hasBulletPoints = /^[ \t]*[-*+]\s/m.test(remainingText) || /^[ \t]*\d+\.\s/m.test(remainingText);
+      const hasHeaders = /\baction items\b/i.test(remainingText) || /^(?:\s+)?#+/m.test(remainingText);
+      
+      if (!hasBulletPoints && !hasHeaders) {
+        clean = clean.substring(0, match.index).trim();
+        break;
+      }
+    }
+  }
+
+  return clean || text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+}
+
 function ThreadSummaryBar({ thread, messages }: { thread: ThreadEntity; messages: GmailMessage[] }) {
   const [summary, setSummary] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -544,9 +592,8 @@ function ThreadSummaryBar({ thread, messages }: { thread: ThreadEntity; messages
 
   const chat = api.agent.chat.useMutation({
     onSuccess: (data) => {
-      let text = data.text;
-      text = text.replace(/<think>[\s\S]*?<\/think>/i, '').trim();
-      setSummary(text);
+      const cleaned = cleanSummaryText(data.text);
+      setSummary(cleaned);
       setIsLoading(false);
     },
     onError: (err) => {
@@ -568,7 +615,7 @@ function ThreadSummaryBar({ thread, messages }: { thread: ThreadEntity; messages
       .join('\n---\n');
 
     chat.mutate({
-      message: `Summarize this email thread in 2-3 sentences and list any action items. Be concise.\n\nThread:\n${emailContext}`,
+      message: `Summarize this email thread in 2-3 sentences and list any action items. Be concise. Output ONLY the summary and action items. Do not include any conversational preamble or postamble.\n\nThread:\n${emailContext}`,
       history: [],
       context: { route: '/inbox' },
     });
