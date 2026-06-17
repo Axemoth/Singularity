@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { authClient } from "@/server/better-auth/client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/trpc/react";
 import { Button } from "@/app/_components/ui/button";
 
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const errorParam = searchParams.get("error");
   const utils = api.useUtils();
   const { data: sessionData, isPending: isSessionPending } = authClient.useSession();
 
@@ -142,6 +144,14 @@ export default function SettingsPage() {
     },
   });
 
+  const isPremium = !!subscription;
+  const gmailLimit = isPremium ? 3 : 1;
+  const calendarLimit = isPremium ? 3 : 1;
+  const currentGmailCount = gmailStatus?.accounts?.length ?? 0;
+  const currentCalendarCount = calendarStatus?.accounts?.length ?? 0;
+  const canConnectMoreGmail = currentGmailCount < gmailLimit;
+  const canConnectMoreCalendar = currentCalendarCount < calendarLimit;
+
   const handleSignOut = async () => {
     try {
       await authClient.signOut({
@@ -161,17 +171,22 @@ export default function SettingsPage() {
     window.location.href = `/api/connect?plugin=${plugin}`;
   };
 
-  const handleDisconnect = (plugin: "gmail" | "googlecalendar") => {
-    if (plugin === "gmail") {
-      disconnectGmail.mutate();
-    } else {
-      disconnectCalendar.mutate();
-    }
-  };
-
   return (
     <div className="min-h-full bg-bg-base px-6 py-10 flex flex-col items-center overflow-y-auto">
       <div className="w-full max-w-2xl flex flex-col gap-8 animate-slide-up">
+        {/* Error/Limit Banner */}
+        {errorParam === "limit_reached" && (
+          <div className="bg-accent-danger/10 border border-accent-danger/20 rounded-2xl p-4 text-xs font-semibold text-accent-danger leading-relaxed animate-fade-in flex flex-col gap-1">
+            <span className="text-sm font-bold">Connection Limit Reached</span>
+            <span>
+              Oops! You've reached the connection limit for your {isPremium ? "Premium" : "Free"} tier. 
+              {isPremium 
+                ? " Premium users can connect up to 3 accounts per integration." 
+                : " Upgrade to Premium to connect up to 3 accounts."}
+            </span>
+          </div>
+        )}
+
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-text-primary">Settings</h1>
@@ -443,7 +458,7 @@ export default function SettingsPage() {
                     ) : subscription ? (
                       `Next billing date: ${new Date(subscription.next_billing_date).toLocaleDateString()}`
                     ) : (
-                      "Upgrade to unlock full AI Co-Pilot integrations, Gmail, and Calendar sync limits."
+                      "Upgrade to Premium to remove the 20 requests/day Copilot limit and connect up to 3 accounts."
                     )}
                   </p>
                 </div>
@@ -486,101 +501,129 @@ export default function SettingsPage() {
 
           <div className="divide-y divide-border-subtle">
             {/* Gmail integration row */}
-            <div className="p-5 flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
-              <div className="flex items-start gap-3.5 min-w-0">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-bg-surface border border-border-subtle text-text-primary">
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
-                  </svg>
+            <div className="p-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap w-full">
+                <div className="flex items-start gap-3.5 min-w-0">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-bg-surface border border-border-subtle text-text-primary">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-medium text-text-primary">Gmail</h3>
+                    <p className="text-xs text-text-tertiary mt-0.5 leading-relaxed">
+                      Access and manage your email threads, prioritize key messages.
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <h3 className="text-sm font-medium text-text-primary">Gmail</h3>
-                  <p className="text-xs text-text-tertiary mt-0.5 leading-relaxed">
-                    Access and manage your email threads, prioritize key messages.
-                  </p>
-                  {gmailStatus?.connected && (
-                    <div className="mt-2 flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 truncate max-w-[200px] sm:max-w-xs">
-                        Connected to {gmailStatus.emailAddress}
-                      </span>
-                    </div>
+                <div className="shrink-0 sm:w-auto w-full mt-2 sm:mt-0">
+                  {isGmailLoading ? (
+                    <div className="h-8 w-20 rounded bg-bg-surface animate-pulse-subtle" />
+                  ) : canConnectMoreGmail ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="sm:w-auto w-full font-semibold border-neutral-700 hover:bg-text-primary hover:text-bg-base"
+                      onClick={() => handleConnect("gmail")}
+                    >
+                      Connect Account
+                    </Button>
+                  ) : (
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-text-tertiary bg-bg-surface/50 border border-border-subtle rounded-md px-2.5 py-1.5">
+                      {isPremium ? "Premium Limit Reached (3/3)" : "Free Limit Reached (1/1)"}
+                    </span>
                   )}
                 </div>
               </div>
-              <div className="shrink-0 sm:w-auto w-full mt-2 sm:mt-0">
-                {isGmailLoading ? (
-                  <div className="h-8 w-20 rounded bg-bg-surface animate-pulse-subtle" />
-                ) : gmailStatus?.connected ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="sm:w-auto w-full hover:bg-accent-danger/10 hover:text-accent-danger border border-border-default hover:border-accent-danger/25"
-                    onClick={() => handleDisconnect("gmail")}
-                    isLoading={disconnectGmail.isPending}
-                  >
-                    Disconnect
-                  </Button>
-                ) : (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="sm:w-auto w-full font-semibold border-neutral-700 hover:bg-text-primary hover:text-bg-base"
-                    onClick={() => handleConnect("gmail")}
-                  >
-                    Connect
-                  </Button>
-                )}
-              </div>
+
+              {/* Connected Accounts List */}
+              {gmailStatus?.accounts && gmailStatus.accounts.length > 0 && (
+                <div className="flex flex-col gap-2.5 pl-12">
+                  <div className="text-[9px] uppercase tracking-wider font-bold text-text-tertiary">Connected Accounts</div>
+                  {gmailStatus.accounts.map((acc: any) => (
+                    <div key={acc.id} className="flex items-center justify-between bg-bg-surface/30 border border-border-subtle rounded-xl p-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse-subtle" />
+                        <span className="text-xs font-semibold text-text-primary truncate">
+                          {acc.emailAddress}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-[11px] font-semibold text-text-secondary hover:text-accent-danger hover:bg-accent-danger/10 border border-border-default hover:border-accent-danger/25 px-2.5 py-1"
+                        onClick={() => disconnectGmail.mutate({ accountId: acc.id })}
+                        isLoading={disconnectGmail.isPending && disconnectGmail.variables?.accountId === acc.id}
+                      >
+                        Disconnect
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Calendar integration row */}
-            <div className="p-5 flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
-              <div className="flex items-start gap-3.5 min-w-0">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-bg-surface border border-border-subtle text-text-primary">
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-                  </svg>
+            <div className="p-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap w-full">
+                <div className="flex items-start gap-3.5 min-w-0">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-bg-surface border border-border-subtle text-text-primary">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-medium text-text-primary">Google Calendar</h3>
+                    <p className="text-xs text-text-tertiary mt-0.5 leading-relaxed">
+                      Sync your agenda, view upcoming meetings, and plan your schedule.
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <h3 className="text-sm font-medium text-text-primary">Google Calendar</h3>
-                  <p className="text-xs text-text-tertiary mt-0.5 leading-relaxed">
-                    Sync your agenda, view upcoming meetings, and plan your schedule.
-                  </p>
-                  {calendarStatus?.connected && (
-                    <div className="mt-2 flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 truncate max-w-[200px] sm:max-w-xs">
-                        Connected to {calendarStatus.emailAddress}
-                      </span>
-                    </div>
+                <div className="shrink-0 sm:w-auto w-full mt-2 sm:mt-0">
+                  {isCalendarLoading ? (
+                    <div className="h-8 w-20 rounded bg-bg-surface animate-pulse-subtle" />
+                  ) : canConnectMoreCalendar ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="sm:w-auto w-full font-semibold border-neutral-700 hover:bg-text-primary hover:text-bg-base"
+                      onClick={() => handleConnect("googlecalendar")}
+                    >
+                      Connect Account
+                    </Button>
+                  ) : (
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-text-tertiary bg-bg-surface/50 border border-border-subtle rounded-md px-2.5 py-1.5">
+                      {isPremium ? "Premium Limit Reached (3/3)" : "Free Limit Reached (1/1)"}
+                    </span>
                   )}
                 </div>
               </div>
-              <div className="shrink-0 sm:w-auto w-full mt-2 sm:mt-0">
-                {isCalendarLoading ? (
-                  <div className="h-8 w-20 rounded bg-bg-surface animate-pulse-subtle" />
-                ) : calendarStatus?.connected ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="sm:w-auto w-full hover:bg-accent-danger/10 hover:text-accent-danger border border-border-default hover:border-accent-danger/25"
-                    onClick={() => handleDisconnect("googlecalendar")}
-                    isLoading={disconnectCalendar.isPending}
-                  >
-                    Disconnect
-                  </Button>
-                ) : (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="sm:w-auto w-full font-semibold border-neutral-700 hover:bg-text-primary hover:text-bg-base"
-                    onClick={() => handleConnect("googlecalendar")}
-                  >
-                    Connect
-                  </Button>
-                )}
-              </div>
+
+              {/* Connected Calendars List */}
+              {calendarStatus?.accounts && calendarStatus.accounts.length > 0 && (
+                <div className="flex flex-col gap-2.5 pl-12">
+                  <div className="text-[9px] uppercase tracking-wider font-bold text-text-tertiary">Connected Accounts</div>
+                  {calendarStatus.accounts.map((acc: any) => (
+                    <div key={acc.id} className="flex items-center justify-between bg-bg-surface/30 border border-border-subtle rounded-xl p-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse-subtle" />
+                        <span className="text-xs font-semibold text-text-primary truncate">
+                          {acc.emailAddress}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-[11px] font-semibold text-text-secondary hover:text-accent-danger hover:bg-accent-danger/10 border border-border-default hover:border-accent-danger/25 px-2.5 py-1"
+                        onClick={() => disconnectCalendar.mutate({ accountId: acc.id })}
+                        isLoading={disconnectCalendar.isPending && disconnectCalendar.variables?.accountId === acc.id}
+                      >
+                        Disconnect
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

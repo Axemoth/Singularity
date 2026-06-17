@@ -1,6 +1,6 @@
 import { db } from "@/server/db";
 import { corsairEntities, corsairAccounts, emailPriorities, userSettings } from "@/server/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, or, like } from "drizzle-orm";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
@@ -158,11 +158,13 @@ export async function classifyAndSaveEmail(tenantId: string, entityId: string, m
     const subject = message.subject ?? "";
     const snippet = message.snippet ?? message.body ?? "";
 
+    const baseUserId = tenantId.includes("_") ? tenantId.split("_")[0]! : tenantId;
+
     // Fetch custom priority rules
     const [settings] = await db
       .select({ priorityInstructions: userSettings.priorityInstructions })
       .from(userSettings)
-      .where(eq(userSettings.userId, tenantId))
+      .where(eq(userSettings.userId, baseUserId))
       .limit(1);
     
     const customRules = settings?.priorityInstructions;
@@ -188,7 +190,7 @@ export async function classifyAndSaveEmail(tenantId: string, entityId: string, m
     } else {
       await db.insert(emailPriorities).values({
         id: crypto.randomUUID(),
-        tenantId,
+        tenantId: baseUserId,
         emailId: entity.id,
         priority: classification.priority,
         reason: classification.reason,
@@ -232,7 +234,10 @@ export async function syncPriorities(userId: string): Promise<void> {
       .leftJoin(emailPriorities, eq(corsairEntities.id, emailPriorities.emailId))
       .where(
         and(
-          eq(corsairAccounts.tenantId, userId),
+          or(
+            eq(corsairAccounts.tenantId, userId),
+            like(corsairAccounts.tenantId, `${userId}_%`)
+          ),
           eq(corsairEntities.entityType, "threads"),
           isNull(emailPriorities.id)
         )

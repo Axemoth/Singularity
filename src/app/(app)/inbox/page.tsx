@@ -685,6 +685,7 @@ export default function InboxPage() {
   const [activeTab, setActiveTab] = useState<"all" | "priority" | "other" | "sent" | "drafts">("all");
   const [priorityInput, setPriorityInput] = useState("");
   const [isEditingRules, setIsEditingRules] = useState(false);
+  const [selectedEmailFilter, setSelectedEmailFilter] = useState<string>("all");
 
   const utils = api.useUtils();
 
@@ -789,8 +790,16 @@ export default function InboxPage() {
     return 1; // low or null
   };
 
-  const sortedAllThreads = threads
-    ? [...threads].sort((a, b) => {
+  // Filter threads by selected account first
+  const filteredByEmailThreads = threads
+    ? threads.filter((t: any) => {
+        if (selectedEmailFilter === "all") return true;
+        return t.emailAddress?.toLowerCase() === selectedEmailFilter.toLowerCase();
+      })
+    : [];
+
+  const sortedAllThreads = filteredByEmailThreads.length > 0
+    ? [...filteredByEmailThreads].sort((a, b) => {
         const aUnread = getThreadData(a).messages?.[0]?.labelIds?.includes("UNREAD") ?? false;
         const bUnread = getThreadData(b).messages?.[0]?.labelIds?.includes("UNREAD") ?? false;
 
@@ -938,6 +947,37 @@ export default function InboxPage() {
                 </span>
               )}
             </button>
+          </div>
+        )}
+
+        {/* Account Filter Pills */}
+        {gmailStatus?.connected && gmailStatus.accounts && gmailStatus.accounts.length > 1 && (
+          <div className="flex gap-1.5 px-3.5 py-2 border-b border-border-subtle bg-bg-raised/20 overflow-x-auto scrollbar-none shrink-0">
+            <button
+              type="button"
+              onClick={() => setSelectedEmailFilter("all")}
+              className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md border cursor-pointer transition-all duration-[var(--transition-fast)] shrink-0 ${
+                selectedEmailFilter === "all"
+                  ? "bg-bg-surface text-text-primary border-border-default shadow-sm"
+                  : "bg-transparent text-text-tertiary border-transparent hover:text-text-primary"
+              }`}
+            >
+              All Accounts
+            </button>
+            {gmailStatus.accounts.map((acc: any) => (
+              <button
+                key={acc.id}
+                type="button"
+                onClick={() => setSelectedEmailFilter(acc.emailAddress)}
+                className={`px-2.5 py-1 text-[10px] font-bold rounded-md border cursor-pointer transition-all duration-[var(--transition-fast)] shrink-0 ${
+                  selectedEmailFilter === acc.emailAddress
+                    ? "bg-bg-surface text-text-primary border-border-default shadow-sm"
+                    : "bg-transparent text-text-tertiary border-transparent hover:text-text-primary"
+                }`}
+              >
+                {acc.emailAddress}
+              </button>
+            ))}
           </div>
         )}
 

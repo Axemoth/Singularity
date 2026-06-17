@@ -80,6 +80,7 @@ interface CalendarEvent {
   entityId: string;
   data: CalendarEventData;
   updatedAt: Date;
+  emailAddress?: string;
 }
 
 interface DateGroup {
@@ -691,6 +692,14 @@ export default function CalendarPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
+  const [selectedCalendars, setSelectedCalendars] = useState<Record<string, boolean>>({});
+
+  const toggleCalendar = (emailAddress: string) => {
+    setSelectedCalendars((prev) => ({
+      ...prev,
+      [emailAddress]: prev[emailAddress] === false ? true : false,
+    }));
+  };
 
   const utils = api.useUtils();
   const { data: calendarStatus, isLoading: isStatusLoading } = api.calendar.getConnectionStatus.useQuery();
@@ -712,6 +721,12 @@ export default function CalendarPage() {
 
     const query = searchQuery.trim().toLowerCase();
     const filtered = (events as CalendarEvent[]).filter((event) => {
+      // Filter by selected calendars
+      const eventEmail = event.emailAddress;
+      if (eventEmail && selectedCalendars[eventEmail] === false) {
+        return false;
+      }
+
       if (!query) return true;
       const summary = (event.data?.summary ?? "").toLowerCase();
       const description = (event.data?.description ?? "").toLowerCase();
@@ -739,7 +754,7 @@ export default function CalendarPage() {
       }
     }
     return map;
-  }, [events, searchQuery]);
+  }, [events, searchQuery, selectedCalendars]);
 
   // List view groups
   const groups = useMemo<DateGroup[]>(() => {
@@ -940,6 +955,30 @@ export default function CalendarPage() {
           </div>
         )}
 
+        {/* Calendar Filter Pills */}
+        {!isLoading && !isError && calendarStatus?.connected && calendarStatus.accounts && calendarStatus.accounts.length > 1 && (
+          <div className="mb-6 flex flex-wrap gap-2 animate-fade-in">
+            {calendarStatus.accounts.map((acc: any) => {
+              const isChecked = selectedCalendars[acc.emailAddress] !== false;
+              return (
+                <button
+                  key={acc.id}
+                  type="button"
+                  onClick={() => toggleCalendar(acc.emailAddress)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all duration-[var(--transition-fast)] ${
+                    isChecked
+                      ? "bg-accent-primary/10 border-accent-primary/25 text-accent-primary animate-fade-in"
+                      : "border-border-default text-text-tertiary bg-transparent hover:text-text-primary"
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full transition-all ${isChecked ? "bg-accent-primary animate-pulse-subtle" : "bg-text-tertiary/40"}`} />
+                  {acc.emailAddress}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Search Input Bar */}
         {!isLoading && !isError && totalEvents > 0 && (
           <div className="mb-6 animate-fade-in">
@@ -1021,7 +1060,7 @@ export default function CalendarPage() {
               No events found
             </p>
             <p className="mb-4 text-xs text-text-tertiary leading-relaxed">
-              Connected as {calendarStatus?.emailAddress}. Sync your calendar to import events.
+              Connected as {calendarStatus?.accounts?.[0]?.emailAddress || "Connected"}. Sync your calendar to import events.
             </p>
             <Button variant="secondary" size="sm" onClick={handleRefresh} isLoading={isFetching}>
               <RefreshIcon className="h-3.5 w-3.5" />
@@ -1116,9 +1155,11 @@ function CreateEventModal({
   defaultTime?: string;
 }) {
   const [activeTab, setActiveTab] = useState<"manual" | "ai">("manual");
+  const { data: calendarStatus } = api.calendar.getConnectionStatus.useQuery();
   
   // Form Fields
   const [summary, setSummary] = useState("");
+  const [fromEmail, setFromEmail] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   
@@ -1162,8 +1203,15 @@ function CreateEventModal({
         setStartTime("10:00");
         setEndTime("11:00");
       }
+
+      const firstAccount = calendarStatus?.accounts?.[0];
+      if (firstAccount) {
+        setFromEmail(firstAccount.emailAddress);
+      } else {
+        setFromEmail("");
+      }
     }
-  }, [isOpen, defaultDate, defaultTime]);
+  }, [isOpen, defaultDate, defaultTime, calendarStatus]);
   const [isAiLoading, setIsAiLoading] = useState(false);
 
   const createMutation = api.calendar.createEvent.useMutation({
@@ -1226,6 +1274,7 @@ function CreateEventModal({
     setEndDate(dateStr);
     setStartTime("10:00");
     setEndTime("11:00");
+    setFromEmail("");
   };
 
   const handleSave = () => {
@@ -1250,6 +1299,7 @@ function CreateEventModal({
       start: startISO,
       end: endISO,
       attendees: attendeeEmails.length > 0 ? attendeeEmails : undefined,
+      fromEmail: fromEmail || undefined,
     });
   };
 
@@ -1374,6 +1424,24 @@ Do not output any conversational text, notes, markdown formatting other than the
                   className="w-full border border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary outline-none px-3.5 py-2 text-xs rounded-xl transition-colors font-semibold"
                 />
               </div>
+
+              {/* Calendar Account Selector (Only if multiple connected) */}
+              {calendarStatus?.accounts && calendarStatus.accounts.length > 1 && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Calendar Account</label>
+                  <select
+                    value={fromEmail}
+                    onChange={(e) => setFromEmail(e.target.value)}
+                    className="w-full border border-border-subtle bg-bg-inset text-text-primary focus:border-accent-primary outline-none px-3.5 py-2 text-xs rounded-xl transition-colors font-semibold"
+                  >
+                    {calendarStatus.accounts.map((acc: any) => (
+                      <option key={acc.id} value={acc.emailAddress}>
+                        {acc.emailAddress}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Date & Time Grid */}
               <div className="grid grid-cols-2 gap-3">

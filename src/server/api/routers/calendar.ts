@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
 import { corsairEntities, corsairAccounts, corsairIntegrations, corsairEvents } from "@/server/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, or, like } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { syncEmbeddings } from "@/server/api/tasks/embeddings";
 
@@ -16,21 +16,38 @@ export const calendarRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      const tenant = corsair.withTenant(userId);
+
+      // Query all connected calendar accounts for this user
+      const accounts = await ctx.db
+        .select({
+          id: corsairAccounts.id,
+          tenantId: corsairAccounts.tenantId,
+          emailAddress: corsairAccounts.emailAddress,
+        })
+        .from(corsairAccounts)
+        .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+        .where(
+          and(
+            or(
+              eq(corsairAccounts.tenantId, userId),
+              like(corsairAccounts.tenantId, `${userId}_%`)
+            ),
+            eq(corsairIntegrations.name, "googlecalendar")
+          )
+        );
 
       if (input.refresh) {
-        try {
-          // Trigger live getMany which updates the corsair_entities table automatically
-          await tenant.googlecalendar.api.events.getMany({
-            calendarId: input.calendarId,
-            maxResults: 100,
-          });
-        } catch (err: any) {
-          console.error("Failed to sync calendar events:", err);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `Failed to refresh calendar cache: ${err.message || err}`,
-          });
+        for (const account of accounts) {
+          const tenant = corsair.withTenant(account.tenantId);
+          try {
+            // Trigger live getMany which updates the corsair_entities table automatically
+            await tenant.googlecalendar.api.events.getMany({
+              calendarId: input.calendarId,
+              maxResults: 100,
+            });
+          } catch (err: any) {
+            console.error(`Failed to sync calendar events for ${account.emailAddress}:`, err);
+          }
         }
       }
 
@@ -46,13 +63,18 @@ export const calendarRouter = createTRPCRouter({
           entityId: corsairEntities.entityId,
           data: corsairEntities.data,
           updatedAt: corsairEntities.updatedAt,
+          accountId: corsairEntities.accountId,
+          emailAddress: corsairAccounts.emailAddress,
         })
         .from(corsairEntities)
         .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
         .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
         .where(
           and(
-            eq(corsairAccounts.tenantId, userId),
+            or(
+              eq(corsairAccounts.tenantId, userId),
+              like(corsairAccounts.tenantId, `${userId}_%`)
+            ),
             eq(corsairIntegrations.name, "googlecalendar"),
             eq(corsairEntities.entityType, "events")
           )
@@ -60,50 +82,44 @@ export const calendarRouter = createTRPCRouter({
         .orderBy(desc(corsairEntities.updatedAt));
 
       // Auto-sync on first load if account exists but database is empty
-      if (events.length === 0 && !input.refresh) {
-        const hasAccount = await ctx.db
-          .select({ id: corsairAccounts.id })
-          .from(corsairAccounts)
-          .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
-          .where(
-            and(
-              eq(corsairAccounts.tenantId, userId),
-              eq(corsairIntegrations.name, "googlecalendar")
-            )
-          )
-          .limit(1);
-
-        if (hasAccount.length > 0) {
+      if (events.length === 0 && !input.refresh && accounts.length > 0) {
+        for (const account of accounts) {
+          const tenant = corsair.withTenant(account.tenantId);
           try {
-            console.log(`[Calendar Auto-sync] Populating Calendar events for user ${userId}...`);
+            console.log(`[Calendar Auto-sync] Populating Calendar events for user ${userId}, account ${account.emailAddress}...`);
             await tenant.googlecalendar.api.events.getMany({
               calendarId: input.calendarId,
               maxResults: 100,
             });
-
-            // Query again
-            events = await ctx.db
-              .select({
-                id: corsairEntities.id,
-                entityId: corsairEntities.entityId,
-                data: corsairEntities.data,
-                updatedAt: corsairEntities.updatedAt,
-              })
-              .from(corsairEntities)
-              .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
-              .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
-              .where(
-                and(
-                  eq(corsairAccounts.tenantId, userId),
-                  eq(corsairIntegrations.name, "googlecalendar"),
-                  eq(corsairEntities.entityType, "events")
-                )
-              )
-              .orderBy(desc(corsairEntities.updatedAt));
           } catch (err: any) {
-            console.error("[Calendar Auto-sync] Failed to auto-sync Calendar events:", err);
+            console.error(`[Calendar Auto-sync] Failed to auto-sync Calendar events for ${account.emailAddress}:`, err);
           }
         }
+
+        // Query again
+        events = await ctx.db
+          .select({
+            id: corsairEntities.id,
+            entityId: corsairEntities.entityId,
+            data: corsairEntities.data,
+            updatedAt: corsairEntities.updatedAt,
+            accountId: corsairEntities.accountId,
+            emailAddress: corsairAccounts.emailAddress,
+          })
+          .from(corsairEntities)
+          .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
+          .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+          .where(
+            and(
+              or(
+                eq(corsairAccounts.tenantId, userId),
+                like(corsairAccounts.tenantId, `${userId}_%`)
+              ),
+              eq(corsairIntegrations.name, "googlecalendar"),
+              eq(corsairEntities.entityType, "events")
+            )
+          )
+          .orderBy(desc(corsairEntities.updatedAt));
       }
 
       return events;
@@ -111,7 +127,7 @@ export const calendarRouter = createTRPCRouter({
 
   getConnectionStatus: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
-    const account = await ctx.db
+    const accounts = await ctx.db
       .select({
         id: corsairAccounts.id,
         emailAddress: corsairAccounts.emailAddress,
@@ -120,55 +136,58 @@ export const calendarRouter = createTRPCRouter({
       .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
       .where(
         and(
-          eq(corsairAccounts.tenantId, userId),
+          or(
+            eq(corsairAccounts.tenantId, userId),
+            like(corsairAccounts.tenantId, `${userId}_%`)
+          ),
           eq(corsairIntegrations.name, "googlecalendar")
         )
-      )
-      .limit(1);
+      );
 
-    const [acc] = account;
-    if (acc) {
-      return {
-        connected: true,
+    return {
+      connected: accounts.length > 0,
+      accounts: accounts.map((acc) => ({
+        id: acc.id,
         emailAddress: acc.emailAddress ?? "Connected",
-      };
-    }
-    return { connected: false };
+      })),
+    };
   }),
 
-  disconnect: protectedProcedure.mutation(async ({ ctx }) => {
-    const userId = ctx.session.user.id;
+  disconnect: protectedProcedure
+    .input(z.object({ accountId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
 
-    const account = await ctx.db
-      .select({ id: corsairAccounts.id })
-      .from(corsairAccounts)
-      .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
-      .where(
-        and(
-          eq(corsairAccounts.tenantId, userId),
-          eq(corsairIntegrations.name, "googlecalendar")
+      const [account] = await ctx.db
+        .select({ id: corsairAccounts.id })
+        .from(corsairAccounts)
+        .where(
+          and(
+            eq(corsairAccounts.id, input.accountId),
+            or(
+              eq(corsairAccounts.tenantId, userId),
+              like(corsairAccounts.tenantId, `${userId}_%`)
+            )
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    const [acc] = account;
-    if (acc) {
-      const accountId = acc.id;
+      if (account) {
+        const accountId = account.id;
 
-      // Delete dependent corsair entities
-      await ctx.db.delete(corsairEntities).where(eq(corsairEntities.accountId, accountId));
+        // Delete dependent corsair entities
+        await ctx.db.delete(corsairEntities).where(eq(corsairEntities.accountId, accountId));
 
-      // Delete integration events
-      await ctx.db.delete(corsairEvents).where(eq(corsairEvents.accountId, accountId));
+        // Delete integration events
+        await ctx.db.delete(corsairEvents).where(eq(corsairEvents.accountId, accountId));
 
-      // Delete the account
-      await ctx.db.delete(corsairAccounts).where(eq(corsairAccounts.id, accountId));
+        // Delete the account
+        await ctx.db.delete(corsairAccounts).where(eq(corsairAccounts.id, accountId));
 
-      return { success: true };
-    }
-    return { success: false };
-  }),
-
+        return { success: true };
+      }
+      return { success: false };
+    }),
 
   createEvent: protectedProcedure
     .input(
@@ -180,11 +199,36 @@ export const calendarRouter = createTRPCRouter({
         start: z.string(), // ISO String or datetime format
         end: z.string(), // ISO String or datetime format
         attendees: z.array(z.string().email()).optional(),
+        fromEmail: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      const tenant = corsair.withTenant(userId);
+      
+      // Resolve tenantId based on preferred email or fallback to primary account
+      const preferredEmail = input.fromEmail;
+      const accounts = await ctx.db
+        .select({ tenantId: corsairAccounts.tenantId, emailAddress: corsairAccounts.emailAddress })
+        .from(corsairAccounts)
+        .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+        .where(
+          and(
+            or(
+              eq(corsairAccounts.tenantId, userId),
+              like(corsairAccounts.tenantId, `${userId}_%`)
+            ),
+            eq(corsairIntegrations.name, "googlecalendar")
+          )
+        );
+
+      let tenantId = userId;
+      const fallbackAccount = accounts[0];
+      if (fallbackAccount) {
+        const matched = preferredEmail ? accounts.find(a => a.emailAddress?.toLowerCase() === preferredEmail.toLowerCase()) : null;
+        tenantId = matched ? matched.tenantId : fallbackAccount.tenantId;
+      }
+
+      const tenant = corsair.withTenant(tenantId);
 
       try {
         const res = await tenant.googlecalendar.api.events.create({
@@ -227,7 +271,25 @@ export const calendarRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      const tenant = corsair.withTenant(userId);
+
+      // Look up event entity's account
+      const [eventEntity] = await ctx.db
+        .select({ accountId: corsairEntities.accountId })
+        .from(corsairEntities)
+        .where(eq(corsairEntities.entityId, input.id))
+        .limit(1);
+
+      let tenantId = userId;
+      if (eventEntity) {
+        const [acc] = await ctx.db
+          .select({ tenantId: corsairAccounts.tenantId })
+          .from(corsairAccounts)
+          .where(eq(corsairAccounts.id, eventEntity.accountId))
+          .limit(1);
+        if (acc) tenantId = acc.tenantId;
+      }
+
+      const tenant = corsair.withTenant(tenantId);
 
       try {
         const res = await tenant.googlecalendar.api.events.update({
@@ -265,7 +327,25 @@ export const calendarRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      const tenant = corsair.withTenant(userId);
+
+      // Look up event entity's account
+      const [eventEntity] = await ctx.db
+        .select({ accountId: corsairEntities.accountId })
+        .from(corsairEntities)
+        .where(eq(corsairEntities.entityId, input.id))
+        .limit(1);
+
+      let tenantId = userId;
+      if (eventEntity) {
+        const [acc] = await ctx.db
+          .select({ tenantId: corsairAccounts.tenantId })
+          .from(corsairAccounts)
+          .where(eq(corsairAccounts.id, eventEntity.accountId))
+          .limit(1);
+        if (acc) tenantId = acc.tenantId;
+      }
+
+      const tenant = corsair.withTenant(tenantId);
 
       try {
         await tenant.googlecalendar.api.events.delete({

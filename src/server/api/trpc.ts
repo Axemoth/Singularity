@@ -132,3 +132,21 @@ export const protectedProcedure = t.procedure
       },
     });
   });
+
+export const adminProcedure = protectedProcedure
+  .use(async ({ ctx, next }) => {
+    const { user } = await import("@/server/db/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const [dbUser] = await ctx.db
+      .select({ role: user.role })
+      .from(user)
+      .where(eq(user.id, ctx.session.user.id))
+      .limit(1);
+
+    if (dbUser?.role !== "admin") {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required." });
+    }
+
+    return next();
+  });

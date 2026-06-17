@@ -680,6 +680,12 @@ export default function LandingPage() {
                 <li className="flex items-center gap-2">
                   <span className="text-accent-success">✓</span> Standard view options
                 </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-accent-success">✓</span> AI Copilot (20 requests/day)
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-accent-success">✓</span> Max 1 Gmail/Calendar account
+                </li>
               </ul>
             </div>
             <div className="mt-8">
@@ -711,7 +717,10 @@ export default function LandingPage() {
               </div>
               <ul className="mt-6 space-y-4 text-xs text-text-secondary">
                 <li className="flex items-center gap-2">
-                  <span className="text-accent-primary">✨</span> Advanced AI Co-Pilot
+                  <span className="text-accent-primary">✨</span> Unlimited AI Co-Pilot requests
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-accent-primary">✨</span> Connect up to 3 accounts
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-accent-primary">✨</span> Careful & Autonomous Modes

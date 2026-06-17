@@ -173,10 +173,57 @@ export const agentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
+      const userEmail = ctx.session.user.email;
 
       try {
-        const { userSettings } = await import("@/server/db/schema");
-        const { eq } = await import("drizzle-orm");
+        const { userSettings, corsairAccounts, corsairIntegrations, copilotUsage } = await import("@/server/db/schema");
+        const { eq, and, or, like, sql } = await import("drizzle-orm");
+        const { isPremiumUser } = await import("@/server/subscription");
+
+        // 1. Enforce daily rate limit of 20 requests for Free tier users
+        const isPremium = await isPremiumUser(userEmail);
+        if (!isPremium) {
+          const d = new Date();
+          const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+          const [usage] = await ctx.db
+            .select()
+            .from(copilotUsage)
+            .where(eq(copilotUsage.userId, userId))
+            .limit(1);
+
+          if (!usage) {
+            await ctx.db.insert(copilotUsage).values({
+              userId,
+              requestCount: 1,
+              lastRequestDate: todayStr,
+              updatedAt: new Date(),
+            });
+          } else if (usage.lastRequestDate !== todayStr) {
+            await ctx.db
+              .update(copilotUsage)
+              .set({
+                requestCount: 1,
+                lastRequestDate: todayStr,
+                updatedAt: new Date(),
+              })
+              .where(eq(copilotUsage.userId, userId));
+          } else {
+            if (usage.requestCount >= 20) {
+              throw new TRPCError({
+                code: "FORBIDDEN",
+                message: "Daily Copilot limit reached. Free tier is limited to 20 requests per day. Upgrade to Premium for unlimited Copilot requests.",
+              });
+            }
+            await ctx.db
+              .update(copilotUsage)
+              .set({
+                requestCount: usage.requestCount + 1,
+                updatedAt: new Date(),
+              })
+              .where(eq(copilotUsage.userId, userId));
+          }
+        }
 
         const [settings] = await ctx.db
           .select({ modelMode: userSettings.modelMode })
@@ -185,9 +232,30 @@ export const agentRouter = createTRPCRouter({
           .limit(1);
         const modelMode = settings?.modelMode ?? "careful";
 
+        // Query all connected Gmail accounts for this user
+        const gmailAccounts = await ctx.db
+          .select({
+            tenantId: corsairAccounts.tenantId,
+            emailAddress: corsairAccounts.emailAddress,
+          })
+          .from(corsairAccounts)
+          .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+          .where(
+            and(
+              or(
+                eq(corsairAccounts.tenantId, userId),
+                like(corsairAccounts.tenantId, `${userId}_%`)
+              ),
+              eq(corsairIntegrations.name, "gmail")
+            )
+          )
+          .orderBy(corsairAccounts.createdAt);
+
+        const primaryGmailTenantId = gmailAccounts[0]?.tenantId ?? userId;
+
         let didExecuteWriteTool = false;
         const provider = new MastraProvider();
-        const toolsList = await provider.build({ corsair: corsair.withTenant(userId) });
+        const toolsList = await provider.build({ corsair: corsair.withTenant(primaryGmailTenantId) });
 
         const wrappedMcpTools = Object.fromEntries(
           toolsList.map((t) => {
@@ -224,11 +292,19 @@ export const agentRouter = createTRPCRouter({
             to: z.string().email().describe("Recipient email address"),
             subject: z.string().describe("Subject line of the email"),
             body: z.string().describe("Body content of the email (HTML or plain text)"),
+            fromEmail: z.string().optional().describe("Sender email address (choose one of the user's connected emails)"),
           }),
-          execute: async ({ to, subject, body }) => {
+          execute: async ({ to, subject, body, fromEmail }) => {
             console.log(`[send_email tool] Sending email to ${to} via tenant ${userId}...`);
             didExecuteWriteTool = true;
-            const tenant = corsair.withTenant(userId);
+            
+            let targetTenantId = primaryGmailTenantId;
+            if (fromEmail) {
+              const matched = gmailAccounts.find(a => a.emailAddress?.toLowerCase() === fromEmail.toLowerCase());
+              if (matched) targetTenantId = matched.tenantId;
+            }
+
+            const tenant = corsair.withTenant(targetTenantId);
             const raw = buildRawEmail(to, subject, body);
             const res = await tenant.gmail.api.messages.send({ raw });
             return res;
@@ -242,11 +318,19 @@ export const agentRouter = createTRPCRouter({
             to: z.string().email().optional().describe("Recipient email address"),
             subject: z.string().optional().describe("Subject line of the email"),
             body: z.string().describe("Body content of the email (HTML or plain text)"),
+            fromEmail: z.string().optional().describe("Sender email address (choose one of the user's connected emails)"),
           }),
-          execute: async ({ to, subject, body }) => {
+          execute: async ({ to, subject, body, fromEmail }) => {
             console.log(`[create_draft tool] Creating draft for ${to} via tenant ${userId}...`);
             didExecuteWriteTool = true;
-            const tenant = corsair.withTenant(userId);
+
+            let targetTenantId = primaryGmailTenantId;
+            if (fromEmail) {
+              const matched = gmailAccounts.find(a => a.emailAddress?.toLowerCase() === fromEmail.toLowerCase());
+              if (matched) targetTenantId = matched.tenantId;
+            }
+
+            const tenant = corsair.withTenant(targetTenantId);
             const raw = buildRawEmail(to ?? "", subject ?? "", body);
             const res = await tenant.gmail.api.drafts.create({
               draft: {
@@ -280,7 +364,7 @@ export const agentRouter = createTRPCRouter({
               
               // 2. Perform vector search in postgres
               const { corsairEmbeddings, corsairEntities, corsairAccounts } = await import("@/server/db/schema");
-              const { sql, eq, and } = await import("drizzle-orm");
+              const { sql, eq, and, or, like } = await import("drizzle-orm");
 
               // We select the top 5 most similar matches, order by cosine distance
               const results = await ctx.db
@@ -297,7 +381,10 @@ export const agentRouter = createTRPCRouter({
                 .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
                 .where(
                   and(
-                    eq(corsairAccounts.tenantId, userId)
+                    or(
+                      eq(corsairAccounts.tenantId, userId),
+                      like(corsairAccounts.tenantId, `${userId}_%`)
+                    )
                   )
                 )
                 .orderBy(sql`${corsairEmbeddings.embedding} <=> ${queryEmbeddingStr}::vector`)
@@ -375,7 +462,7 @@ export const agentRouter = createTRPCRouter({
             console.log(`[search_contacts tool] Searching contacts for query: "${query}" via tenant ${userId}...`);
             try {
               const { corsairEntities, corsairAccounts } = await import("@/server/db/schema");
-              const { eq, and } = await import("drizzle-orm");
+              const { eq, and, or, like } = await import("drizzle-orm");
 
               const threads = await ctx.db
                 .select({ data: corsairEntities.data })
@@ -383,7 +470,10 @@ export const agentRouter = createTRPCRouter({
                 .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
                 .where(
                   and(
-                    eq(corsairAccounts.tenantId, userId),
+                    or(
+                      eq(corsairAccounts.tenantId, userId),
+                      like(corsairAccounts.tenantId, `${userId}_%`)
+                    ),
                     eq(corsairEntities.entityType, "threads")
                   )
                 );

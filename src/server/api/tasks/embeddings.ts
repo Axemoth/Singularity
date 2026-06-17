@@ -1,6 +1,6 @@
 import { db } from "@/server/db";
 import { corsairEntities, corsairAccounts, corsairEmbeddings } from "@/server/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, or, like } from "drizzle-orm";
 import { env } from "@/env";
 
 interface GmailMessagePayload {
@@ -173,7 +173,10 @@ export async function syncEmbeddings(userId: string): Promise<void> {
       .leftJoin(corsairEmbeddings, eq(corsairEntities.id, corsairEmbeddings.entityId))
       .where(
         and(
-          eq(corsairAccounts.tenantId, userId),
+          or(
+            eq(corsairAccounts.tenantId, userId),
+            like(corsairAccounts.tenantId, `${userId}_%`)
+          ),
           isNull(corsairEmbeddings.id)
         )
       );

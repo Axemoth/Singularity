@@ -1,6 +1,10 @@
 import { generateOAuthUrl } from "corsair/oauth";
 import { corsair } from "@/server/corsair";
 import { getSession } from "@/server/better-auth/server";
+import { isPremiumUser } from "@/server/subscription";
+import { db } from "@/server/db";
+import { corsairAccounts, corsairIntegrations } from "@/server/db/schema";
+import { eq, and, or, like } from "drizzle-orm";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -19,8 +23,34 @@ export async function GET(request: NextRequest) {
     const redirectUri = `${process.env.APP_URL}/api/connect/callback`;
 
     try {
+        // 1. Determine connection limit based on user subscription
+        const isPremium = await isPremiumUser(session.user.email);
+        const limit = isPremium ? 3 : 1;
+
+        // 2. Query existing connections for this user and integration
+        const existingAccounts = await db
+            .select({ id: corsairAccounts.id })
+            .from(corsairAccounts)
+            .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+            .where(
+                and(
+                    or(
+                        eq(corsairAccounts.tenantId, session.user.id),
+                        like(corsairAccounts.tenantId, `${session.user.id}_%`)
+                    ),
+                    eq(corsairIntegrations.name, plugin)
+                )
+            );
+
+        if (existingAccounts.length >= limit) {
+            return NextResponse.redirect(new URL(`/settings?error=limit_reached&plugin=${plugin}`, process.env.APP_URL));
+        }
+
+        // 3. Generate a unique tenant ID for this new connection
+        const uniqueTenantId = `${session.user.id}_${Date.now()}`;
+
         const { url, state } = await generateOAuthUrl(corsair, plugin, {
-            tenantId: session.user.id,
+            tenantId: uniqueTenantId,
             redirectUri,
         });
 
@@ -37,3 +67,4 @@ export async function GET(request: NextRequest) {
         return new NextResponse(`Failed to generate OAuth URL: ${err.message || err}`, { status: 500 });
     }
 }
+
