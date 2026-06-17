@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { Tooltip } from '@/app/_components/ui/tooltip';
 import { Avatar } from '@/app/_components/ui/avatar';
 import { useTheme } from '@/app/_components/theme-provider';
-
+import { api } from '@/trpc/react';
 import { authClient } from '@/server/better-auth/client';
 
 interface NavItem {
@@ -49,6 +50,80 @@ const navItems: NavItem[] = [
   },
 ];
 
+// ─── Keyboard Shortcuts Modal ─────────────────────────────────────────────────
+
+const shortcuts = [
+  { key: 'C', description: 'Compose new email' },
+  { key: 'G I', description: 'Go to Inbox' },
+  { key: 'G C', description: 'Go to Calendar' },
+  { key: 'G A', description: 'Go to Agent Chat' },
+  { key: 'G S', description: 'Go to Settings' },
+  { key: 'E', description: 'Archive selected thread (in inbox)' },
+  { key: '#', description: 'Delete selected thread (in inbox)' },
+  { key: 'R', description: 'Open reply (in inbox)' },
+  { key: '?', description: 'Show keyboard shortcuts' },
+  { key: 'Esc', description: 'Close panel / cancel' },
+];
+
+function ShortcutsModal({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-md mx-4 rounded-2xl border border-border-default bg-bg-overlay shadow-[var(--shadow-xl)] animate-scale-in p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-base font-bold text-text-primary">Keyboard Shortcuts</h2>
+            <p className="text-xs text-text-tertiary mt-0.5">Press <kbd className="px-1.5 py-0.5 bg-bg-surface border border-border-default rounded text-[10px] font-mono">?</kbd> to toggle this panel</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-surface transition-colors cursor-pointer"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Shortcut list */}
+        <div className="flex flex-col gap-1">
+          {shortcuts.map((s) => (
+            <div key={s.key} className="flex items-center justify-between py-1.5 border-b border-border-subtle last:border-0">
+              <span className="text-sm text-text-secondary">{s.description}</span>
+              <div className="flex gap-1">
+                {s.key.split(' ').map((k) => (
+                  <kbd
+                    key={k}
+                    className="px-2 py-0.5 bg-bg-surface border border-border-default rounded-md text-[11px] font-mono font-semibold text-text-primary shadow-sm"
+                  >
+                    {k}
+                  </kbd>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Icon components ──────────────────────────────────────────────────────────
+
 function ComposeIcon() {
   return (
     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -82,100 +157,198 @@ function MoonIcon() {
   );
 }
 
+function HelpIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+    </svg>
+  );
+}
+
+// ─── Main Sidebar ─────────────────────────────────────────────────────────────
+
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const { data: sessionData } = authClient.useSession();
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Fetch unread count for inbox badge
+  const { data: threads } = api.gmail.listThreads.useQuery(
+    { refresh: false },
+    { refetchInterval: 60000 } // refresh every 60s
+  );
+
+  const unreadCount = threads
+    ? threads.filter((t: any) => {
+        const msgs = (t.data as any)?.messages ?? [];
+        return msgs[0]?.labelIds?.includes('UNREAD');
+      }).length
+    : 0;
+
+  // Global '?' keyboard shortcut to open shortcuts modal
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.key === '?') setShowShortcuts((prev) => !prev);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // G-prefix navigation shortcuts (G I, G C, G A, G S)
+  useEffect(() => {
+    let gPressed = false;
+    let gTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      // Don't trigger when typing in inputs
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return;
+      // Don't trigger with modifier keys
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      if (e.key === 'g' || e.key === 'G') {
+        gPressed = true;
+        // Reset after 1.5s if no second key pressed
+        if (gTimer) clearTimeout(gTimer);
+        gTimer = setTimeout(() => { gPressed = false; }, 1500);
+        return;
+      }
+
+      if (gPressed) {
+        gPressed = false;
+        if (gTimer) clearTimeout(gTimer);
+        switch (e.key.toLowerCase()) {
+          case 'i': router.push('/inbox'); break;
+          case 'c': router.push('/calendar'); break;
+          case 'a': router.push('/agent'); break;
+          case 's': router.push('/settings'); break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      if (gTimer) clearTimeout(gTimer);
+    };
+  }, [router]);
 
   return (
-    <aside className="flex h-screen w-16 flex-col items-center border-r border-border-subtle bg-bg-raised py-4 sticky top-0">
-      {/* ─── Logo ─── */}
-      <Link
-        href="/inbox"
-        className="mb-4 flex h-9 w-9 overflow-hidden items-center justify-center rounded-[var(--radius-md)] bg-accent-primary text-text-inverse select-none transition-transform duration-150 hover:scale-105 active:scale-95"
-        aria-label="Singularity home"
-      >
-        <img src="/logo.png" alt="Singularity Logo" className="h-full w-full object-cover" />
-      </Link>
-
-      <Tooltip content="Compose" shortcut="C" position="right">
-        <button
-          onClick={() => window.dispatchEvent(new CustomEvent("open-compose"))}
-          className="mb-6 flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-accent-primary text-text-inverse shadow-[var(--shadow-md)] transition-all duration-150 hover:bg-accent-primary-hover hover:shadow-[var(--shadow-lg)] hover:scale-105 active:scale-95"
-          aria-label="Compose"
+    <>
+      <aside className="flex h-screen w-16 flex-col items-center border-r border-border-subtle bg-bg-raised py-4 sticky top-0">
+        {/* ─── Logo ─── */}
+        <Link
+          href="/inbox"
+          className="mb-4 flex h-9 w-9 overflow-hidden items-center justify-center rounded-[var(--radius-md)] bg-accent-primary text-text-inverse select-none transition-transform duration-150 hover:scale-105 active:scale-95"
+          aria-label="Singularity home"
         >
-          <ComposeIcon />
-        </button>
-      </Tooltip>
+          <img src="/logo.png" alt="Singularity Logo" className="h-full w-full object-cover" />
+        </Link>
 
-      {/* ─── Navigation ─── */}
-      <nav className="flex flex-col items-center gap-1">
-        {navItems.map((item) => {
-          const isActive = pathname.startsWith(item.href);
-          return (
-            <Tooltip key={item.href} content={item.label} shortcut={item.shortcut} position="right">
-              <Link
-                href={item.href}
-                aria-label={item.label}
-                className={`relative flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] transition-all duration-150 ${
-                  isActive
-                    ? 'bg-accent-primary/15 text-accent-primary'
-                    : 'text-text-tertiary hover:bg-bg-surface hover:text-text-secondary'
-                }`}
-              >
-                {/* Active indicator bar */}
-                {isActive && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-accent-primary animate-scale-in" />
-                )}
-                {item.icon}
-              </Link>
-            </Tooltip>
-          );
-        })}
-      </nav>
-
-      {/* ─── Spacer ─── */}
-      <div className="flex-1" />
-
-      {/* ─── Bottom section ─── */}
-      <div className="flex flex-col items-center gap-1">
-        {/* Settings */}
-        <Tooltip content="Settings" shortcut="G S" position="right">
-          <Link
-            href="/settings"
-            aria-label="Settings"
-            className={`flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] transition-all duration-150 ${
-              pathname.startsWith('/settings')
-                ? 'bg-accent-primary/15 text-accent-primary'
-                : 'text-text-tertiary hover:bg-bg-surface hover:text-text-secondary'
-            }`}
-          >
-            <SettingsIcon />
-          </Link>
-        </Tooltip>
-
-        {/* Theme toggle */}
-        <Tooltip content={theme === 'dark' ? 'Light mode' : 'Dark mode'} position="right">
+        <Tooltip content="Compose" shortcut="C" position="right">
           <button
-            onClick={toggleTheme}
-            aria-label="Toggle theme"
-            className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] text-text-tertiary transition-all duration-150 hover:bg-bg-surface hover:text-text-secondary"
+            onClick={() => window.dispatchEvent(new CustomEvent("open-compose"))}
+            className="mb-6 flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-accent-primary text-text-inverse shadow-[var(--shadow-md)] transition-all duration-150 hover:bg-accent-primary-hover hover:shadow-[var(--shadow-glow)] hover:scale-105 active:scale-95"
+            aria-label="Compose"
           >
-            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+            <ComposeIcon />
           </button>
         </Tooltip>
 
-        {/* User avatar */}
-        <Tooltip content="Settings" position="right">
-          <Link
-            href="/settings"
-            aria-label="Settings"
-            className="mt-1 flex items-center justify-center rounded-full transition-transform duration-150 hover:scale-105 active:scale-95"
-          >
-            <Avatar name={sessionData?.user?.name ?? 'User'} size="sm" />
-          </Link>
-        </Tooltip>
-      </div>
-    </aside>
+        {/* ─── Navigation ─── */}
+        <nav className="flex flex-col items-center gap-1">
+          {navItems.map((item) => {
+            const isActive = pathname.startsWith(item.href);
+            const isInbox = item.href === '/inbox';
+            return (
+              <Tooltip key={item.href} content={item.label} shortcut={item.shortcut} position="right">
+                <Link
+                  href={item.href}
+                  aria-label={item.label}
+                  className={`relative flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] transition-all duration-150 ${
+                    isActive
+                      ? 'bg-accent-primary/15 text-accent-primary'
+                      : 'text-text-tertiary hover:bg-bg-surface hover:text-text-secondary'
+                  }`}
+                >
+                  {/* Active indicator bar */}
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-accent-primary animate-scale-in" />
+                  )}
+                  {item.icon}
+                  {/* Unread count badge for inbox */}
+                  {isInbox && unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-primary text-[9px] font-bold text-text-inverse px-0.5 shadow-sm">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </Link>
+              </Tooltip>
+            );
+          })}
+        </nav>
+
+        {/* ─── Spacer ─── */}
+        <div className="flex-1" />
+
+        {/* ─── Bottom section ─── */}
+        <div className="flex flex-col items-center gap-1">
+          {/* Help / Keyboard Shortcuts */}
+          <Tooltip content="Keyboard shortcuts" shortcut="?" position="right">
+            <button
+              onClick={() => setShowShortcuts(true)}
+              aria-label="Keyboard shortcuts"
+              className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] text-text-tertiary transition-all duration-150 hover:bg-bg-surface hover:text-text-secondary cursor-pointer"
+            >
+              <HelpIcon />
+            </button>
+          </Tooltip>
+
+          {/* Settings */}
+          <Tooltip content="Settings" shortcut="G S" position="right">
+            <Link
+              href="/settings"
+              aria-label="Settings"
+              className={`flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] transition-all duration-150 ${
+                pathname.startsWith('/settings')
+                  ? 'bg-accent-primary/15 text-accent-primary'
+                  : 'text-text-tertiary hover:bg-bg-surface hover:text-text-secondary'
+              }`}
+            >
+              <SettingsIcon />
+            </Link>
+          </Tooltip>
+
+          {/* Theme toggle */}
+          <Tooltip content={theme === 'dark' ? 'Light mode' : 'Dark mode'} position="right">
+            <button
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+              className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] text-text-tertiary transition-all duration-150 hover:bg-bg-surface hover:text-text-secondary"
+            >
+              {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+            </button>
+          </Tooltip>
+
+          {/* User avatar */}
+          <Tooltip content="Settings" position="right">
+            <Link
+              href="/settings"
+              aria-label="Settings"
+              className="mt-1 flex items-center justify-center rounded-full transition-transform duration-150 hover:scale-105 active:scale-95"
+            >
+              <Avatar name={sessionData?.user?.name ?? 'User'} size="sm" />
+            </Link>
+          </Tooltip>
+        </div>
+      </aside>
+
+      {/* Keyboard shortcuts modal */}
+      {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
+    </>
   );
 }

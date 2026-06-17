@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { api } from "@/trpc/react";
 import { Button } from "@/app/_components/ui/button";
 import { Badge } from "@/app/_components/ui/badge";
+import { useToast } from "@/app/_components/ui/toast";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -93,6 +94,50 @@ function truncate(str: string | undefined, max: number): string {
 }
 
 // ---------------------------------------------------------------------------
+// Sender Avatar
+// ---------------------------------------------------------------------------
+
+const AVATAR_COLORS = [
+  '#06b6d4', // cyan
+  '#8b5cf6', // violet
+  '#f59e0b', // amber
+  '#10b981', // emerald
+  '#f43f5e', // rose
+  '#3b82f6', // blue
+  '#a855f7', // purple
+  '#ef4444', // red
+  '#14b8a6', // teal
+  '#f97316', // orange
+];
+
+function getAvatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]!;
+}
+
+function SenderAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }) {
+  const initials = name
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
+  const color = getAvatarColor(name);
+  const dim = size === 'sm' ? 'h-7 w-7 text-[10px]' : 'h-8 w-8 text-xs';
+  return (
+    <span
+      className={`${dim} shrink-0 rounded-full flex items-center justify-center font-bold text-white select-none`}
+      style={{ backgroundColor: color }}
+      aria-hidden
+    >
+      {initials || '?'}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Skeleton Components
 // ---------------------------------------------------------------------------
 
@@ -144,11 +189,16 @@ function ThreadListItem({
   thread,
   isSelected,
   onSelect,
+  onArchive,
+  onDelete,
 }: {
   thread: ThreadEntity;
   isSelected: boolean;
   onSelect: () => void;
+  onArchive?: () => void;
+  onDelete?: () => void;
 }) {
+  const [isHovered, setIsHovered] = useState(false);
   const threadData = getThreadData(thread);
   const firstMessage = threadData.messages?.[0];
   const isUnread = firstMessage?.labelIds?.includes("UNREAD") ?? false;
@@ -166,62 +216,109 @@ function ThreadListItem({
   const priority = thread.priority as "urgent" | "normal" | "low" | null;
 
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`w-full text-left px-3 py-2.5 rounded-[var(--radius-md)] transition-all duration-[var(--transition-fast)] cursor-pointer group ${
+    <div
+      className={`relative w-full text-left rounded-[var(--radius-md)] transition-all duration-[var(--transition-fast)] cursor-pointer group ${
         isSelected
-          ? "bg-bg-surface border border-border-default"
+          ? "bg-bg-surface border border-border-default shadow-sm"
           : "border border-transparent hover:bg-bg-surface/60"
       }`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="flex items-center justify-between gap-2 mb-0.5">
-        <div className="flex items-center gap-2 min-w-0">
-          {/* Priority dot */}
-          {priority === "urgent" && (
-            <span className="h-2 w-2 shrink-0 rounded-full bg-accent-danger" />
-          )}
-          {priority === "normal" && (
-            <span className="h-2 w-2 shrink-0 rounded-full bg-accent-warning" />
-          )}
-          <span
-            className={`truncate text-sm ${
-              isUnread
-                ? "font-semibold text-text-primary"
-                : "font-medium text-text-primary"
-            }`}
-          >
-            {sender}
-          </span>
-          {thread.emailAddress && (
-            <span 
-              className="text-[9px] px-1.5 py-0.5 bg-bg-base/85 text-text-tertiary border border-border-subtle/50 rounded-md font-medium truncate max-w-[120px] shrink-0"
-              title={thread.emailAddress}
-            >
-              {thread.emailAddress}
-            </span>
-          )}
-        </div>
-        <span className="shrink-0 text-[11px] text-text-tertiary tabular-nums">
-          {time}
-        </span>
-      </div>
-      <p
-        className={`truncate text-[13px] leading-snug ${
-          isUnread ? "font-medium text-text-primary" : "text-text-secondary"
-        }`}
+      <button
+        type="button"
+        onClick={onSelect}
+        className="w-full text-left px-3 py-2.5"
       >
-        {subject}
-      </p>
-      <p className="truncate text-xs text-text-tertiary mt-0.5 leading-relaxed">
-        {snippet}
-      </p>
+        <div className="flex items-start gap-2.5">
+          {/* Sender Avatar */}
+          <SenderAvatar name={sender} size="md" />
 
-      {/* Unread indicator bar */}
-      {isUnread && !isSelected && (
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-accent-primary" />
-      )}
-    </button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-0.5">
+              <div className="flex items-center gap-1.5 min-w-0">
+                {/* Unread dot */}
+                {isUnread && !isSelected && (
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-accent-primary" />
+                )}
+                {/* Priority dot */}
+                {!isUnread && priority === "urgent" && (
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-accent-danger" />
+                )}
+                {!isUnread && priority === "normal" && (
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-accent-warning" />
+                )}
+                <span
+                  className={`truncate text-sm ${
+                    isUnread
+                      ? "font-semibold text-text-primary"
+                      : "font-medium text-text-secondary"
+                  }`}
+                >
+                  {sender}
+                </span>
+                {thread.emailAddress && (
+                  <span 
+                    className="text-[9px] px-1.5 py-0.5 bg-accent-primary/10 text-accent-primary border border-accent-primary/20 rounded-md font-medium truncate max-w-[90px] shrink-0"
+                    title={thread.emailAddress}
+                  >
+                    {thread.emailAddress.split('@')[0]}
+                  </span>
+                )}
+              </div>
+              {/* Time — hide on hover to show action buttons */}
+              {!isHovered && (
+                <span className="shrink-0 text-[11px] text-text-tertiary tabular-nums">
+                  {time}
+                </span>
+              )}
+              {/* Hover action buttons */}
+              {isHovered && (onArchive || onDelete) && (
+                <div className="flex items-center gap-0.5 shrink-0 animate-fade-in">
+                  {onArchive && (
+                    <button
+                      type="button"
+                      title="Archive"
+                      onClick={(e) => { e.stopPropagation(); onArchive(); }}
+                      className="flex h-6 w-6 items-center justify-center rounded-md text-text-tertiary hover:text-text-primary hover:bg-bg-inset transition-colors"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="21 8 21 21 3 21 3 8" />
+                        <rect x="1" y="3" width="22" height="5" />
+                        <line x1="10" y1="12" x2="14" y2="12" />
+                      </svg>
+                    </button>
+                  )}
+                  {onDelete && (
+                    <button
+                      type="button"
+                      title="Delete"
+                      onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                      className="flex h-6 w-6 items-center justify-center rounded-md text-text-tertiary hover:text-accent-danger hover:bg-accent-danger/10 transition-colors"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+            <p
+              className={`truncate text-[12.5px] leading-snug ${
+                isUnread ? "font-semibold text-text-primary" : "text-text-secondary"
+              }`}
+            >
+              {subject}
+            </p>
+            <p className="truncate text-xs text-text-tertiary mt-0.5 leading-relaxed">
+              {snippet}
+            </p>
+          </div>
+        </div>
+      </button>
+    </div>
   );
 }
 
@@ -250,7 +347,18 @@ function InlineReplyForm({
   const [isReplying, setIsReplying] = useState(false);
   const [replyBody, setReplyBody] = useState("");
   const [aiPrompt, setAiPrompt] = useState("");
-  const [notification, setNotification] = useState<string | null>(null);
+  const toast = useToast();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Listen for global R key shortcut to open reply
+  useEffect(() => {
+    const handler = () => {
+      setIsReplying(true);
+      setTimeout(() => textareaRef.current?.focus(), 50);
+    };
+    window.addEventListener('open-reply', handler);
+    return () => window.removeEventListener('open-reply', handler);
+  }, []);
 
   const utils = api.useUtils();
   const sendEmail = api.gmail.sendEmail.useMutation({
@@ -258,14 +366,13 @@ function InlineReplyForm({
       setReplyBody("");
       setAiPrompt("");
       setIsReplying(false);
-      setNotification("Reply sent successfully!");
-      setTimeout(() => setNotification(null), 3000);
+      toast("Reply sent successfully!", "success");
       void utils.gmail.listThreads.invalidate();
       void utils.gmail.getThread.invalidate({ id: thread.entityId });
       onReplySent();
     },
     onError: (err) => {
-      setNotification(`Error: ${err.message}`);
+      toast(`Failed to send: ${err.message}`, "error");
     },
   });
 
@@ -278,7 +385,7 @@ function InlineReplyForm({
       setReplyBody(cleanText);
     },
     onError: (err) => {
-      setNotification(`AI drafting error: ${err.message}`);
+      toast(`AI drafting error: ${err.message}`, 'error');
     },
   });
 
@@ -333,11 +440,6 @@ Please output ONLY the email reply body text. Do not output subject, signature, 
 
   return (
     <div className="mt-4 border border-border-default bg-bg-surface rounded-2xl p-5 shadow-sm text-left">
-      {notification && (
-        <div className="mb-4 text-xs font-mono p-2.5 rounded bg-bg-inset border border-border-subtle text-text-secondary">
-          {notification}
-        </div>
-      )}
 
       {!isReplying ? (
         <div 
@@ -395,6 +497,7 @@ Please output ONLY the email reply body text. Do not output subject, signature, 
 
           <div className="flex flex-col gap-1.5">
             <textarea
+              ref={textareaRef}
               value={replyBody}
               onChange={(e) => setReplyBody(e.target.value)}
               placeholder="Write your email reply here..."
@@ -426,6 +529,79 @@ Please output ONLY the email reply body text. Do not output subject, signature, 
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AI Summary Strip
+// ---------------------------------------------------------------------------
+
+function ThreadSummaryBar({ thread, messages }: { thread: ThreadEntity; messages: GmailMessage[] }) {
+  const [summary, setSummary] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const toast = useToast();
+
+  const chat = api.agent.chat.useMutation({
+    onSuccess: (data) => {
+      let text = data.text;
+      text = text.replace(/<think>[\s\S]*?<\/think>/i, '').trim();
+      setSummary(text);
+      setIsLoading(false);
+    },
+    onError: (err) => {
+      toast(`AI summary failed: ${err.message}`, 'error');
+      setIsLoading(false);
+    },
+  });
+
+  const handleSummarize = () => {
+    if (messages.length === 0) return;
+    setIsLoading(true);
+    const emailContext = messages
+      .slice(-5)
+      .map((m) => {
+        const from = getMessageHeader(m, 'from') ?? 'Unknown';
+        const body = m.body ?? m.snippet ?? '';
+        return `From: ${from}\n${body.slice(0, 600)}`;
+      })
+      .join('\n---\n');
+
+    chat.mutate({
+      message: `Summarize this email thread in 2-3 sentences and list any action items. Be concise.\n\nThread:\n${emailContext}`,
+      history: [],
+      context: { route: '/inbox' },
+    });
+  };
+
+  if (summary) {
+    return (
+      <div className="mx-6 mt-3 mb-1 rounded-xl border border-accent-primary/20 bg-accent-primary/5 px-4 py-3 animate-fade-in">
+        <div className="flex items-start gap-2.5">
+          <svg className="h-4 w-4 mt-0.5 shrink-0 text-accent-primary" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.091-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.091L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.091 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.091Z" />
+          </svg>
+          <p className="text-xs text-text-secondary leading-relaxed flex-1">{summary}</p>
+          <button onClick={() => setSummary(null)} className="text-text-tertiary hover:text-text-secondary shrink-0 cursor-pointer" title="Dismiss">
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-6 mt-3 mb-1">
+      <button
+        onClick={handleSummarize}
+        disabled={isLoading || messages.length === 0}
+        className="flex items-center gap-1.5 text-[11px] font-semibold text-accent-primary/70 hover:text-accent-primary transition-colors cursor-pointer disabled:opacity-50"
+      >
+        <svg className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.091-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.091L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.091 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.091Z" />
+        </svg>
+        {isLoading ? 'Summarizing...' : 'AI Summary'}
+      </button>
     </div>
   );
 }
@@ -469,7 +645,7 @@ function ThreadDetail({
     <div className="flex h-full flex-col animate-fade-in">
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-border-subtle px-6 py-3">
-        <h2 className="text-lg font-semibold text-text-primary truncate pr-4">
+        <h2 className="text-base font-semibold text-text-primary truncate pr-4">
           {subject}
         </h2>
         <div className="flex items-center gap-2 shrink-0">
@@ -505,6 +681,11 @@ function ThreadDetail({
           </Button>
         </div>
       </div>
+
+      {/* AI Summary Strip */}
+      {!isLoading && !error && messages.length > 0 && (
+        <ThreadSummaryBar thread={thread} messages={messages} />
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
@@ -695,6 +876,7 @@ export default function InboxPage() {
   const [priorityInput, setPriorityInput] = useState("");
   const [isEditingRules, setIsEditingRules] = useState(false);
   const [selectedEmailFilter, setSelectedEmailFilter] = useState<string>("all");
+  const toast = useToast();
 
   const utils = api.useUtils();
 
@@ -738,15 +920,23 @@ export default function InboxPage() {
 
   const archiveMutation = api.gmail.archiveThread.useMutation({
     onSuccess: () => {
+      toast("Thread archived", "success");
       setSelectedThreadId(null);
       void utils.gmail.listThreads.invalidate();
+    },
+    onError: (err) => {
+      toast(`Archive failed: ${err.message}`, "error");
     },
   });
 
   const deleteMutation = api.gmail.deleteThread.useMutation({
     onSuccess: () => {
+      toast("Thread deleted", "success");
       setSelectedThreadId(null);
       void utils.gmail.listThreads.invalidate();
+    },
+    onError: (err) => {
+      toast(`Delete failed: ${err.message}`, "error");
     },
   });
 
@@ -755,7 +945,11 @@ export default function InboxPage() {
 
   const syncInbox = api.gmail.syncInbox.useMutation({
     onSuccess: () => {
+      toast("Inbox synced!", "success");
       void utils.gmail.listThreads.invalidate();
+    },
+    onError: (err) => {
+      toast(`Sync failed: ${err.message}`, "error");
     },
   });
 
@@ -781,6 +975,30 @@ export default function InboxPage() {
     if (!selectedThread) return;
     deleteMutation.mutate({ id: selectedThread.entityId });
   }, [selectedThread, deleteMutation]);
+
+  // Keyboard shortcuts: E = archive, # = delete, R = open reply
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (!selectedThread) return;
+
+      if (e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        handleArchive();
+      } else if (e.key === '#') {
+        e.preventDefault();
+        handleDelete();
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        // Dispatch event to open reply in the thread detail
+        window.dispatchEvent(new CustomEvent('open-reply'));
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedThread, handleArchive, handleDelete]);
 
   const threadCount = threads?.length ?? 0;
 
@@ -1076,19 +1294,21 @@ export default function InboxPage() {
             </div>
           ) : !gmailStatus?.connected ? (
             <div className="flex flex-col items-center justify-center h-full gap-4 px-6 text-center animate-fade-in">
-              <InboxIcon />
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-text-primary">
-                  Gmail is not connected
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-primary/10 border border-accent-primary/20">
+                <InboxIcon />
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-sm font-bold text-text-primary">
+                  Connect your Gmail
                 </p>
-                <p className="text-xs text-text-tertiary leading-relaxed max-w-[240px]">
-                  Authorize Singularity to access your inbox and get started.
+                <p className="text-xs text-text-tertiary leading-relaxed max-w-[220px]">
+                  Authorize Singularity to access your inbox and supercharge your workflow.
                 </p>
               </div>
               <Button
                 variant="primary"
                 size="sm"
-                className="font-semibold"
+                className="font-semibold shadow-[var(--shadow-glow)]"
                 onClick={() => {
                   window.location.href = "/api/connect?plugin=gmail";
                 }}
@@ -1104,30 +1324,34 @@ export default function InboxPage() {
                   thread={thread}
                   isSelected={thread.id === selectedThreadId}
                   onSelect={() => setSelectedThreadId(thread.id)}
+                  onArchive={() => archiveMutation.mutate({ id: thread.entityId })}
+                  onDelete={() => deleteMutation.mutate({ id: thread.entityId })}
                 />
               ))}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-4 px-6 text-center animate-fade-in">
-              <InboxIcon />
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-text-primary">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-bg-surface border border-border-default">
+                <InboxIcon />
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-sm font-bold text-text-primary">
                   {activeTab === "priority" 
-                    ? "Inbox Zero" 
+                    ? "🎉 Inbox Zero!" 
                     : activeTab === "sent" 
                     ? "No sent messages" 
                     : activeTab === "drafts" 
                     ? "No drafts" 
-                    : "No other threads"}
+                    : "Nothing here yet"}
                 </p>
-                <p className="text-xs text-text-tertiary leading-relaxed max-w-[240px]">
+                <p className="text-xs text-text-tertiary leading-relaxed max-w-[220px]">
                   {activeTab === "priority" 
-                    ? "Nice work! You have cleared your priority inbox." 
+                    ? "You've cleared your priority inbox. Keep it up!" 
                     : activeTab === "sent" 
-                    ? "You haven't sent any emails yet." 
+                    ? "Emails you send will appear here." 
                     : activeTab === "drafts" 
-                    ? "Your drafts folder is empty." 
-                    : "No emails in this section."}
+                    ? "Your saved drafts will appear here." 
+                    : "No emails in this section yet."}
                 </p>
               </div>
               {activeTab === "other" && threads && threads.length === 0 && (
@@ -1156,11 +1380,14 @@ export default function InboxPage() {
             isDeleting={deleteMutation.isPending}
           />
         ) : (
-          <div className="flex flex-col items-center justify-center h-full gap-3 animate-fade-in">
-            <InboxIcon />
-            <p className="text-sm text-text-tertiary">
-              Select a thread to read
-            </p>
+          <div className="flex flex-col items-center justify-center h-full gap-4 animate-fade-in">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent-primary/10 border border-accent-primary/20">
+              <InboxIcon />
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-sm font-semibold text-text-primary">Select a conversation</p>
+              <p className="text-xs text-text-tertiary max-w-[200px] leading-relaxed">Choose an email from the left to read and reply</p>
+            </div>
           </div>
         )}
       </div>

@@ -3,6 +3,7 @@ import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 import { TRPCReactProvider } from "@/trpc/react";
 import { ThemeProvider } from "@/app/_components/theme-provider";
+import { ToastProvider } from "@/app/_components/ui/toast";
 
 export const metadata: Metadata = {
   title: "Singularity — Email & Calendar Reimagined",
@@ -23,7 +24,9 @@ export default function RootLayout({
     <html lang="en" className={`${geist.variable}`} suppressHydrationWarning>
       <body className="min-h-screen antialiased">
         <ThemeProvider>
-          <TRPCReactProvider>{children}</TRPCReactProvider>
+          <TRPCReactProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </TRPCReactProvider>
         </ThemeProvider>
       </body>
     </html>
