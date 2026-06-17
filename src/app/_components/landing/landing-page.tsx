@@ -16,7 +16,7 @@ const features = [
       </svg>
     ),
     title: "Unified Inbox",
-    desc: "All your Gmail threads in one place. Sent, Drafts, everything — beautifully organised.",
+    desc: "All your Gmail threads in one place. Sent, Drafts, everything - beautifully organised.",
   },
   {
     icon: (
@@ -25,7 +25,7 @@ const features = [
       </svg>
     ),
     title: "Calendar Workflow",
-    desc: "See your schedule at a glance. No tab-switching, no context loss — just flow.",
+    desc: "See your schedule at a glance. No tab-switching, no context loss - just flow.",
   },
   {
     icon: (
@@ -53,7 +53,7 @@ const features = [
       </svg>
     ),
     title: "Instant Actions",
-    desc: "Reply, forward, archive or schedule — type '/' for quick command autocompletes like /prioritize or /draft.",
+    desc: "Reply, forward, archive or schedule - type '/' for quick command autocompletes like /prioritize or /draft.",
   },
   {
     icon: (
@@ -202,7 +202,7 @@ export default function LandingPage() {
     },
     {
       from: "Dev Team",
-      subj: "Re: Q3 planning — next steps",
+      subj: "Re: Q3 planning - next steps",
       unread: false,
       time: "5h",
       body: "Should we schedule the planning meeting for Tuesday morning? I can send over the Agenda doc.",
@@ -701,7 +701,7 @@ export default function LandingPage() {
           {/* Premium Plan */}
           <div className="relative flex flex-col rounded-3xl border-2 border-accent-primary bg-bg-raised p-8 shadow-md justify-between transition-all duration-300 hover:-translate-y-1">
             <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-accent-primary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-text-inverse shadow-sm">
-              Popular — 49% Off
+              Popular - 49% Off
             </div>
             <div>
               <h3 className="text-lg font-bold text-text-primary">Premium</h3>

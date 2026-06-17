@@ -27,7 +27,7 @@ export default function PrivacyPolicyPage() {
 
       {/* Main Content */}
       <main className="mx-auto max-w-3xl px-6 py-12 md:py-20">
-        <div className="rounded-2xl border border-border-default bg-bg-raised p-8 shadow-xl backdrop-blur-xl md:p-12">
+        <div className="rounded-xl border border-border-default bg-bg-raised p-8 shadow-xl backdrop-blur-xl md:p-12">
           <h1 className="mb-2 text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">
             Privacy Policy
           </h1>

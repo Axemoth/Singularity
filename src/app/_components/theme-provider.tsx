@@ -20,7 +20,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (stored) {
       setTheme(stored);
     }
-    // No OS fallback — dark is the default
+    // No OS fallback - dark is the default
     setMounted(true);
   }, []);
 

@@ -92,14 +92,14 @@ export default function AdminDashboardPage() {
               desc: "Gmail & Calendar connections",
             },
           ].map((card, i) => (
-            <div key={i} className="glass rounded-2xl p-5 border border-border-default flex flex-col justify-between h-28 relative overflow-hidden">
+            <div key={i} className="glass rounded-xl p-5 border border-border-default flex flex-col justify-between h-28 relative overflow-hidden">
               <div className="flex justify-between items-start">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">{card.title}</span>
                 <span className="text-lg">{card.icon}</span>
               </div>
               <div>
                 <span className="text-2xl font-extrabold tracking-tight tabular-nums block text-text-primary leading-none">
-                  {isMetricsLoading ? "…" : card.value}
+                  {isMetricsLoading ? "..." : card.value}
                 </span>
                 <span className="text-[10px] text-text-tertiary mt-1 block">{card.desc}</span>
               </div>
@@ -108,7 +108,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Users Table */}
-        <div className="glass rounded-2xl border border-border-default overflow-hidden">
+        <div className="glass rounded-xl border border-border-default overflow-hidden">
           <div className="border-b border-border-subtle p-5 bg-bg-raised/40 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-text-primary">Registered Users & Workspace Accounts</h2>

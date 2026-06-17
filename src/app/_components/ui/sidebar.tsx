@@ -80,7 +80,7 @@ function ShortcutsModal({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-md mx-4 rounded-2xl border border-border-default bg-bg-overlay shadow-[var(--shadow-xl)] animate-scale-in p-6"
+        className="relative w-full max-w-md mx-4 rounded-xl border border-border-default bg-bg-overlay shadow-[var(--shadow-xl)] animate-scale-in p-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

@@ -6,6 +6,14 @@ import { eq, and, desc, or, like } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { syncEmbeddings } from "@/server/api/tasks/embeddings";
 
+const calendarDateTimeSchema = z
+  .string()
+  .trim()
+  .refine((value) => !Number.isNaN(new Date(value).getTime()), {
+    message: "Expected a valid datetime.",
+  })
+  .transform((value) => new Date(value).toISOString());
+
 export const calendarRouter = createTRPCRouter({
   listEvents: protectedProcedure
     .input(
@@ -30,7 +38,7 @@ export const calendarRouter = createTRPCRouter({
           and(
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}_%`)
+              like(corsairAccounts.tenantId, `${userId}\\_%`)
             ),
             eq(corsairIntegrations.name, "googlecalendar")
           )
@@ -73,7 +81,7 @@ export const calendarRouter = createTRPCRouter({
           and(
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}_%`)
+              like(corsairAccounts.tenantId, `${userId}\\_%`)
             ),
             eq(corsairIntegrations.name, "googlecalendar"),
             eq(corsairEntities.entityType, "events")
@@ -118,7 +126,7 @@ export const calendarRouter = createTRPCRouter({
             and(
               or(
                 eq(corsairAccounts.tenantId, userId),
-                like(corsairAccounts.tenantId, `${userId}_%`)
+                like(corsairAccounts.tenantId, `${userId}\\_%`)
               ),
               eq(corsairIntegrations.name, "googlecalendar"),
               eq(corsairEntities.entityType, "events")
@@ -146,7 +154,7 @@ export const calendarRouter = createTRPCRouter({
         and(
           or(
             eq(corsairAccounts.tenantId, userId),
-            like(corsairAccounts.tenantId, `${userId}_%`)
+            like(corsairAccounts.tenantId, `${userId}\\_%`)
           ),
           eq(corsairIntegrations.name, "googlecalendar")
         )
@@ -188,7 +196,7 @@ export const calendarRouter = createTRPCRouter({
         and(
           or(
             eq(corsairAccounts.tenantId, userId),
-            like(corsairAccounts.tenantId, `${userId}_%`)
+            like(corsairAccounts.tenantId, `${userId}\\_%`)
           ),
           eq(corsairIntegrations.name, "googlecalendar")
         )
@@ -216,7 +224,7 @@ export const calendarRouter = createTRPCRouter({
             eq(corsairAccounts.id, input.accountId),
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}_%`)
+              like(corsairAccounts.tenantId, `${userId}\\_%`)
             )
           )
         )
@@ -243,18 +251,26 @@ export const calendarRouter = createTRPCRouter({
     .input(
       z.object({
         calendarId: z.string().optional().default("primary"),
-        summary: z.string().min(1),
-        description: z.string().optional(),
-        location: z.string().optional(),
-        start: z.string(), // ISO String or datetime format
-        end: z.string(), // ISO String or datetime format
-        attendees: z.array(z.string().email()).optional(),
-        fromEmail: z.string().optional(),
+        summary: z.string().min(1).max(500).trim(),
+        description: z.string().max(5000).trim().optional(),
+        location: z.string().max(1000).trim().optional(),
+        start: calendarDateTimeSchema,
+        end: calendarDateTimeSchema,
+        attendees: z.array(z.string().email().max(320).trim()).optional(),
+        fromEmail: z.string().email().max(320).trim().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       
+      // Cross-field datetime validation: end must be after start
+      if (new Date(input.end) <= new Date(input.start)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "End time must be after start time.",
+        });
+      }
+
       // Resolve tenantId based on preferred email or fallback to primary account
       const preferredEmail = input.fromEmail;
       const accounts = await ctx.db
@@ -265,7 +281,7 @@ export const calendarRouter = createTRPCRouter({
           and(
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}_%`)
+              like(corsairAccounts.tenantId, `${userId}\\_%`)
             ),
             eq(corsairIntegrations.name, "googlecalendar")
           )
@@ -310,35 +326,53 @@ export const calendarRouter = createTRPCRouter({
     .input(
       z.object({
         calendarId: z.string().optional().default("primary"),
-        id: z.string(), // event entity ID
-        summary: z.string().min(1),
-        description: z.string().optional(),
-        location: z.string().optional(),
-        start: z.string(),
-        end: z.string(),
-        attendees: z.array(z.string().email()).optional(),
+        id: z.string().trim().min(1), // event entity ID
+        summary: z.string().min(1).max(500).trim(),
+        description: z.string().max(5000).trim().optional(),
+        location: z.string().max(1000).trim().optional(),
+        start: calendarDateTimeSchema,
+        end: calendarDateTimeSchema,
+        attendees: z.array(z.string().email().max(320).trim()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
-      // Look up event entity's account
-      const [eventEntity] = await ctx.db
-        .select({ accountId: corsairEntities.accountId })
-        .from(corsairEntities)
-        .where(eq(corsairEntities.entityId, input.id))
-        .limit(1);
-
-      let tenantId = userId;
-      if (eventEntity) {
-        const [acc] = await ctx.db
-          .select({ tenantId: corsairAccounts.tenantId })
-          .from(corsairAccounts)
-          .where(eq(corsairAccounts.id, eventEntity.accountId))
-          .limit(1);
-        if (acc) tenantId = acc.tenantId;
+      // Cross-field datetime validation: end must be after start
+      if (new Date(input.end) <= new Date(input.start)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "End time must be after start time.",
+        });
       }
 
+      // Securely look up the event entity ensuring it belongs to the current user
+      const [eventAccount] = await ctx.db
+        .select({ tenantId: corsairAccounts.tenantId })
+        .from(corsairEntities)
+        .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
+        .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+        .where(
+          and(
+            eq(corsairEntities.entityId, input.id),
+            eq(corsairEntities.entityType, "events"),
+            eq(corsairIntegrations.name, "googlecalendar"),
+            or(
+              eq(corsairAccounts.tenantId, userId),
+              like(corsairAccounts.tenantId, `${userId}\\_%`)
+            )
+          )
+        )
+        .limit(1);
+
+      if (!eventAccount) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Calendar event not found or you do not have permission to access it.",
+        });
+      }
+
+      const tenantId = eventAccount.tenantId;
       const tenant = corsair.withTenant(tenantId);
 
       try {
@@ -372,37 +406,47 @@ export const calendarRouter = createTRPCRouter({
     .input(
       z.object({
         calendarId: z.string().optional().default("primary"),
-        id: z.string(), // event entity ID
+        id: z.string().trim().min(1), // event entity ID
       })
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
-      // Look up event entity's account
-      const [eventEntity] = await ctx.db
-        .select({ accountId: corsairEntities.accountId })
+      // Securely look up the event entity ensuring it belongs to the current user
+      const [eventAccount] = await ctx.db
+        .select({ tenantId: corsairAccounts.tenantId })
         .from(corsairEntities)
-        .where(eq(corsairEntities.entityId, input.id))
+        .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
+        .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+        .where(
+          and(
+            eq(corsairEntities.entityId, input.id),
+            eq(corsairEntities.entityType, "events"),
+            eq(corsairIntegrations.name, "googlecalendar"),
+            or(
+              eq(corsairAccounts.tenantId, userId),
+              like(corsairAccounts.tenantId, `${userId}\\_%`)
+            )
+          )
+        )
         .limit(1);
 
-      let tenantId = userId;
-      if (eventEntity) {
-        const [acc] = await ctx.db
-          .select({ tenantId: corsairAccounts.tenantId })
-          .from(corsairAccounts)
-          .where(eq(corsairAccounts.id, eventEntity.accountId))
-          .limit(1);
-        if (acc) tenantId = acc.tenantId;
+      if (!eventAccount) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Calendar event not found or you do not have permission to access it.",
+        });
       }
 
+      const tenantId = eventAccount.tenantId;
       const tenant = corsair.withTenant(tenantId);
 
       try {
-        await tenant.googlecalendar.api.events.delete({
+        const res = await tenant.googlecalendar.api.events.delete({
           calendarId: input.calendarId,
           id: input.id,
         });
-        return { success: true };
+        return res;
       } catch (err: any) {
         console.error("Failed to delete calendar event:", err);
         throw new TRPCError({

@@ -6,7 +6,7 @@ import { ThemeProvider } from "@/app/_components/theme-provider";
 import { ToastProvider } from "@/app/_components/ui/toast";
 
 export const metadata: Metadata = {
-  title: "Singularity — Email & Calendar Reimagined",
+  title: "Singularity - Email & Calendar Reimagined",
   description:
     "A Superhuman-style Gmail and Google Calendar workflow app. Manage emails, schedule meetings, and automate your workflow with AI.",
   icons: [{ rel: "icon", url: "/favicon.ico" }],

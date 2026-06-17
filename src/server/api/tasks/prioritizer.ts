@@ -236,7 +236,7 @@ export async function syncPriorities(userId: string): Promise<void> {
         and(
           or(
             eq(corsairAccounts.tenantId, userId),
-            like(corsairAccounts.tenantId, `${userId}_%`)
+            like(corsairAccounts.tenantId, `${userId}\\_%`)
           ),
           eq(corsairEntities.entityType, "threads"),
           isNull(emailPriorities.id)

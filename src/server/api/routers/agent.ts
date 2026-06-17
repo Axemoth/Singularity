@@ -9,6 +9,8 @@ import { corsair } from "@/server/corsair";
 import { createTool } from "@mastra/core/tools";
 import { buildRawEmail } from "./gmail";
 import { TRPCError } from "@trpc/server";
+import { corsairEntities, corsairAccounts, corsairIntegrations } from "@/server/db/schema";
+import { eq, and, or, like, inArray } from "drizzle-orm";
 
 const deepseek = createOpenAI({
   baseURL: "https://api.deepseek.com",
@@ -55,12 +57,12 @@ const agentActionSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("confirm_archive_threads"),
     label: z.string(),
-    threadIds: z.array(z.string()),
+    threadIds: z.array(z.string().trim().min(1)).min(1).max(50),
   }),
   z.object({
     type: z.literal("confirm_delete_threads"),
     label: z.string(),
-    threadIds: z.array(z.string()),
+    threadIds: z.array(z.string().trim().min(1)).min(1).max(50),
   }),
 ]);
 
@@ -245,7 +247,7 @@ export const agentRouter = createTRPCRouter({
             and(
               or(
                 eq(corsairAccounts.tenantId, userId),
-                like(corsairAccounts.tenantId, `${userId}_%`)
+                like(corsairAccounts.tenantId, `${userId}\\_%`)
               ),
               eq(corsairIntegrations.name, "gmail")
             )
@@ -393,7 +395,7 @@ export const agentRouter = createTRPCRouter({
                   and(
                     or(
                       eq(corsairAccounts.tenantId, userId),
-                      like(corsairAccounts.tenantId, `${userId}_%`)
+                      like(corsairAccounts.tenantId, `${userId}\\_%`)
                     )
                   )
                 )
@@ -482,7 +484,7 @@ export const agentRouter = createTRPCRouter({
                   and(
                     or(
                       eq(corsairAccounts.tenantId, userId),
-                      like(corsairAccounts.tenantId, `${userId}_%`)
+                      like(corsairAccounts.tenantId, `${userId}\\_%`)
                     ),
                     eq(corsairEntities.entityType, "threads")
                   )
@@ -730,40 +732,91 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
     .input(agentActionSchema)
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      const tenant = corsair.withTenant(userId);
 
       try {
-        if (input.type === "confirm_archive_threads") {
-          await Promise.all(
-            input.threadIds.map((id) =>
-              tenant.gmail.api.threads.modify({
-                id,
-                removeLabelIds: ["INBOX"],
-              }),
-            ),
-          );
+        if (input.type === "confirm_archive_threads" || input.type === "confirm_delete_threads") {
+          const requestedThreadIds = Array.from(new Set(input.threadIds));
 
-          return {
-            success: true,
-            message:
-              input.threadIds.length === 1
-                ? "Archived the selected thread."
-                : `Archived ${input.threadIds.length} selected threads.`,
-          };
-        }
+          // Look up all thread accounts for the requested thread IDs ensuring user ownership
+          const threadAccounts = await ctx.db
+            .select({
+              entityId: corsairEntities.entityId,
+              tenantId: corsairAccounts.tenantId,
+            })
+            .from(corsairEntities)
+            .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
+            .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+            .where(
+              and(
+                inArray(corsairEntities.entityId, requestedThreadIds),
+                eq(corsairEntities.entityType, "threads"),
+                eq(corsairIntegrations.name, "gmail"),
+                or(
+                  eq(corsairAccounts.tenantId, userId),
+                  like(corsairAccounts.tenantId, `${userId}\\_%`)
+                )
+              )
+            );
 
-        if (input.type === "confirm_delete_threads") {
-          await Promise.all(
-            input.threadIds.map((id) => tenant.gmail.api.threads.trash({ id })),
-          );
+          const foundThreadIds = new Set(threadAccounts.map((thread) => thread.entityId));
+          const missingThreadIds = requestedThreadIds.filter((id) => !foundThreadIds.has(id));
 
-          return {
-            success: true,
-            message:
-              input.threadIds.length === 1
-                ? "Moved the selected thread to trash."
-                : `Moved ${input.threadIds.length} selected threads to trash.`,
-          };
+          if (missingThreadIds.length > 0) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "One or more threads were not found or you do not have permission to access them.",
+            });
+          }
+
+          // Group thread IDs by tenantId
+          const tenantThreadsMap = new Map<string, string[]>();
+          for (const ta of threadAccounts) {
+            if (!ta.entityId || !ta.tenantId) continue;
+            const list = tenantThreadsMap.get(ta.tenantId) ?? [];
+            list.push(ta.entityId);
+            tenantThreadsMap.set(ta.tenantId, list);
+          }
+
+          if (input.type === "confirm_archive_threads") {
+            await Promise.all(
+              Array.from(tenantThreadsMap.entries()).map(async ([tid, ids]) => {
+                const tenant = corsair.withTenant(tid);
+                return Promise.all(
+                  ids.map((id) =>
+                    tenant.gmail.api.threads.modify({
+                      id,
+                      removeLabelIds: ["INBOX"],
+                    })
+                  )
+                );
+              })
+            );
+
+            return {
+              success: true,
+              message:
+                threadAccounts.length === 1
+                  ? "Archived the selected thread."
+                  : `Archived ${threadAccounts.length} selected threads.`,
+            };
+          }
+
+          if (input.type === "confirm_delete_threads") {
+            await Promise.all(
+              Array.from(tenantThreadsMap.entries()).map(async ([tid, ids]) => {
+                const tenant = corsair.withTenant(tid);
+                return Promise.all(ids.map((id) => tenant.gmail.api.threads.trash({ id })));
+              })
+            );
+
+            return {
+              success: true,
+              message:
+                threadAccounts.length === 1
+                  ? "Moved the selected thread to trash."
+                  : `Moved ${threadAccounts.length} selected threads to trash.`,
+            };
+          }
         }
 
         return {

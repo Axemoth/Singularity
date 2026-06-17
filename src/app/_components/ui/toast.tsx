@@ -144,7 +144,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast: addToast }}>
       {children}
-      {/* Toast container — fixed bottom-right */}
+      {/* Toast container - fixed bottom-right */}
       <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 items-end pointer-events-none">
         {toasts.map((t) => (
           <div key={t.id} className="pointer-events-auto">

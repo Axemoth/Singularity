@@ -192,7 +192,7 @@ function SettingsPageContent() {
       <div className="w-full max-w-2xl flex flex-col gap-8 animate-slide-up">
         {/* Error/Limit Banner */}
         {errorParam === "limit_reached" && (
-          <div className="bg-accent-danger/10 border border-accent-danger/20 rounded-2xl p-4 text-xs font-semibold text-accent-danger leading-relaxed animate-fade-in flex flex-col gap-1">
+          <div className="bg-accent-danger/10 border border-accent-danger/20 rounded-xl p-4 text-xs font-semibold text-accent-danger leading-relaxed animate-fade-in flex flex-col gap-1">
             <span className="text-sm font-bold">Connection Limit Reached</span>
             <span>
               Oops! You've reached the connection limit for your {isPremium ? "Premium" : "Free"} tier. 
@@ -205,7 +205,7 @@ function SettingsPageContent() {
 
         {/* Payment Success Banner */}
         {paymentParam === "success" && (
-          <div className="bg-accent-success/10 border border-accent-success/20 rounded-2xl p-4 text-xs font-semibold text-accent-success leading-relaxed animate-fade-in flex flex-col gap-1">
+          <div className="bg-accent-success/10 border border-accent-success/20 rounded-xl p-4 text-xs font-semibold text-accent-success leading-relaxed animate-fade-in flex flex-col gap-1">
             <span className="text-sm font-bold">Subscription Upgraded!</span>
             <span>
               Congratulations! Your Premium subscription has been successfully activated. Enjoy unlimited Copilot requests and connect up to 3 workspace accounts.
@@ -256,7 +256,7 @@ function SettingsPageContent() {
         {activeTab === "workspace" ? (
           <div className="flex flex-col gap-8 animate-fade-in">
             {/* Integrations Card */}
-            <div className="glass rounded-2xl border border-border-default overflow-hidden">
+            <div className="glass rounded-xl border border-border-default overflow-hidden">
               <div className="border-b border-border-subtle p-5 bg-bg-raised/40">
                 <h2 className="text-base font-semibold text-text-primary">Integrations</h2>
                 <p className="text-xs text-text-tertiary mt-0.5">
@@ -395,7 +395,7 @@ function SettingsPageContent() {
 
             {/* Model Behavior Settings Card */}
             {sessionData?.user && (
-              <div className="glass rounded-2xl border border-border-default overflow-hidden animate-fade-in">
+              <div className="glass rounded-xl border border-border-default overflow-hidden animate-fade-in">
                 <div className="border-b border-border-subtle p-5 bg-bg-raised/40">
                   <h2 className="text-base font-semibold text-text-primary">AI Agent Behavior</h2>
                   <p className="text-xs text-text-tertiary mt-0.5">
@@ -457,7 +457,7 @@ function SettingsPageContent() {
 
             {/* Priority Rules Card */}
             {sessionData?.user && (
-              <div className="glass rounded-2xl border border-border-default overflow-hidden animate-fade-in">
+              <div className="glass rounded-xl border border-border-default overflow-hidden animate-fade-in">
                 <div className="border-b border-border-subtle p-5 bg-bg-raised/40">
                   <h2 className="text-base font-semibold text-text-primary">Inbox Priority Instructions</h2>
                   <p className="text-xs text-text-tertiary mt-0.5">
@@ -528,11 +528,11 @@ function SettingsPageContent() {
         ) : (
           <div className="flex flex-col gap-8 animate-fade-in">
             {/* Profile Card */}
-            <div className="glass rounded-2xl p-6 border border-border-default flex flex-col sm:flex-row sm:items-center justify-between gap-6 animate-fade-in">
+            <div className="glass rounded-xl p-6 border border-border-default flex flex-col sm:flex-row sm:items-center justify-between gap-6 animate-fade-in">
               <div className="flex items-center gap-4">
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-neutral-600 to-neutral-800 text-white font-bold text-lg shadow-inner">
                   {isSessionPending
-                    ? "…"
+                    ? "..."
                     : sessionData?.user?.name?.[0]?.toUpperCase() ?? "U"}
                 </div>
                 {isSessionPending ? (
@@ -566,7 +566,7 @@ function SettingsPageContent() {
 
             {/* Signature Settings Card */}
             {sessionData?.user && (
-              <div className="glass rounded-2xl border border-border-default overflow-hidden animate-fade-in">
+              <div className="glass rounded-xl border border-border-default overflow-hidden animate-fade-in">
                 <div className="border-b border-border-subtle p-5 bg-bg-raised/40">
                   <h2 className="text-base font-semibold text-text-primary">Email Signature Settings</h2>
                   <p className="text-xs text-text-tertiary mt-0.5">
@@ -633,7 +633,7 @@ function SettingsPageContent() {
 
             {/* Billing / Subscription Card */}
             {sessionData?.user && (
-              <div className="glass rounded-2xl border border-border-default overflow-hidden animate-fade-in">
+              <div className="glass rounded-xl border border-border-default overflow-hidden animate-fade-in">
                 <div className="border-b border-border-subtle p-5 bg-bg-raised/40">
                   <h2 className="text-base font-semibold text-text-primary">Subscription & Billing</h2>
                   <p className="text-xs text-text-tertiary mt-0.5">

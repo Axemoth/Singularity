@@ -2,7 +2,7 @@ import "dotenv/config";
 import { db, conn } from "./db";
 import { corsairEntities, corsairAccounts, corsairIntegrations, corsairEmbeddings } from "./db/schema";
 import { syncEmbeddings } from "./api/tasks/embeddings";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import { generateEmbedding } from "./api/tasks/embeddings";
 
 async function runTest() {
@@ -171,7 +171,15 @@ async function runTest() {
   } finally {
     // 8. Cleanup test rows
     console.log("\nCleaning up database test entries...");
-    await db.delete(corsairEmbeddings).where(sql`true`);
+    await db.delete(corsairEmbeddings).where(
+      inArray(
+        corsairEmbeddings.entityId,
+        db
+          .select({ id: corsairEntities.id })
+          .from(corsairEntities)
+          .where(sql`account_id IN (${accountIdGmail}, ${accountIdCalendar})`)
+      )
+    );
     await db.delete(corsairEntities).where(
       sql`account_id IN (${accountIdGmail}, ${accountIdCalendar})`
     );

@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
                 and(
                     or(
                         eq(corsairAccounts.tenantId, session.user.id),
-                        like(corsairAccounts.tenantId, `${session.user.id}_%`)
+                        like(corsairAccounts.tenantId, `${session.user.id}\\_%`)
                     ),
                     eq(corsairIntegrations.name, plugin)
                 )
@@ -62,9 +62,10 @@ export async function GET(request: NextRequest) {
             maxAge: 60 * 10,
         });
         return response;
-    } catch (err: any) {
+    } catch (err) {
         console.error("Error generating OAuth URL:", err);
-        return new NextResponse(`Failed to generate OAuth URL: ${err.message || err}`, { status: 500 });
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        return new NextResponse(`Failed to generate OAuth URL: ${errorMessage}`, { status: 500 });
     }
 }
 

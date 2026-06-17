@@ -19,7 +19,7 @@ function formatEventTime(start: any, end: any): string {
       minute: "2-digit",
       hour12: true,
     });
-  return e ? `${fmt(s)} — ${fmt(e)}` : fmt(s);
+  return e ? `${fmt(s)} - ${fmt(e)}` : fmt(s);
 }
 
 function getEventDateKey(event: CalendarEvent): string {
@@ -210,7 +210,7 @@ function EventCard({ event }: { event: CalendarEvent }) {
   const isTentative = data.status === "tentative";
   const attendeeCount = data.attendees?.length ?? 0;
   const description = data.description
-    ? data.description.slice(0, 120) + (data.description.length > 120 ? "…" : "")
+    ? data.description.slice(0, 120) + (data.description.length > 120 ? "..." : "")
     : null;
 
   return (
@@ -1348,7 +1348,7 @@ Do not output any conversational text, notes, markdown formatting other than the
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
-      <div className="bg-bg-raised border border-border-default rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
+      <div className="bg-bg-raised border border-border-default rounded-xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
         {/* Header */}
         <div className="border-b border-border-subtle p-4 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-text-primary">Create Event</h2>

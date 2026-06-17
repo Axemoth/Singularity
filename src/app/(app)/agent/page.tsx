@@ -54,13 +54,13 @@ function PlusIcon() {
 // ─── Thinking Bar ────────────────────────────────────────────────────────────
 
 const THINKING_PHRASES = [
-  "Understanding your request…",
-  "Searching through your data…",
-  "Analyzing context…",
-  "Querying tools…",
-  "Reasoning about the best approach…",
-  "Composing a response…",
-  "Almost there…",
+  "Understanding your request...",
+  "Searching through your data...",
+  "Analyzing context...",
+  "Querying tools...",
+  "Reasoning about the best approach...",
+  "Composing a response...",
+  "Almost there...",
 ];
 
 function ThinkingBar() {
@@ -481,7 +481,7 @@ function AgentPageContent() {
     const isFirstUserMessage = activeThread.messages.filter((m) => m.role === "user").length === 0;
     const threadTitle = isFirstUserMessage
       ? trimmed.length > 25
-        ? trimmed.slice(0, 24) + "…"
+        ? trimmed.slice(0, 24) + "..."
         : trimmed
       : activeThread.title;
 

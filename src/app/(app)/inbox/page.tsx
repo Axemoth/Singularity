@@ -90,7 +90,7 @@ function formatFullDate(epochMs: string | undefined): string {
 
 function truncate(str: string | undefined, max: number): string {
   if (!str) return "";
-  return str.length > max ? str.slice(0, max) + "…" : str;
+  return str.length > max ? str.slice(0, max) + "..." : str;
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +266,7 @@ function ThreadListItem({
                   </span>
                 )}
               </div>
-              {/* Time — hide on hover to show action buttons */}
+              {/* Time - hide on hover to show action buttons */}
               {!isHovered && (
                 <span className="shrink-0 text-[11px] text-text-tertiary tabular-nums">
                   {time}
@@ -439,14 +439,14 @@ Please output ONLY the email reply body text. Do not output subject, signature, 
   };
 
   return (
-    <div className="mt-4 border border-border-default bg-bg-surface rounded-2xl p-5 shadow-sm text-left">
+    <div className="mt-4 border border-border-default bg-bg-surface rounded-xl p-5 shadow-sm text-left">
 
       {!isReplying ? (
         <div 
           onClick={() => setIsReplying(true)}
           className="border border-border-subtle bg-bg-inset hover:border-border-default text-text-tertiary cursor-pointer px-4 py-3 rounded-[var(--radius-md)] text-xs flex items-center justify-between transition-colors"
         >
-          <span>Click to reply to {replyToName || replyToEmail}...</span>
+          <span>Click to reply to {replyToName || replyToEmail}... <kbd className="ml-1.5 px-1 bg-bg-surface border border-border-default rounded text-[9px] font-mono font-semibold text-text-secondary">R</kbd></span>
           <span className="text-[10px] font-bold uppercase tracking-wider text-accent-primary">Quick Reply</span>
         </div>
       ) : (
@@ -715,6 +715,7 @@ function ThreadDetail({
           >
             <ArchiveIcon />
             Archive
+            <kbd className="ml-1.5 px-1 bg-bg-raised border border-border-default rounded text-[9px] font-mono font-semibold text-text-tertiary">E</kbd>
           </Button>
           <Button
             variant="danger"
@@ -725,6 +726,7 @@ function ThreadDetail({
           >
             <TrashIcon />
             Delete
+            <kbd className="ml-1.5 px-1 bg-bg-raised border border-border-default rounded text-[9px] font-mono font-semibold text-text-tertiary">#</kbd>
           </Button>
         </div>
       </div>
@@ -772,6 +774,150 @@ function ThreadDetail({
 // ---------------------------------------------------------------------------
 // Message Card
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Message Card
+// ---------------------------------------------------------------------------
+
+function SafeEmailRenderer({ htmlContent }: { htmlContent: string }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState("150px");
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const handleResize = () => {
+      try {
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (doc && doc.body) {
+          // Set standard styles matching the parent dark/light modes
+          const isDark = document.documentElement.classList.contains("dark");
+          
+          // Apply theme class to iframe's root
+          if (isDark) {
+            doc.documentElement.classList.add("dark");
+          } else {
+            doc.documentElement.classList.remove("dark");
+          }
+
+          if (!doc.getElementById("email-custom-styles")) {
+            const style = doc.createElement("style");
+            style.id = "email-custom-styles";
+            style.textContent = `
+              :root {
+                --text-primary: #1a1a2e;
+                --text-secondary: #495057;
+                --text-tertiary: #868e96;
+                --border-default: #dee2e6;
+                --bg-surface: #f1f3f5;
+                --accent-info: #3b82f6;
+              }
+              .dark {
+                --text-primary: #e8e8ed;
+                --text-secondary: #9898a6;
+                --text-tertiary: #5c5c6e;
+                --border-default: #2a2a38;
+                --bg-surface: #252530;
+                --accent-info: #60a5fa;
+              }
+              body {
+                margin: 0;
+                font-family: ui-sans-serif, system-ui, sans-serif;
+                color: var(--text-secondary);
+                font-size: 0.875rem;
+                line-height: 1.6;
+                background-color: transparent;
+                word-break: break-word;
+              }
+              a {
+                color: var(--accent-info);
+                text-decoration: underline;
+              }
+              img {
+                max-width: 100%;
+                height: auto;
+              }
+              table {
+                width: 100% !important;
+                border-collapse: collapse;
+              }
+              blockquote {
+                border-left: 2px solid var(--border-default);
+                padding-left: 0.75rem;
+                margin-left: 0;
+                margin-right: 0;
+                color: var(--text-tertiary);
+              }
+              pre {
+                background-color: var(--bg-surface);
+                padding: 0.75rem;
+                border-radius: 6px;
+                overflow-x: auto;
+              }
+            `;
+            doc.head.appendChild(style);
+          }
+
+          // Force all links to open in a new tab/window for safety and UX
+          const links = doc.querySelectorAll("a");
+          links.forEach((link) => {
+            link.setAttribute("target", "_blank");
+            link.setAttribute("rel", "noopener noreferrer");
+          });
+
+          // Adjust height
+          const newHeight = doc.documentElement.scrollHeight || doc.body.scrollHeight;
+          setHeight(`${newHeight + 24}px`);
+        }
+      } catch (e) {
+        console.error("Error adjusting email iframe height:", e);
+      }
+    };
+
+    iframe.addEventListener("load", handleResize);
+
+    // Initial trigger after short delay to let browser lay out the iframe
+    const initialTimer = setTimeout(handleResize, 50);
+
+    // Watch for internal mutations/resizes (e.g. image loads)
+    let observer: ResizeObserver | null = null;
+    try {
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (doc && doc.body && typeof ResizeObserver !== "undefined") {
+        observer = new ResizeObserver(() => {
+          handleResize();
+        });
+        observer.observe(doc.body);
+      }
+    } catch (e) {
+      console.error("Error initializing ResizeObserver on email iframe:", e);
+    }
+
+    return () => {
+      iframe.removeEventListener("load", handleResize);
+      clearTimeout(initialTimer);
+      if (observer) {
+        observer.disconnect();
+      }
+    };
+  }, [htmlContent]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      srcDoc={htmlContent}
+      sandbox="allow-same-origin allow-popups"
+      style={{
+        width: "100%",
+        height: height,
+        border: "none",
+        overflow: "hidden",
+        backgroundColor: "transparent",
+      }}
+    />
+  );
+}
 
 function MessageCard({ message }: { message: GmailMessage }) {
   const fromHeader = getMessageHeader(message, "from");
@@ -824,10 +970,9 @@ function MessageCard({ message }: { message: GmailMessage }) {
           {date}
         </span>
       </div>
-      <div
-        className="prose-email text-sm text-text-secondary leading-relaxed max-w-none [&_a]:text-accent-info [&_a]:underline [&_img]:max-w-full [&_img]:h-auto [&_table]:w-full [&_blockquote]:border-l-2 [&_blockquote]:border-border-default [&_blockquote]:pl-3 [&_blockquote]:text-text-tertiary [&_pre]:bg-bg-surface [&_pre]:p-3 [&_pre]:rounded-[var(--radius-md)] [&_pre]:overflow-x-auto"
-        dangerouslySetInnerHTML={{ __html: htmlContent }}
-      />
+      <div className="prose-email text-sm text-text-secondary leading-relaxed max-w-none">
+        <SafeEmailRenderer htmlContent={htmlContent} />
+      </div>
     </div>
   );
 }
@@ -1341,7 +1486,7 @@ export default function InboxPage() {
             </div>
           ) : !gmailStatus?.connected ? (
             <div className="flex flex-col items-center justify-center h-full gap-4 px-6 text-center animate-fade-in">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-primary/10 border border-accent-primary/20">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-accent-primary/10 border border-accent-primary/20">
                 <InboxIcon />
               </div>
               <div className="space-y-1.5">
@@ -1363,6 +1508,49 @@ export default function InboxPage() {
                 Connect Gmail
               </Button>
             </div>
+          ) : (gmailStatus?.connected && threads && threads.length === 0 && activeTab === "all") ? (
+            <div className="flex flex-col justify-center h-full p-6 text-left animate-fade-in max-w-sm mx-auto">
+              <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-accent-primary/10 border border-accent-primary/20">
+                <svg className="h-6 w-6 text-accent-primary animate-pulse" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" />
+                </svg>
+              </div>
+              <h2 className="text-base font-bold text-text-primary mb-2">Workspace Connected!</h2>
+              <p className="text-xs text-text-secondary leading-relaxed mb-6">
+                Your Gmail account is successfully linked. Follow these quick steps to get started:
+              </p>
+              <div className="space-y-4 mb-6">
+                <div className="flex gap-3">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-bg-surface border border-border-default text-[10px] font-bold text-accent-primary">1</div>
+                  <div>
+                    <h3 className="text-xs font-semibold text-text-primary">Sync Your Inbox</h3>
+                    <p className="text-[11px] text-text-tertiary leading-relaxed mt-0.5">Click the sync button below to download your latest conversations.</p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-bg-surface border border-border-default text-[10px] font-bold text-accent-primary">2</div>
+                  <div>
+                    <h3 className="text-xs font-semibold text-text-primary">Configure AI Priority Rules</h3>
+                    <p className="text-[11px] text-text-tertiary leading-relaxed mt-0.5">Switch to the "Priority" tab to set criteria for labeling urgent/important emails.</p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-bg-surface border border-border-default text-[10px] font-bold text-accent-primary">3</div>
+                  <div>
+                    <h3 className="text-xs font-semibold text-text-primary">Keyboard Shortcuts</h3>
+                    <p className="text-[11px] text-text-tertiary leading-relaxed mt-0.5">Use <kbd className="px-1 py-0.5 text-[9px] bg-bg-surface border border-border-default rounded text-text-secondary">R</kbd> to reply, <kbd className="px-1 py-0.5 text-[9px] bg-bg-surface border border-border-default rounded text-text-secondary">E</kbd> to archive, and <kbd className="px-1 py-0.5 text-[9px] bg-bg-surface border border-border-default rounded text-text-secondary">#</kbd> to delete.</p>
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="primary"
+                className="w-full justify-center text-xs font-bold uppercase tracking-wider h-9 shadow-[var(--shadow-glow)]"
+                onClick={handleRefresh}
+                isLoading={isRefreshing}
+              >
+                Sync Inbox Now
+              </Button>
+            </div>
           ) : visibleThreads.length > 0 ? (
             <div className="flex flex-col gap-0.5 p-1.5">
               {visibleThreads.map((thread) => (
@@ -1378,7 +1566,7 @@ export default function InboxPage() {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-4 px-6 text-center animate-fade-in">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-bg-surface border border-border-default">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-bg-surface border border-border-default">
                 <InboxIcon />
               </div>
               <div className="space-y-1.5">
@@ -1428,7 +1616,7 @@ export default function InboxPage() {
           />
         ) : (
           <div className="flex flex-col items-center justify-center h-full gap-4 animate-fade-in">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent-primary/10 border border-accent-primary/20">
+            <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-accent-primary/10 border border-accent-primary/20">
               <InboxIcon />
             </div>
             <div className="text-center space-y-1">

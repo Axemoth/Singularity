@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
 import { corsairEntities, corsairAccounts, corsairIntegrations, emailPriorities, userSettings, user } from "@/server/db/schema";
-import { eq, and, desc, or, like, sql } from "drizzle-orm";
+import { eq, and, desc, or, like, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { syncEmbeddings } from "@/server/api/tasks/embeddings";
 import { syncPriorities } from "@/server/api/tasks/prioritizer";
@@ -88,7 +88,7 @@ export const gmailRouter = createTRPCRouter({
           and(
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}_%`)
+              like(corsairAccounts.tenantId, `${userId}\\_%`)
             ),
             eq(corsairIntegrations.name, "gmail")
           )
@@ -162,7 +162,7 @@ export const gmailRouter = createTRPCRouter({
           and(
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}_%`)
+              like(corsairAccounts.tenantId, `${userId}\\_%`)
             ),
             eq(corsairIntegrations.name, "gmail"),
             eq(corsairEntities.entityType, "threads")
@@ -235,7 +235,7 @@ export const gmailRouter = createTRPCRouter({
             and(
               or(
                 eq(corsairAccounts.tenantId, userId),
-                like(corsairAccounts.tenantId, `${userId}_%`)
+                like(corsairAccounts.tenantId, `${userId}\\_%`)
               ),
               eq(corsairIntegrations.name, "gmail"),
               eq(corsairEntities.entityType, "threads")
@@ -330,7 +330,7 @@ export const gmailRouter = createTRPCRouter({
         and(
           or(
             eq(corsairAccounts.tenantId, userId),
-            like(corsairAccounts.tenantId, `${userId}_%`)
+            like(corsairAccounts.tenantId, `${userId}\\_%`)
           ),
           eq(corsairIntegrations.name, "gmail")
         )
@@ -400,7 +400,7 @@ export const gmailRouter = createTRPCRouter({
         and(
           or(
             eq(corsairAccounts.tenantId, userId),
-            like(corsairAccounts.tenantId, `${userId}_%`)
+            like(corsairAccounts.tenantId, `${userId}\\_%`)
           ),
           eq(corsairIntegrations.name, "gmail")
         )
@@ -428,7 +428,7 @@ export const gmailRouter = createTRPCRouter({
             eq(corsairAccounts.id, input.accountId),
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}_%`)
+              like(corsairAccounts.tenantId, `${userId}\\_%`)
             )
           )
         )
@@ -445,9 +445,7 @@ export const gmailRouter = createTRPCRouter({
         
         const entityIds = entities.map(e => e.id);
         if (entityIds.length > 0) {
-          await ctx.db.delete(emailPriorities).where(
-            sql`${emailPriorities.emailId} IN ${entityIds}`
-          );
+          await ctx.db.delete(emailPriorities).where(inArray(emailPriorities.emailId, entityIds));
         }
 
         // Delete dependent corsair entities
@@ -462,27 +460,37 @@ export const gmailRouter = createTRPCRouter({
     }),
 
   getThread: protectedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string().trim().min(1) }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
-      // Look up which account/tenant this thread belongs to
-      const [threadEntity] = await ctx.db
-        .select({ accountId: corsairEntities.accountId })
+      // Securely look up the thread entity ensuring it belongs to the current user
+      const [threadAccount] = await ctx.db
+        .select({ tenantId: corsairAccounts.tenantId })
         .from(corsairEntities)
-        .where(eq(corsairEntities.entityId, input.id))
+        .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
+        .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+        .where(
+          and(
+            eq(corsairEntities.entityId, input.id),
+            eq(corsairEntities.entityType, "threads"),
+            eq(corsairIntegrations.name, "gmail"),
+            or(
+              eq(corsairAccounts.tenantId, userId),
+              like(corsairAccounts.tenantId, `${userId}\\_%`)
+            )
+          )
+        )
         .limit(1);
 
-      let tenantId = userId;
-      if (threadEntity) {
-        const [acc] = await ctx.db
-          .select({ tenantId: corsairAccounts.tenantId })
-          .from(corsairAccounts)
-          .where(eq(corsairAccounts.id, threadEntity.accountId))
-          .limit(1);
-        if (acc) tenantId = acc.tenantId;
+      if (!threadAccount) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Thread not found or you do not have permission to access it.",
+        });
       }
 
+      const tenantId = threadAccount.tenantId;
       const tenant = corsair.withTenant(tenantId);
 
       try {
@@ -515,9 +523,9 @@ export const gmailRouter = createTRPCRouter({
   sendEmail: protectedProcedure
     .input(
       z.object({
-        to: z.string().email(),
-        subject: z.string().min(1),
-        body: z.string().min(1),
+        to: z.string().email().max(320).trim(),
+        subject: z.string().min(1).max(1000).trim(),
+        body: z.string().min(1).max(50000).trim(),
         cc: z.string().optional(),
         bcc: z.string().optional(),
         threadId: z.string().optional(),
@@ -538,17 +546,47 @@ export const gmailRouter = createTRPCRouter({
           and(
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}_%`)
+              like(corsairAccounts.tenantId, `${userId}\\_%`)
             ),
             eq(corsairIntegrations.name, "gmail")
           )
         );
 
       let tenantId = userId;
-      const fallbackAccount = accounts[0];
-      if (fallbackAccount) {
-        const matched = preferredEmail ? accounts.find(a => a.emailAddress?.toLowerCase() === preferredEmail.toLowerCase()) : null;
-        tenantId = matched ? matched.tenantId : fallbackAccount.tenantId;
+
+      if (input.threadId) {
+        // Securely look up the thread entity to verify ownership and resolve the correct tenant ID
+        const [threadAccount] = await ctx.db
+          .select({ tenantId: corsairAccounts.tenantId })
+          .from(corsairEntities)
+          .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
+          .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+          .where(
+            and(
+              eq(corsairEntities.entityId, input.threadId),
+              eq(corsairEntities.entityType, "threads"),
+              eq(corsairIntegrations.name, "gmail"),
+              or(
+                eq(corsairAccounts.tenantId, userId),
+                like(corsairAccounts.tenantId, `${userId}\\_%`)
+              )
+            )
+          )
+          .limit(1);
+
+        if (!threadAccount) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "The specified threadId does not exist or you do not have access to it.",
+          });
+        }
+        tenantId = threadAccount.tenantId;
+      } else {
+        const fallbackAccount = accounts[0];
+        if (fallbackAccount) {
+          const matched = preferredEmail ? accounts.find(a => a.emailAddress?.toLowerCase() === preferredEmail.toLowerCase()) : null;
+          tenantId = matched ? matched.tenantId : fallbackAccount.tenantId;
+        }
       }
 
       const tenant = corsair.withTenant(tenantId);
@@ -572,9 +610,9 @@ export const gmailRouter = createTRPCRouter({
   createDraft: protectedProcedure
     .input(
       z.object({
-        to: z.string().email().optional(),
-        subject: z.string().optional(),
-        body: z.string().min(1),
+        to: z.string().email().max(320).trim().optional(),
+        subject: z.string().max(1000).trim().optional(),
+        body: z.string().min(1).max(50000).trim(),
         cc: z.string().optional(),
         bcc: z.string().optional(),
         fromEmail: z.string().optional(),
@@ -593,7 +631,7 @@ export const gmailRouter = createTRPCRouter({
           and(
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}_%`)
+              like(corsairAccounts.tenantId, `${userId}\\_%`)
             ),
             eq(corsairIntegrations.name, "gmail")
           )
@@ -626,27 +664,37 @@ export const gmailRouter = createTRPCRouter({
     }),
 
   archiveThread: protectedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string().trim().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
-      // Look up which account/tenant this thread belongs to
-      const [threadEntity] = await ctx.db
-        .select({ accountId: corsairEntities.accountId })
+      // Securely look up the thread entity ensuring it belongs to the current user
+      const [threadAccount] = await ctx.db
+        .select({ tenantId: corsairAccounts.tenantId })
         .from(corsairEntities)
-        .where(eq(corsairEntities.entityId, input.id))
+        .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
+        .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+        .where(
+          and(
+            eq(corsairEntities.entityId, input.id),
+            eq(corsairEntities.entityType, "threads"),
+            eq(corsairIntegrations.name, "gmail"),
+            or(
+              eq(corsairAccounts.tenantId, userId),
+              like(corsairAccounts.tenantId, `${userId}\\_%`)
+            )
+          )
+        )
         .limit(1);
 
-      let tenantId = userId;
-      if (threadEntity) {
-        const [acc] = await ctx.db
-          .select({ tenantId: corsairAccounts.tenantId })
-          .from(corsairAccounts)
-          .where(eq(corsairAccounts.id, threadEntity.accountId))
-          .limit(1);
-        if (acc) tenantId = acc.tenantId;
+      if (!threadAccount) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Thread not found or you do not have permission to access it.",
+        });
       }
 
+      const tenantId = threadAccount.tenantId;
       const tenant = corsair.withTenant(tenantId);
 
       try {
@@ -666,27 +714,37 @@ export const gmailRouter = createTRPCRouter({
     }),
 
   deleteThread: protectedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string().trim().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
-      // Look up which account/tenant this thread belongs to
-      const [threadEntity] = await ctx.db
-        .select({ accountId: corsairEntities.accountId })
+      // Securely look up the thread entity ensuring it belongs to the current user
+      const [threadAccount] = await ctx.db
+        .select({ tenantId: corsairAccounts.tenantId })
         .from(corsairEntities)
-        .where(eq(corsairEntities.entityId, input.id))
+        .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
+        .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+        .where(
+          and(
+            eq(corsairEntities.entityId, input.id),
+            eq(corsairEntities.entityType, "threads"),
+            eq(corsairIntegrations.name, "gmail"),
+            or(
+              eq(corsairAccounts.tenantId, userId),
+              like(corsairAccounts.tenantId, `${userId}\\_%`)
+            )
+          )
+        )
         .limit(1);
 
-      let tenantId = userId;
-      if (threadEntity) {
-        const [acc] = await ctx.db
-          .select({ tenantId: corsairAccounts.tenantId })
-          .from(corsairAccounts)
-          .where(eq(corsairAccounts.id, threadEntity.accountId))
-          .limit(1);
-        if (acc) tenantId = acc.tenantId;
+      if (!threadAccount) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Thread not found or you do not have permission to access it.",
+        });
       }
 
+      const tenantId = threadAccount.tenantId;
       const tenant = corsair.withTenant(tenantId);
 
       try {
@@ -857,7 +915,7 @@ export const gmailRouter = createTRPCRouter({
           and(
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}_%`)
+              like(corsairAccounts.tenantId, `${userId}\\_%`)
             ),
             eq(corsairEntities.entityType, "threads")
           )

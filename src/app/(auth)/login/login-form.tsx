@@ -37,7 +37,7 @@ export default function LoginForm() {
       {/* ── Login card ── */}
       <div className="animate-slide-up relative z-10 mx-4 w-full max-w-md">
         {/* Card */}
-        <div className="relative overflow-hidden rounded-2xl border border-border-default bg-bg-raised px-8 py-12 shadow-xl backdrop-blur-xl sm:px-10 sm:py-14">
+        <div className="relative overflow-hidden rounded-xl border border-border-default bg-bg-raised px-8 py-12 shadow-xl backdrop-blur-xl sm:px-10 sm:py-14">
           
           {/* Corner glow inside card */}
           <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-bg-surface/40 blur-3xl" />
@@ -45,8 +45,8 @@ export default function LoginForm() {
 
           {/* Logo */}
           <div className="relative flex flex-col items-center">
-            <div className="relative flex h-16 w-16 overflow-hidden items-center justify-center rounded-2xl bg-accent-primary text-text-inverse shadow-md">
-              <span className="animate-shimmer absolute inset-0 -skew-x-12 rounded-2xl bg-gradient-to-r from-transparent via-text-inverse/10 to-transparent" />
+            <div className="relative flex h-16 w-16 overflow-hidden items-center justify-center rounded-xl bg-accent-primary text-text-inverse shadow-md">
+              <span className="animate-shimmer absolute inset-0 -skew-x-12 rounded-xl bg-gradient-to-r from-transparent via-text-inverse/10 to-transparent" />
               <img src="/logo.png" alt="Singularity Logo" className="relative z-10 h-full w-full object-cover" />
             </div>
 

@@ -175,7 +175,7 @@ export async function syncEmbeddings(userId: string): Promise<void> {
         and(
           or(
             eq(corsairAccounts.tenantId, userId),
-            like(corsairAccounts.tenantId, `${userId}_%`)
+            like(corsairAccounts.tenantId, `${userId}\\_%`)
           ),
           isNull(corsairEmbeddings.id)
         )

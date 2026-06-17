@@ -15,10 +15,10 @@ export async function POST(request: NextRequest) {
 	let body: string | Record<string, unknown>;
 
 	if (contentType?.includes('application/json')) {
-		body = await request.json();
+		body = (await request.json()) as Record<string, unknown>;
 	} else {
 		const text = await request.text();
-		body = text && text.trim() ? text : {};
+		body = text?.trim() ? text : {};
 	}
 
 	const { searchParams } = new URL(request.url);
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 						const { eq } = await import("drizzle-orm");
 
 						const accountRow = await db.query.corsairAccounts.findFirst({
-							where: eq(corsairAccounts.emailAddress, validatedEmail),
+							where: eq(corsairAccounts.emailAddress, validatedEmail.toLowerCase()),
 						});
 
 						if (accountRow) {
@@ -69,9 +69,7 @@ export async function POST(request: NextRequest) {
 		}
 	}
 
-	if (!tenantId) {
-		tenantId = 'dev';
-	}
+	tenantId ??= 'dev';
 
 	const result = await processWebhook(corsair, headers, body, { tenantId });
 

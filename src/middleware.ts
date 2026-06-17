@@ -15,7 +15,8 @@ export function middleware(request: NextRequest) {
   const isProtectedRoute =
     path.startsWith("/inbox") ||
     path.startsWith("/calendar") ||
-    path.startsWith("/settings");
+    path.startsWith("/settings") ||
+    path.startsWith("/agent");
 
   // 1. If user is logged in and tries to access /login, redirect to /inbox
   if (hasSessionToken && isAuthRoute) {

@@ -1,10 +1,20 @@
+import "dotenv/config";
 import DodoPayments from "dodopayments";
 
 const dodoPayments = new DodoPayments({
   bearerToken: process.env.DODO_PAYMENTS_API_KEY || "dummy",
-  environment: "test_mode",
+  environment: (process.env.DODO_PAYMENTS_ENVIRONMENT as "test_mode" | "live_mode") || "test_mode",
 });
 
-console.log("Subscriptions prototype methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(dodoPayments.subscriptions)));
-console.log("Customers prototype methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(dodoPayments.customers)));
-process.exit(0);
+async function run() {
+  console.log("Calling customers.list with environment:", process.env.DODO_PAYMENTS_ENVIRONMENT || "test_mode");
+  try {
+    const res = await dodoPayments.customers.list({ email: "dev@example.com" });
+    console.log("Result keys:", Object.keys(res));
+    console.log("Full Result:", JSON.stringify(res, null, 2));
+  } catch (err: any) {
+    console.error("Error calling customers.list:", err.message || err);
+  }
+}
+
+run();

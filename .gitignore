@@ -50,3 +50,7 @@ yarn-error.log*
 !/README.md
 !/ARCHITECTURE.md
 !/FRONTEND_PROGRESS.md
+
+# temporary scratch/debug files
+/src/server/test_debug.ts
+/src/server/test_import*.ts

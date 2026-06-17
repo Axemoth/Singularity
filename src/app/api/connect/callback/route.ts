@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
                     console.error("[OAuth Callback] Invalid email address format:", emailAddress);
                     throw new Error("Invalid email address format received from provider");
                 }
-                const validatedEmail = parseResult.data;
+                const validatedEmail = parseResult.data.toLowerCase();
 
                 const { db } = await import("@/server/db");
                 const { corsairAccounts, corsairIntegrations } = await import("@/server/db/schema");
@@ -106,9 +106,10 @@ export async function GET(request: NextRequest) {
         const response = NextResponse.redirect(new URL("/settings?connected=" + plugin, process.env.APP_URL));
         response.cookies.delete("oauth_state");
         return response;
-    } catch (err: any) {
+    } catch (err) {
         console.error("OAuth callback exchange failed:", err);
-        const response = new NextResponse(`OAuth failed: ${err.message || err}`, { status: 500 });
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        const response = new NextResponse(`OAuth failed: ${errorMessage}`, { status: 500 });
         response.cookies.delete("oauth_state");
         return response;
     }
