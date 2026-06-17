@@ -25,6 +25,7 @@ const agentContextSchema = z
     selectedThreadId: z.string().optional(),
     selectedEventId: z.string().optional(),
     selectedEntityIds: z.array(z.string()).optional(),
+    targetEmail: z.string().optional(),
   })
   .optional();
 
@@ -252,10 +253,19 @@ export const agentRouter = createTRPCRouter({
           .orderBy(corsairAccounts.createdAt);
 
         const primaryGmailTenantId = gmailAccounts[0]?.tenantId ?? userId;
+        let activeGmailTenantId = primaryGmailTenantId;
+        if (input.context?.targetEmail) {
+          const matched = gmailAccounts.find(
+            (a) => a.emailAddress?.toLowerCase() === input.context?.targetEmail?.toLowerCase()
+          );
+          if (matched) {
+            activeGmailTenantId = matched.tenantId;
+          }
+        }
 
         let didExecuteWriteTool = false;
         const provider = new MastraProvider();
-        const toolsList = await provider.build({ corsair: corsair.withTenant(primaryGmailTenantId) });
+        const toolsList = await provider.build({ corsair: corsair.withTenant(activeGmailTenantId) });
 
         const wrappedMcpTools = Object.fromEntries(
           toolsList.map((t) => {
@@ -298,7 +308,7 @@ export const agentRouter = createTRPCRouter({
             console.log(`[send_email tool] Sending email to ${to} via tenant ${userId}...`);
             didExecuteWriteTool = true;
             
-            let targetTenantId = primaryGmailTenantId;
+            let targetTenantId = activeGmailTenantId;
             if (fromEmail) {
               const matched = gmailAccounts.find(a => a.emailAddress?.toLowerCase() === fromEmail.toLowerCase());
               if (matched) targetTenantId = matched.tenantId;
@@ -324,7 +334,7 @@ export const agentRouter = createTRPCRouter({
             console.log(`[create_draft tool] Creating draft for ${to} via tenant ${userId}...`);
             didExecuteWriteTool = true;
 
-            let targetTenantId = primaryGmailTenantId;
+            let targetTenantId = activeGmailTenantId;
             if (fromEmail) {
               const matched = gmailAccounts.find(a => a.emailAddress?.toLowerCase() === fromEmail.toLowerCase());
               if (matched) targetTenantId = matched.tenantId;
@@ -549,6 +559,10 @@ export const agentRouter = createTRPCRouter({
           },
         });
 
+        const targetEmailInstruction = input.context?.targetEmail
+          ? `\n\nCRITICAL CONTEXT: The user is currently targeting the email account: "${input.context.targetEmail}". Any Gmail thread lists, email searches, compose templates, or draft creations must target this account. Use "${input.context.targetEmail}" as 'fromEmail' parameter when calling send_email or create_draft.`
+          : "";
+
         // System instructions (completely static to maximize DeepSeek/Gemini prompt caching)
         const instructions = `You have access to Corsair tools. Use list_operations to discover available APIs, get_schema to understand required arguments, and run_script to execute them.
 The 'corsair' variable is already pre-scoped to your active tenant, so you must NOT call '.withTenant()' yourself. Simply run operations directly on 'corsair', e.g. const res = await corsair.gmail.api.threads.list({}); return res;
@@ -591,7 +605,7 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
    <email body>
    ---DRAFT_END---
    Always keep conversational text outside of this block (preferably before it). This block allows the frontend to render the draft as an interactive, editable review card in the chat.
-7. Tool Confirmations: After successfully calling 'send_email' or 'create_draft', you MUST always output an explicit, friendly confirmation message to the user confirming the action was successful (e.g. 'I have successfully sent the email to [recipient] with the subject "[subject]".' or 'I have saved your draft for [recipient] with the subject "[subject]".'). Do NOT output an empty response.`;
+7. Tool Confirmations: After successfully calling 'send_email' or 'create_draft', you MUST always output an explicit, friendly confirmation message to the user confirming the action was successful (e.g. 'I have successfully sent the email to [recipient] with the subject "[subject]".' or 'I have saved your draft for [recipient] with the subject "[subject]".'). Do NOT output an empty response.${targetEmailInstruction}`;
         const contextPrompt = buildContextPrompt(input.context);
 
         const historyMessages = (input.history ?? []).map((msg) => {

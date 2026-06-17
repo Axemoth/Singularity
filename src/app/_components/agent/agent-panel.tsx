@@ -164,6 +164,13 @@ export function AgentPanel() {
   const [customInputMsgId, setCustomInputMsgId] = useState<string | null>(null);
   const [customInputVal, setCustomInputVal] = useState("");
 
+  // Trigger menus state
+  const [showEmailMenu, setShowEmailMenu] = useState(false);
+  const [showCommandMenu, setShowCommandMenu] = useState(false);
+  const [menuSearch, setMenuSearch] = useState("");
+  const [menuIndex, setMenuIndex] = useState(0);
+  const [targetEmail, setTargetEmail] = useState<string | null>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -374,6 +381,96 @@ export function AgentPanel() {
     },
   });
 
+  const { data: gmailStatus } = api.gmail.getConnectionStatus.useQuery(undefined, {
+    enabled: !!sessionData?.user,
+  });
+  const { data: subscriptionStatus } = api.gmail.getSubscriptionStatus.useQuery(undefined, {
+    enabled: !!sessionData?.user,
+  });
+  const isPremium = subscriptionStatus?.isPremium === true;
+  const connectedEmails = useMemo(() => {
+    return gmailStatus?.accounts?.map((acc: any) => acc.emailAddress) ?? [];
+  }, [gmailStatus]);
+
+  const COMMANDS = useMemo(() => [
+    { cmd: "/prioritize", label: "Prioritize inbox", text: "Prioritize my inbox" },
+    { cmd: "/draft", label: "Draft email", text: "Draft an email to " },
+    { cmd: "/schedule", label: "Schedule event", text: "Schedule a meeting for " },
+    { cmd: "/summarize", label: "Summarize agenda", text: "Summarize my unread emails" },
+  ], []);
+
+  const filteredCommands = useMemo(() => {
+    return COMMANDS.filter(c => c.cmd.slice(1).startsWith(menuSearch.toLowerCase()));
+  }, [COMMANDS, menuSearch]);
+
+  const filteredEmails = useMemo(() => {
+    return connectedEmails.filter(e => e.toLowerCase().includes(menuSearch.toLowerCase()));
+  }, [connectedEmails, menuSearch]);
+
+  const handleInputChange = (val: string, selectionStart: number) => {
+    setInput(val);
+    const textBeforeCursor = val.slice(0, selectionStart);
+    const commandMatch = textBeforeCursor.match(/\/(\w*)$/);
+    const emailMatch = textBeforeCursor.match(/@([\w.@-]*)$/);
+
+    if (commandMatch) {
+      setShowCommandMenu(true);
+      setShowEmailMenu(false);
+      setMenuSearch(commandMatch[1] ?? "");
+      setMenuIndex(0);
+    } else if (emailMatch && isPremium) {
+      setShowEmailMenu(true);
+      setShowCommandMenu(false);
+      setMenuSearch(emailMatch[1] ?? "");
+      setMenuIndex(0);
+    } else {
+      setShowCommandMenu(false);
+      setShowEmailMenu(false);
+      setMenuSearch("");
+    }
+  };
+
+  const handleSelectCommand = (cmdText: string) => {
+    const selectionStart = inputRef.current?.selectionStart ?? 0;
+    const textBeforeCursor = input.slice(0, selectionStart);
+    const textAfterCursor = input.slice(selectionStart);
+    const triggerIndex = textBeforeCursor.lastIndexOf("/");
+    if (triggerIndex !== -1) {
+      const newText = textBeforeCursor.slice(0, triggerIndex) + cmdText + textAfterCursor;
+      setInput(newText);
+      setShowCommandMenu(false);
+      if (cmdText === "Prioritize my inbox" || cmdText === "Summarize my unread emails") {
+        window.setTimeout(() => {
+          submitMessage(cmdText);
+        }, 100);
+      } else {
+        window.setTimeout(() => {
+          if (inputRef.current) {
+            inputRef.current.focus();
+            const newCursorPos = triggerIndex + cmdText.length;
+            inputRef.current.setSelectionRange(newCursorPos, newCursorPos);
+          }
+        }, 50);
+      }
+    }
+  };
+
+  const handleSelectEmail = (email: string) => {
+    const selectionStart = inputRef.current?.selectionStart ?? 0;
+    const textBeforeCursor = input.slice(0, selectionStart);
+    const textAfterCursor = input.slice(selectionStart);
+    const triggerIndex = textBeforeCursor.lastIndexOf("@");
+    if (triggerIndex !== -1) {
+      setTargetEmail(email);
+      const newText = textBeforeCursor.slice(0, triggerIndex) + textAfterCursor;
+      setInput(newText);
+      setShowEmailMenu(false);
+      window.setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+    }
+  };
+
   const quickPrompts = useMemo(
     () => [
       "What should I handle first?",
@@ -427,6 +524,7 @@ export function AgentPanel() {
       })),
       context: {
         route: pathname,
+        targetEmail: targetEmail ?? undefined,
       },
       reasoningEnabled: isReasoningEnabled,
     });
@@ -744,7 +842,57 @@ export function AgentPanel() {
             </div>
 
             {/* Input area */}
-            <div className="border-border-subtle border-t p-3">
+            <div className="border-border-subtle border-t p-3 relative">
+              {/* Slash commands menu */}
+              {showCommandMenu && filteredCommands.length > 0 && (
+                <div className="absolute bottom-full left-3 right-3 mb-2 bg-bg-surface/95 backdrop-blur-md border border-border-default rounded-xl shadow-lg z-50 py-1.5 max-h-48 overflow-y-auto">
+                  <div className="px-3 py-1 text-[10px] font-bold text-text-tertiary uppercase tracking-wider border-b border-border-subtle/50 mb-1">
+                    Slash Commands
+                  </div>
+                  {filteredCommands.map((item, idx) => (
+                    <button
+                      key={item.cmd}
+                      type="button"
+                      onClick={() => handleSelectCommand(item.text)}
+                      onMouseEnter={() => setMenuIndex(idx)}
+                      className={`w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer text-left ${
+                        idx === menuIndex
+                          ? "bg-accent-primary/10 text-accent-primary"
+                          : "text-text-primary hover:bg-bg-surface/80"
+                      }`}
+                    >
+                      <span>{item.cmd}</span>
+                      <span className="text-[10px] text-text-tertiary font-normal">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Email selector menu */}
+              {showEmailMenu && filteredEmails.length > 0 && (
+                <div className="absolute bottom-full left-3 right-3 mb-2 bg-bg-surface/95 backdrop-blur-md border border-border-default rounded-xl shadow-lg z-50 py-1.5 max-h-48 overflow-y-auto">
+                  <div className="px-3 py-1 text-[10px] font-bold text-text-tertiary uppercase tracking-wider border-b border-border-subtle/50 mb-1">
+                    Select Targeting Email
+                  </div>
+                  {filteredEmails.map((email, idx) => (
+                    <button
+                      key={email}
+                      type="button"
+                      onClick={() => handleSelectEmail(email)}
+                      onMouseEnter={() => setMenuIndex(idx)}
+                      className={`w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer text-left ${
+                        idx === menuIndex
+                          ? "bg-accent-primary/10 text-accent-primary"
+                          : "text-text-primary hover:bg-bg-surface/80"
+                      }`}
+                    >
+                      <span className="truncate">{email}</span>
+                      <span className="text-[10px] text-text-tertiary font-normal">Gmail Account</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="mb-2.5 flex flex-wrap gap-1.5">
                 {quickPrompts.map((prompt) => (
                   <button
@@ -759,18 +907,64 @@ export function AgentPanel() {
               </div>
 
               <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-xl border border-border-default bg-bg-inset p-2 focus-within:border-accent-primary transition-colors">
+                {targetEmail && (
+                  <div className="flex items-center gap-1.5 bg-accent-primary/10 text-accent-primary border border-accent-primary/20 rounded-full px-2.5 py-1 text-[11px] font-medium w-fit mb-1 animate-fade-in shrink-0">
+                    <span>Targeting: {targetEmail}</span>
+                    <button
+                      type="button"
+                      onClick={() => setTargetEmail(null)}
+                      className="hover:text-accent-primary-hover font-bold text-xs cursor-pointer ml-0.5 leading-none"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
                 <textarea
                   ref={inputRef}
                   value={input}
-                  onChange={(event) => setInput(event.target.value)}
+                  onChange={(event) => handleInputChange(event.target.value, event.target.selectionStart)}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
+                    if (showCommandMenu && filteredCommands.length > 0) {
+                      if (event.key === "ArrowDown") {
+                        event.preventDefault();
+                        setMenuIndex((prev) => (prev + 1) % filteredCommands.length);
+                      } else if (event.key === "ArrowUp") {
+                        event.preventDefault();
+                        setMenuIndex((prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+                      } else if (event.key === "Enter" || event.key === "Tab") {
+                        event.preventDefault();
+                        const selected = filteredCommands[menuIndex];
+                        if (selected) {
+                          handleSelectCommand(selected.text);
+                        }
+                      } else if (event.key === "Escape") {
+                        event.preventDefault();
+                        setShowCommandMenu(false);
+                      }
+                    } else if (showEmailMenu && filteredEmails.length > 0) {
+                      if (event.key === "ArrowDown") {
+                        event.preventDefault();
+                        setMenuIndex((prev) => (prev + 1) % filteredEmails.length);
+                      } else if (event.key === "ArrowUp") {
+                        event.preventDefault();
+                        setMenuIndex((prev) => (prev - 1 + filteredEmails.length) % filteredEmails.length);
+                      } else if (event.key === "Enter" || event.key === "Tab") {
+                        event.preventDefault();
+                        const selected = filteredEmails[menuIndex];
+                        if (selected) {
+                          handleSelectEmail(selected);
+                        }
+                      } else if (event.key === "Escape") {
+                        event.preventDefault();
+                        setShowEmailMenu(false);
+                      }
+                    } else if (event.key === "Enter" && !event.shiftKey) {
                       event.preventDefault();
                       submitMessage();
                     }
                   }}
                   rows={2}
-                  placeholder="Ask the agent..."
+                  placeholder="Ask the agent... (Type / for commands, @ for email accounts)"
                   className="bg-transparent text-text-primary placeholder:text-text-tertiary w-full resize-none px-2 py-1 text-sm outline-none border-none focus:ring-0"
                 />
                 <div className="flex items-center justify-between px-1 border-t border-border-subtle/50 pt-2">
