@@ -157,6 +157,9 @@ export const emailPriorities = pgTable("email_priorities", {
   emailId: text("email_id").notNull(),
   priority: text("priority").notNull(), // 'urgent' | 'normal' | 'low'
   reason: text("reason"),
+  manuallyUpdated: boolean("manually_updated").default(false).notNull(),
+  detectedDeadline: timestamp("detected_deadline", { withTimezone: true }),
+  isSpam: boolean("is_spam").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -177,6 +180,7 @@ export const userSettings = pgTable("user_settings", {
   priorityInstructions: text("priority_instructions"),
   username: text("username"),
   modelMode: text("model_mode").notNull().default("careful"),
+  learntHabits: text("learnt_habits"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

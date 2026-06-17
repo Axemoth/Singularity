@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
 import { corsairEntities, corsairAccounts, corsairIntegrations, emailPriorities, userSettings, user } from "@/server/db/schema";
-import { eq, and, desc, or, like, inArray } from "drizzle-orm";
+import { eq, and, desc, or, like, inArray, count } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { syncEmbeddings } from "@/server/api/tasks/embeddings";
 import { syncPriorities } from "@/server/api/tasks/prioritizer";
@@ -984,6 +984,130 @@ export const gmailRouter = createTRPCRouter({
       return [];
     }
   }),
+
+  getLearningStats: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    try {
+      const [manualCountRes] = await ctx.db
+        .select({ value: count() })
+        .from(emailPriorities)
+        .where(
+          and(
+            eq(emailPriorities.tenantId, userId),
+            eq(emailPriorities.manuallyUpdated, true)
+          )
+        );
+
+      const [totalPrioritizedRes] = await ctx.db
+        .select({ value: count() })
+        .from(emailPriorities)
+        .where(eq(emailPriorities.tenantId, userId));
+
+      const [spamCountRes] = await ctx.db
+        .select({ value: count() })
+        .from(emailPriorities)
+        .where(
+          and(
+            eq(emailPriorities.tenantId, userId),
+            eq(emailPriorities.isSpam, true)
+          )
+        );
+
+      const [settings] = await ctx.db
+        .select({ learntHabits: userSettings.learntHabits })
+        .from(userSettings)
+        .where(eq(userSettings.userId, userId))
+        .limit(1);
+
+      return {
+        manualOverrides: manualCountRes?.value ?? 0,
+        totalPrioritized: totalPrioritizedRes?.value ?? 0,
+        spamFiltered: spamCountRes?.value ?? 0,
+        learntHabits: settings?.learntHabits ?? "",
+      };
+    } catch (err) {
+      console.error("[GetLearningStats] Failed to fetch stats:", err);
+      return {
+        manualOverrides: 0,
+        totalPrioritized: 0,
+        spamFiltered: 0,
+      };
+    }
+  }),
+
+  setThreadPriority: protectedProcedure
+    .input(
+      z.object({
+        threadId: z.string(),
+        priority: z.enum(["urgent", "normal", "low"]),
+        reason: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      try {
+        const [thread] = await ctx.db
+          .select({ id: corsairEntities.id })
+          .from(corsairEntities)
+          .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
+          .where(
+            and(
+              eq(corsairEntities.entityId, input.threadId),
+              eq(corsairEntities.entityType, "threads"),
+              or(
+                eq(corsairAccounts.tenantId, userId),
+                like(corsairAccounts.tenantId, `${userId}\\_%`)
+              )
+            )
+          )
+          .limit(1);
+
+        if (!thread) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Thread not found or unauthorized.",
+          });
+        }
+
+        const [existing] = await ctx.db
+          .select({ id: emailPriorities.id })
+          .from(emailPriorities)
+          .where(eq(emailPriorities.emailId, thread.id))
+          .limit(1);
+
+        if (existing) {
+          await ctx.db
+            .update(emailPriorities)
+            .set({
+              priority: input.priority,
+              reason: input.reason ?? "Manually adjusted by user",
+              manuallyUpdated: true,
+              isSpam: false,
+              updatedAt: new Date(),
+            })
+            .where(eq(emailPriorities.id, existing.id));
+        } else {
+          await ctx.db.insert(emailPriorities).values({
+            id: crypto.randomUUID(),
+            tenantId: userId,
+            emailId: thread.id,
+            priority: input.priority,
+            reason: input.reason ?? "Manually adjusted by user",
+            manuallyUpdated: true,
+            isSpam: false,
+          });
+        }
+
+        return { success: true };
+      } catch (err: any) {
+        console.error("Failed to set thread priority:", err);
+        if (err instanceof TRPCError) throw err;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to update thread priority: ${err.message || err}`,
+        });
+      }
+    }),
 
   getSubscriptionStatus: protectedProcedure.query(async ({ ctx }) => {
     const userEmail = ctx.session.user.email;

@@ -654,6 +654,92 @@ function ThreadSummaryBar({ thread, messages }: { thread: ThreadEntity; messages
 }
 
 // ---------------------------------------------------------------------------
+// Priority Selector Dropdown
+// ---------------------------------------------------------------------------
+
+function PrioritySelector({
+  threadId,
+  currentPriority,
+}: {
+  threadId: string;
+  currentPriority: "urgent" | "normal" | "low";
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const utils = api.useUtils();
+  const toast = useToast();
+
+  const mutation = api.gmail.setThreadPriority.useMutation({
+    onSuccess: (_, variables) => {
+      toast(`Priority manually set to ${variables.priority}. The AI will learn from this correction.`, "success");
+      void utils.gmail.listThreads.invalidate();
+      void utils.gmail.getLearningStats.invalidate();
+    },
+    onError: (err) => {
+      toast(`Error updating priority: ${err.message}`, "error");
+    },
+  });
+
+  const handleSelect = (newPriority: "urgent" | "normal" | "low") => {
+    setIsOpen(false);
+    if (newPriority === currentPriority) return;
+    
+    toast(`Saving manual override: ${newPriority}`, "info");
+
+    mutation.mutate({
+      threadId,
+      priority: newPriority,
+      reason: "Manually adjusted by user",
+    });
+  };
+
+  const priorityMeta = {
+    urgent: { label: "Urgent", color: "bg-accent-danger/15 text-accent-danger border-accent-danger/30" },
+    normal: { label: "Normal", color: "bg-accent-info/15 text-accent-info border-accent-info/30" },
+    low: { label: "Low", color: "bg-bg-surface border-border-subtle text-text-tertiary" },
+  };
+
+  return (
+    <div className="relative inline-block text-left">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={mutation.isPending}
+        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all duration-150 cursor-pointer hover:scale-105 active:scale-95 ${priorityMeta[currentPriority].color}`}
+      >
+        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+          currentPriority === "urgent" ? "bg-accent-danger" : currentPriority === "normal" ? "bg-accent-info" : "bg-text-tertiary"
+        }`} />
+        {currentPriority}
+        <svg className="h-3 w-3 opacity-60 ml-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className="absolute left-0 mt-1.5 w-32 origin-top-left rounded-lg border border-border-default bg-bg-raised shadow-[var(--shadow-lg)] z-20 py-1 animate-scale-in">
+            {(["urgent", "normal", "low"] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => handleSelect(p)}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs font-semibold hover:bg-bg-surface transition-colors cursor-pointer ${
+                  p === currentPriority ? "text-text-primary bg-bg-surface/50" : "text-text-secondary"
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${
+                  p === "urgent" ? "bg-accent-danger" : p === "normal" ? "bg-accent-info" : "bg-text-tertiary"
+                }`} />
+                {priorityMeta[p].label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Thread Detail
 // ---------------------------------------------------------------------------
 
@@ -696,10 +782,10 @@ function ThreadDetail({
           {subject}
         </h2>
         <div className="flex items-center gap-2 shrink-0">
-          {thread.priority && (
-            <Badge variant="priority" priority={thread.priority as "urgent" | "normal" | "low"}>
-              {thread.priority}
-            </Badge>
+          {thread.priority ? (
+            <PrioritySelector threadId={thread.entityId} currentPriority={thread.priority as "urgent" | "normal" | "low"} />
+          ) : (
+            <Badge>Unprioritized</Badge>
           )}
           {thread.priorityReason && (
             <span className="text-xs text-text-tertiary italic max-w-[200px] truncate" title={thread.priorityReason}>
@@ -1336,7 +1422,7 @@ export default function InboxPage() {
                   : "text-text-tertiary hover:text-text-primary border border-transparent"
               }`}
             >
-              Other
+              Digest
               {otherThreads.length > 0 && (
                 <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-text-tertiary/10 text-text-tertiary">
                   {otherThreads.length}
@@ -1404,6 +1490,18 @@ export default function InboxPage() {
                 {acc.emailAddress}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Smart Priority Digest Box */}
+        {activeTab === "other" && gmailStatus?.connected && threads && (
+          <div className="px-4 py-3.5 border-b border-border-subtle bg-bg-raised/15 flex flex-col gap-1.5 shrink-0 animate-fade-in">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+              Smart Low Priority Digest
+            </span>
+            <p className="text-[11px] leading-relaxed text-text-secondary">
+              Newsletters, receipts, system updates, and automated notifications are grouped here to protect your workspace focus.
+            </p>
           </div>
         )}
 

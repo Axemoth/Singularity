@@ -15,11 +15,23 @@ function SettingsPageContent() {
   const { data: sessionData, isPending: isSessionPending } = authClient.useSession();
 
   // Settings State
-  const [activeTab, setActiveTab] = useState<"workspace" | "account">("workspace");
+  const [activeTab, setActiveTab] = useState<"workspace" | "account" | "habits">("workspace");
   const [priorityInput, setPriorityInput] = useState("");
   const [isEditingPriority, setIsEditingPriority] = useState(false);
   const [usernameInput, setUsernameInput] = useState("");
   const [isEditingUsername, setIsEditingUsername] = useState(false);
+
+  const parseHabits = (habitsStr: string | null | undefined) => {
+    const map: Record<string, string> = {};
+    if (!habitsStr) return map;
+    habitsStr.split("\n").forEach((line) => {
+      const parts = line.split(": ");
+      if (parts[0] && parts[1]) {
+        map[parts[0].trim()] = parts[1].trim();
+      }
+    });
+    return map;
+  };
 
   // Sync tab selection with query params
   useEffect(() => {
@@ -97,6 +109,9 @@ function SettingsPageContent() {
     enabled: !!sessionData?.user,
   });
   const { data: subscriptionStatus } = api.gmail.getSubscriptionStatus.useQuery(undefined, {
+    enabled: !!sessionData?.user,
+  });
+  const { data: learningStats } = api.gmail.getLearningStats.useQuery(undefined, {
     enabled: !!sessionData?.user,
   });
 
@@ -239,6 +254,20 @@ function SettingsPageContent() {
           </button>
           <button
             type="button"
+            onClick={() => setActiveTab("habits")}
+            className={`pb-3.5 text-sm font-semibold transition-all cursor-pointer relative ${
+              activeTab === "habits"
+                ? "text-text-primary"
+                : "text-text-tertiary hover:text-text-secondary"
+            }`}
+          >
+            AI Persona & Habits
+            {activeTab === "habits" && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent-primary rounded-full animate-fade-in" />
+            )}
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab("account")}
             className={`pb-3.5 text-sm font-semibold transition-all cursor-pointer relative ${
               activeTab === "account"
@@ -253,7 +282,7 @@ function SettingsPageContent() {
           </button>
         </div>
 
-        {activeTab === "workspace" ? (
+        {activeTab === "workspace" && (
           <div className="flex flex-col gap-8 animate-fade-in">
             {/* Integrations Card */}
             <div className="glass rounded-xl border border-border-default overflow-hidden">
@@ -525,8 +554,219 @@ function SettingsPageContent() {
               </div>
             )}
           </div>
-        ) : (
-          <div className="flex flex-col gap-8 animate-fade-in">
+        )}
+
+        {activeTab === "habits" && sessionData?.user && (
+          <div className="flex flex-col gap-8 animate-fade-in w-full">
+            {/* Header / Intro Card */}
+            <div className="glass rounded-xl p-6 border border-border-default bg-gradient-to-br from-bg-raised/40 via-bg-surface/10 to-accent-primary/5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 h-40 w-40 bg-accent-primary/5 rounded-full blur-3xl pointer-events-none" />
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent-primary/10 border border-accent-primary/20 text-accent-primary">
+                  <svg className="h-6 w-6 text-accent-primary animate-pulse" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.467 5.99 5.99 0 0 0-1.925 3.546 5.974 5.974 0 0 1-2.133-1A3.75 3.75 0 0 0 12 18Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364.364l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547Z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+                    <h2 className="text-lg font-bold text-text-primary">AI Persona & Workspace Habits</h2>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-accent-primary">
+                      <span className="h-1.5 w-1.5 rounded-full bg-accent-primary animate-ping" />
+                      Active Learning
+                    </span>
+                  </div>
+                  <p className="text-xs text-text-secondary mt-1.5 leading-relaxed">
+                    Axehuman Singularity constantly analyzes your sent replies, communication speed, busy days, and scheduling history. This profile is fed directly to your AI co-pilot, adapting its tone and draft structures to match your personal signature.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* AI Learning Counters */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="glass p-4 rounded-xl border border-border-default bg-bg-surface/30">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                  Manual Corrections
+                </div>
+                <div className="text-2xl font-bold text-text-primary mt-1">
+                  {learningStats?.manualOverrides ?? 0}
+                </div>
+                <div className="text-[10px] text-text-tertiary mt-1 leading-relaxed">
+                  Corrections acting as few-shot rules.
+                </div>
+              </div>
+
+              <div className="glass p-4 rounded-xl border border-border-default bg-bg-surface/30">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                  Emails Prioritized
+                </div>
+                <div className="text-2xl font-bold text-text-primary mt-1">
+                  {learningStats?.totalPrioritized ?? 0}
+                </div>
+                <div className="text-[10px] text-text-tertiary mt-1 leading-relaxed">
+                  Emails processed and prioritized.
+                </div>
+              </div>
+
+              <div className="glass p-4 rounded-xl border border-border-default bg-bg-surface/30">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                  Spam Filtered
+                </div>
+                <div className="text-2xl font-bold text-text-primary mt-1">
+                  {learningStats?.spamFiltered ?? 0}
+                </div>
+                <div className="text-[10px] text-text-tertiary mt-1 leading-relaxed">
+                  Spams intercepted and removed.
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed Habits Categories */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Group 1: Writing Style & Tone */}
+              <div className="glass rounded-xl border border-border-default overflow-hidden">
+                <div className="border-b border-border-subtle p-4 bg-bg-raised/40 flex items-center gap-2 text-text-primary">
+                  <svg className="h-4 w-4 text-accent-primary" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+                  </svg>
+                  <h3 className="text-xs font-bold uppercase tracking-wider">Writing Style & Tone</h3>
+                </div>
+                <div className="p-4 flex flex-col gap-3">
+                  {learningStats?.learntHabits ? (
+                    (() => {
+                      const h = parseHabits(learningStats.learntHabits);
+                      return (
+                        <>
+                          <div className="flex items-center justify-between py-1 border-b border-border-subtle">
+                            <span className="text-xs text-text-secondary">Writing Style</span>
+                            <span className="text-xs font-bold text-text-primary">{h["Writing Style"] ?? "Concise & Brief"}</span>
+                          </div>
+                          <div className="flex items-center justify-between py-1 border-b border-border-subtle">
+                            <span className="text-xs text-text-secondary">Email Tone</span>
+                            <span className="text-xs font-bold text-text-primary">{h["Email Tone"] ?? "Neutral & Professional"}</span>
+                          </div>
+                          <div className="flex items-center justify-between py-1 border-b border-border-subtle">
+                            <span className="text-xs text-text-secondary">Greeting Preference</span>
+                            <span className="text-xs font-bold text-text-primary">{h["Greeting Style"] ?? "Casual (Hi/Hello)"}</span>
+                          </div>
+                          <div className="flex items-center justify-between py-1 border-b border-border-subtle">
+                            <span className="text-xs text-text-secondary">Sign-off Style</span>
+                            <span className="text-xs font-bold text-text-primary">{h["Sign-off Style"] ?? "Appreciative (Thanks)"}</span>
+                          </div>
+                          <div className="flex items-center justify-between py-1">
+                            <span className="text-xs text-text-secondary">Formatting Preference</span>
+                            <span className="text-xs font-bold text-text-primary">{h["Formatting Preference"] ?? "Block paragraphs"}</span>
+                          </div>
+                        </>
+                      );
+                    })()
+                  ) : (
+                    <div className="text-xs text-text-tertiary italic text-center py-6">
+                      Sync your inbox to discover your writing persona.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Group 2: Speed & Scheduling */}
+              <div className="glass rounded-xl border border-border-default overflow-hidden">
+                <div className="border-b border-border-subtle p-4 bg-bg-raised/40 flex items-center gap-2 text-text-primary">
+                  <svg className="h-4 w-4 text-accent-primary" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                  <h3 className="text-xs font-bold uppercase tracking-wider">Speed & Scheduling</h3>
+                </div>
+                <div className="p-4 flex flex-col gap-3">
+                  {learningStats?.learntHabits ? (
+                    (() => {
+                      const h = parseHabits(learningStats.learntHabits);
+                      return (
+                        <>
+                          <div className="flex items-center justify-between py-1 border-b border-border-subtle">
+                            <span className="text-xs text-text-secondary">Average Reply Speed</span>
+                            <span className="text-xs font-bold text-text-primary">{h["Average Reply Speed"] ?? "Same day / Under 24h"}</span>
+                          </div>
+                          <div className="flex items-center justify-between py-1 border-b border-border-subtle">
+                            <span className="text-xs text-text-secondary">Peak Active Hours</span>
+                            <span className="text-xs font-bold text-text-primary">{h["Peak Active Hours"] ?? "09:00 - 17:00"}</span>
+                          </div>
+                          <div className="flex items-center justify-between py-1 border-b border-border-subtle">
+                            <span className="text-xs text-text-secondary">Peak Activity Days</span>
+                            <span className="text-xs font-bold text-text-primary">{h["Peak Activity Days"] ?? "Weekday Focused"}</span>
+                          </div>
+                          <div className="flex items-center justify-between py-1 border-b border-border-subtle">
+                            <span className="text-xs text-text-secondary">Preferred Meeting Length</span>
+                            <span className="text-xs font-bold text-text-primary">{h["Preferred Meeting Duration"] ?? "30 minutes"}</span>
+                          </div>
+                          <div className="flex items-center justify-between py-1">
+                            <span className="text-xs text-text-secondary">Peak Calendar Time</span>
+                            <span className="text-xs font-bold text-text-primary">{h["Peak Meeting Time"] ?? "Morning (9 AM - 12 PM)"}</span>
+                          </div>
+                        </>
+                      );
+                    })()
+                  ) : (
+                    <div className="text-xs text-text-tertiary italic text-center py-6">
+                      Sync your inbox/calendar to analyze scheduling patterns.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Collaborators & Smart Integration Status */}
+            <div className="glass rounded-xl border border-border-default p-5 flex flex-col gap-4">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">Collaboration Insights</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl border border-border-subtle bg-bg-surface/10">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary flex items-center gap-1.5">
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0-3.741-3.376M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm-9.725 6.72c.124-1.02.535-1.97 1.171-2.77A8.99 8.99 0 0 1 12 15a8.99 8.99 0 0 1 5.554 2.95c.636.8 1.047 1.75 1.171 2.77H4.275Z" />
+                    </svg>
+                    Top Co-Workers
+                  </div>
+                  <div className="mt-2 text-xs font-semibold text-text-primary truncate">
+                    {(() => {
+                      const h = parseHabits(learningStats?.learntHabits);
+                      return h["Primary Collaborators"] ?? "No interactions indexed yet.";
+                    })()}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl border border-border-subtle bg-bg-surface/10">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary flex items-center gap-1.5">
+                    <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                    AI System Sync
+                  </div>
+                  <div className="mt-2 text-xs font-bold text-emerald-500 flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse-subtle" />
+                    Adaptation Enabled
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Context Explanation */}
+            <div className="flex gap-3.5 p-4 rounded-xl bg-accent-primary/5 border border-accent-primary/15">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-primary/10 text-accent-primary font-bold text-xs">
+                i
+              </span>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-text-primary">How Axehuman AI grows with you</p>
+                <p className="text-[11px] leading-relaxed text-text-secondary">
+                  Every manual priority adjustment you apply (e.g. changing an email to Urgent or Low) is securely saved in your database settings. The AI model fetches these overrides as immediate few-shot examples for all future classifications. Over time, your prioritizer becomes completely tailored to your personal preferences.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "account" && (
+          <div className="flex flex-col gap-8 animate-fade-in w-full">
             {/* Profile Card */}
             <div className="glass rounded-xl p-6 border border-border-default flex flex-col sm:flex-row sm:items-center justify-between gap-6 animate-fade-in">
               <div className="flex items-center gap-4">

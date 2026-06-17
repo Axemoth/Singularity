@@ -229,11 +229,15 @@ export const agentRouter = createTRPCRouter({
         }
 
         const [settings] = await ctx.db
-          .select({ modelMode: userSettings.modelMode })
+          .select({ 
+            modelMode: userSettings.modelMode,
+            learntHabits: userSettings.learntHabits
+          })
           .from(userSettings)
           .where(eq(userSettings.userId, userId))
           .limit(1);
         const modelMode = settings?.modelMode ?? "careful";
+        const learntHabits = settings?.learntHabits ?? "";
 
         // Query all connected Gmail accounts for this user
         const gmailAccounts = await ctx.db
@@ -565,6 +569,10 @@ export const agentRouter = createTRPCRouter({
           ? `\n\nCRITICAL CONTEXT: The user is currently targeting the email account: "${input.context.targetEmail}". Any Gmail thread lists, email searches, compose templates, or draft creations must target this account. Use "${input.context.targetEmail}" as 'fromEmail' parameter when calling send_email or create_draft.`
           : "";
 
+        const habitsInstruction = learntHabits
+          ? `\n\nLEARNED USER HABITS (Mimic this user's work style and preferences strictly):\n${learntHabits}`
+          : "";
+
         // System instructions (completely static to maximize DeepSeek/Gemini prompt caching)
         const instructions = `You have access to Corsair tools. Use list_operations to discover available APIs, get_schema to understand required arguments, and run_script to execute them.
 The 'corsair' variable is already pre-scoped to your active tenant, so you must NOT call '.withTenant()' yourself. Simply run operations directly on 'corsair', e.g. const res = await corsair.gmail.api.threads.list({}); return res;
@@ -607,7 +615,7 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
    <email body>
    ---DRAFT_END---
    Always keep conversational text outside of this block (preferably before it). This block allows the frontend to render the draft as an interactive, editable review card in the chat.
-7. Tool Confirmations: After successfully calling 'send_email' or 'create_draft', you MUST always output an explicit, friendly confirmation message to the user confirming the action was successful (e.g. 'I have successfully sent the email to [recipient] with the subject "[subject]".' or 'I have saved your draft for [recipient] with the subject "[subject]".'). Do NOT output an empty response.${targetEmailInstruction}`;
+7. Tool Confirmations: After successfully calling 'send_email' or 'create_draft', you MUST always output an explicit, friendly confirmation message to the user confirming the action was successful (e.g. 'I have successfully sent the email to [recipient] with the subject "[subject]".' or 'I have saved your draft for [recipient] with the subject "[subject]".'). Do NOT output an empty response.${targetEmailInstruction}${habitsInstruction}`;
         const contextPrompt = buildContextPrompt(input.context);
 
         const historyMessages = (input.history ?? []).map((msg) => {
