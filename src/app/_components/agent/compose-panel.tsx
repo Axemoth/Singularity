@@ -113,6 +113,17 @@ export function ComposePanel() {
   const [bcc, setBcc] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [fromEmail, setFromEmail] = useState("");
+
+  const { data: gmailStatus } = api.gmail.getConnectionStatus.useQuery(undefined, {
+    enabled: isOpen,
+  });
+
+  useEffect(() => {
+    if (gmailStatus?.accounts && gmailStatus.accounts.length > 0 && !fromEmail) {
+      setFromEmail(gmailStatus.accounts[0]?.emailAddress ?? "");
+    }
+  }, [gmailStatus, fromEmail]);
 
   // Autocomplete Suggestions State
   const { data: contacts } = api.gmail.getContacts.useQuery(undefined, {
@@ -440,11 +451,25 @@ export function ComposePanel() {
       ]);
       return;
     }
-    sendEmail.mutate({ to, subject: subject || "No Subject", body, cc: cc || undefined, bcc: bcc || undefined });
+    sendEmail.mutate({
+      to,
+      subject: subject || "No Subject",
+      body,
+      cc: cc || undefined,
+      bcc: bcc || undefined,
+      fromEmail: fromEmail || undefined,
+    });
   };
 
   const handleSaveDraft = () => {
-    createDraft.mutate({ to: to || undefined, subject, body, cc: cc || undefined, bcc: bcc || undefined });
+    createDraft.mutate({
+      to: to || undefined,
+      subject,
+      body,
+      cc: cc || undefined,
+      bcc: bcc || undefined,
+      fromEmail: fromEmail || undefined,
+    });
   };
 
   const submitAiMessage = (messageText: string) => {
@@ -499,6 +524,7 @@ If you are only asking a question or cannot draft the email yet, do NOT output t
       })),
       context: {
         route: pathname,
+        targetEmail: fromEmail || undefined,
       },
       reasoningEnabled: isReasoningEnabled,
     });
@@ -570,6 +596,25 @@ If you are only asking a question or cannot draft the email yet, do NOT output t
 
           {/* Form */}
           <div className="flex-1 flex flex-col gap-3 min-h-0 overflow-y-auto pr-1">
+            {/* From Selector */}
+            {gmailStatus?.accounts && gmailStatus.accounts.length > 0 && (
+              <div className="flex flex-col gap-1 animate-fade-in">
+                <label htmlFor="from-select" className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider">From</label>
+                <select
+                  id="from-select"
+                  value={fromEmail}
+                  onChange={(e) => setFromEmail(e.target.value)}
+                  className="w-full border border-border-default bg-bg-inset text-text-primary focus:border-accent-primary outline-none px-3 py-2 text-sm rounded-[var(--radius-md)] transition-colors cursor-pointer"
+                >
+                  {gmailStatus.accounts.map((acc) => (
+                    <option key={acc.id} value={acc.emailAddress} className="bg-bg-raised text-text-primary">
+                      {acc.emailAddress}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="flex flex-col gap-1">
               <label htmlFor="to-input" className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider">To</label>
               <div className="relative">
