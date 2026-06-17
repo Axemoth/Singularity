@@ -10,6 +10,7 @@ function SettingsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const errorParam = searchParams.get("error");
+  const paymentParam = searchParams.get("payment");
   const utils = api.useUtils();
   const { data: sessionData, isPending: isSessionPending } = authClient.useSession();
 
@@ -85,6 +86,9 @@ function SettingsPageContent() {
   const { data: dbModelMode } = api.gmail.getModelMode.useQuery(undefined, {
     enabled: !!sessionData?.user,
   });
+  const { data: subscriptionStatus } = api.gmail.getSubscriptionStatus.useQuery(undefined, {
+    enabled: !!sessionData?.user,
+  });
 
   // Effects to sync settings input
   useEffect(() => {
@@ -144,7 +148,9 @@ function SettingsPageContent() {
     },
   });
 
-  const isPremium = !!subscription;
+  const isAdminBypass = subscriptionStatus?.premiumOverride === true;
+  const isPaidPremium = !!subscription || (subscriptionStatus?.premium === true && !isAdminBypass);
+  const isPremium = isAdminBypass || isPaidPremium;
   const gmailLimit = isPremium ? 3 : 1;
   const calendarLimit = isPremium ? 3 : 1;
   const currentGmailCount = gmailStatus?.accounts?.length ?? 0;
@@ -183,6 +189,16 @@ function SettingsPageContent() {
               {isPremium 
                 ? " Premium users can connect up to 3 accounts per integration." 
                 : " Upgrade to Premium to connect up to 3 accounts."}
+            </span>
+          </div>
+        )}
+
+        {/* Payment Success Banner */}
+        {paymentParam === "success" && (
+          <div className="bg-accent-success/10 border border-accent-success/20 rounded-2xl p-4 text-xs font-semibold text-accent-success leading-relaxed animate-fade-in flex flex-col gap-1">
+            <span className="text-sm font-bold">Subscription Upgraded!</span>
+            <span>
+              Congratulations! Your Premium subscription has been successfully activated. Enjoy unlimited Copilot requests and connect up to 3 workspace accounts.
             </span>
           </div>
         )}
@@ -446,8 +462,10 @@ function SettingsPageContent() {
                   <h3 className="text-sm font-semibold text-text-primary">
                     {isBillingLoading ? (
                       <span className="inline-block h-4 w-28 rounded bg-bg-surface animate-pulse-subtle" />
-                    ) : subscription ? (
+                    ) : isPaidPremium ? (
                       "Singularity Premium"
+                    ) : isAdminBypass ? (
+                      "Singularity Premium (Admin Bypass)"
                     ) : (
                       "Free Tier"
                     )}
@@ -457,6 +475,10 @@ function SettingsPageContent() {
                       <span className="inline-block h-3.5 w-48 rounded bg-bg-surface animate-pulse-subtle" />
                     ) : subscription ? (
                       `Next billing date: ${new Date(subscription.next_billing_date).toLocaleDateString()}`
+                    ) : isPaidPremium ? (
+                      "Your Premium subscription is active. All limits removed."
+                    ) : isAdminBypass ? (
+                      "You have been granted Premium access by an administrator. All limits removed."
                     ) : (
                       "Upgrade to Premium to remove the 20 requests/day Copilot limit and connect up to 3 accounts."
                     )}
@@ -465,7 +487,7 @@ function SettingsPageContent() {
                 <div className="shrink-0 sm:w-auto w-full flex gap-2.5">
                   {isBillingLoading ? (
                     <div className="h-8 w-24 rounded bg-bg-surface animate-pulse-subtle" />
-                  ) : subscription ? (
+                  ) : isPaidPremium ? (
                     <Button
                       variant="secondary"
                       size="sm"
@@ -474,6 +496,10 @@ function SettingsPageContent() {
                     >
                       Manage Billing
                     </Button>
+                  ) : isAdminBypass ? (
+                    <span className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg bg-accent-primary/10 text-accent-primary border border-accent-primary/25 flex items-center justify-center sm:w-auto w-full text-center">
+                      Bypass Active
+                    </span>
                   ) : (
                     <Button
                       variant="primary"

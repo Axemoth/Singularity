@@ -26,6 +26,8 @@ export const user = pgTable("user", {
   image: text("image"),
   role: text("role").notNull().default("user"),
   premiumOverride: boolean("premium_override").notNull().default(false),
+  premium: boolean("premium").notNull().default(false),
+  dodoCustomerId: text("dodo_customer_id"),
   createdAt: timestamp("created_at")
     .$defaultFn(() => /* @__PURE__ */ new Date())
     .notNull(),

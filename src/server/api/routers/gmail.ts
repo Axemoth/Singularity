@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
-import { corsairEntities, corsairAccounts, corsairIntegrations, emailPriorities, userSettings } from "@/server/db/schema";
+import { corsairEntities, corsairAccounts, corsairIntegrations, emailPriorities, userSettings, user } from "@/server/db/schema";
 import { eq, and, desc, or, like, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { syncEmbeddings } from "@/server/api/tasks/embeddings";
@@ -847,5 +847,26 @@ export const gmailRouter = createTRPCRouter({
       console.error("[GetContacts] Failed to fetch contacts:", err);
       return [];
     }
+  }),
+
+  getSubscriptionStatus: protectedProcedure.query(async ({ ctx }) => {
+    const userEmail = ctx.session.user.email;
+    const { isPremiumUser } = await import("@/server/subscription");
+    const isPremium = await isPremiumUser(userEmail);
+
+    const [dbUser] = await ctx.db
+      .select({ 
+        premiumOverride: user.premiumOverride,
+        premium: user.premium,
+      })
+      .from(user)
+      .where(eq(user.email, userEmail))
+      .limit(1);
+
+    return {
+      isPremium,
+      premiumOverride: dbUser?.premiumOverride ?? false,
+      premium: dbUser?.premium ?? false,
+    };
   }),
 });

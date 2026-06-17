@@ -10,14 +10,17 @@ const dodoPayments = new DodoPayments({
 
 export async function isPremiumUser(email: string): Promise<boolean> {
   try {
-    // 0. Check database for premiumOverride
+    // 0. Check database for premiumOverride or premium
     const [dbUser] = await db
-      .select({ premiumOverride: user.premiumOverride })
+      .select({ 
+        premiumOverride: user.premiumOverride,
+        premium: user.premium,
+      })
       .from(user)
       .where(eq(user.email, email))
       .limit(1);
 
-    if (dbUser?.premiumOverride) {
+    if (dbUser?.premiumOverride || dbUser?.premium) {
       return true;
     }
 
@@ -35,6 +38,8 @@ export async function isPremiumUser(email: string): Promise<boolean> {
       });
 
       if (subscriptions && subscriptions.items && subscriptions.items.length > 0) {
+        // Cache the active subscription status in the DB
+        await db.update(user).set({ premium: true }).where(eq(user.email, email));
         return true;
       }
     }
