@@ -127,7 +127,7 @@ Return a list of classifications matching the exact IDs provided.`;
     return object.classifications;
   } catch (err) {
     console.error("[Prioritizer] Error in classifyEmailsBatch:", err);
-    return emails.map((e) => ({ id: e.id, priority: "normal", reason: "LLM batch failed" }));
+    return emails.map((e) => ({ id: e.id, priority: "normal", reason: "" }));
   }
 }
 
