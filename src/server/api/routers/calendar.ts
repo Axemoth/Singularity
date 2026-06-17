@@ -81,12 +81,15 @@ export const calendarRouter = createTRPCRouter({
         )
         .orderBy(desc(corsairEntities.updatedAt));
 
-      // Auto-sync on first load if account exists but database is empty
-      if (events.length === 0 && !input.refresh && accounts.length > 0) {
-        for (const account of accounts) {
+      // Auto-sync on first load if account exists but database has no events for this specific account
+      let didSyncAny = false;
+      for (const account of accounts) {
+        const hasEvents = events.some((e) => e.accountId === account.id);
+        if (!hasEvents && !input.refresh) {
+          didSyncAny = true;
           const tenant = corsair.withTenant(account.tenantId);
           try {
-            console.log(`[Calendar Auto-sync] Populating Calendar events for user ${userId}, account ${account.emailAddress}...`);
+            console.log(`[Calendar Auto-sync] Populating Calendar events for account ${account.emailAddress}...`);
             await tenant.googlecalendar.api.events.getMany({
               calendarId: input.calendarId,
               maxResults: 100,
@@ -95,8 +98,10 @@ export const calendarRouter = createTRPCRouter({
             console.error(`[Calendar Auto-sync] Failed to auto-sync Calendar events for ${account.emailAddress}:`, err);
           }
         }
+      }
 
-        // Query again
+      if (didSyncAny) {
+        // Query again to include newly populated events
         events = await ctx.db
           .select({
             id: corsairEntities.id,

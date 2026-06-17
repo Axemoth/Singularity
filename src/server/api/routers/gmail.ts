@@ -170,12 +170,15 @@ export const gmailRouter = createTRPCRouter({
         )
         .orderBy(desc(corsairEntities.updatedAt));
 
-      // Auto-sync on first load if account exists but database is empty
-      if (threads.length === 0 && !input.refresh && accounts.length > 0) {
-        for (const account of accounts) {
+      // Auto-sync on first load if account exists but database has no threads for this specific account
+      let didSyncAny = false;
+      for (const account of accounts) {
+        const hasThreads = threads.some((t) => t.accountId === account.id);
+        if (!hasThreads && !input.refresh) {
+          didSyncAny = true;
           const tenant = corsair.withTenant(account.tenantId);
           try {
-            console.log(`[Gmail Auto-sync] Populating Gmail threads for user ${userId}, account ${account.emailAddress}...`);
+            console.log(`[Gmail Auto-sync] Populating Gmail threads for account ${account.emailAddress}...`);
             const res = await tenant.gmail.api.threads.list({});
             const threadsList = res.threads ?? [];
 
@@ -209,8 +212,10 @@ export const gmailRouter = createTRPCRouter({
             console.error(`[Gmail Auto-sync] Failed to auto-sync Gmail threads for ${account.emailAddress}:`, err);
           }
         }
+      }
 
-        // Query again
+      if (didSyncAny) {
+        // Query again to include newly populated threads
         threads = await ctx.db
           .select({
             id: corsairEntities.id,

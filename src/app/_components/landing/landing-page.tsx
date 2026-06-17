@@ -35,7 +35,7 @@ const features = [
       </svg>
     ),
     title: "AI Co-Pilot",
-    desc: "Draft emails, summarise threads, and automate actions with a powerful AI agent built in.",
+    desc: "Draft emails, summarise threads, and automate actions. Use the '@' trigger to target specific connected accounts.",
   },
   {
     icon: (
@@ -53,7 +53,7 @@ const features = [
       </svg>
     ),
     title: "Instant Actions",
-    desc: "Reply, forward, archive or schedule — all from a single keystroke or a voice command.",
+    desc: "Reply, forward, archive or schedule — type '/' for quick command autocompletes like /prioritize or /draft.",
   },
   {
     icon: (
@@ -678,7 +678,7 @@ export default function LandingPage() {
                   <span className="text-accent-success">✓</span> Google Calendar Sync
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-accent-success">✓</span> Standard view options
+                  <span className="text-accent-success">✓</span> Keyboard / Slash Commands
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-accent-success">✓</span> AI Copilot (20 requests/day)
@@ -723,16 +723,22 @@ export default function LandingPage() {
                   <span className="text-accent-primary">✨</span> Connect up to 3 accounts
                 </li>
                 <li className="flex items-center gap-2">
+                  <span className="text-accent-primary">✨</span> Multi-Account @ Targeting
+                </li>
+                <li className="flex items-center gap-2">
                   <span className="text-accent-primary">✨</span> Careful & Autonomous Modes
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-accent-primary">✨</span> Workspace Settings Layout
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-accent-primary">✨</span> Keyboard / Slash Commands
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-accent-primary">✨</span> Full Hourly Day View Timeline
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-accent-primary">✨</span> Click-to-Create pre-population
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-accent-primary">✨</span> Local Vector Search (Coming soon)
                 </li>
               </ul>
             </div>
