@@ -1,5 +1,5 @@
 import { db } from "@/server/db";
-import { corsairEntities, corsairAccounts, emailPriorities, userSettings } from "@/server/db/schema";
+import { corsairEntities, corsairAccounts, emailPriorities, userSettings, user } from "@/server/db/schema";
 import { eq, and, isNull, or, like } from "drizzle-orm";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
@@ -13,36 +13,94 @@ const deepseek = createOpenAI({
 
 const activeSyncs = new Set<string>();
 
+// Rule-based fallback classifier in case DeepSeek is offline or rate-limited
+function fallbackClassify(
+  from: string,
+  subject: string,
+  snippet: string
+): { priority: "urgent" | "normal" | "low"; reason: string } {
+  const fromLower = from.toLowerCase();
+  const subjectLower = subject.toLowerCase();
+  const snippetLower = snippet.toLowerCase();
+
+  // 1. Detect low priority indicators (newsletters, receipts, automated notifications)
+  if (
+    fromLower.includes("noreply") ||
+    fromLower.includes("no-reply") ||
+    fromLower.includes("do-not-reply") ||
+    fromLower.includes("newsletter") ||
+    fromLower.includes("promotions") ||
+    fromLower.includes("notification") ||
+    fromLower.includes("alerts@") ||
+    fromLower.includes("info@") ||
+    fromLower.includes("bounce") ||
+    subjectLower.includes("receipt") ||
+    subjectLower.includes("invoice") ||
+    subjectLower.includes("newsletter") ||
+    subjectLower.includes("digest") ||
+    subjectLower.includes("weekly update") ||
+    subjectLower.includes("daily update") ||
+    snippetLower.includes("unsubscribe") ||
+    snippetLower.includes("view in browser")
+  ) {
+    return { priority: "low", reason: "Automated (Fallback)" };
+  }
+
+  // 2. Detect urgent indicators (calendar invitations, direct action request triggers)
+  if (
+    subjectLower.includes("invitation:") ||
+    subjectLower.includes("accepted:") ||
+    subjectLower.includes("declined:") ||
+    subjectLower.includes("urgent") ||
+    subjectLower.includes("action required") ||
+    snippetLower.includes("calendar invite")
+  ) {
+    return { priority: "urgent", reason: "Urgent keywords (Fallback)" };
+  }
+
+  // 3. Default to normal
+  return { priority: "normal", reason: "" };
+}
+
 // Helper to classify a single email (for webhook trigger)
 async function classifyEmail(
   from: string,
   subject: string,
   snippet: string,
-  customRules?: string | null
+  customRules?: string | null,
+  username?: string | null,
+  userEmail?: string | null
 ): Promise<{ priority: "urgent" | "normal" | "low"; reason: string }> {
   const apiKey = env.DEEPSEEK_API_KEY;
   if (!apiKey) {
-    console.warn("[Prioritizer] DEEPSEEK_API_KEY is missing, using default priority.");
-    return { priority: "normal", reason: "AI API Key missing" };
+    console.warn("[Prioritizer] DEEPSEEK_API_KEY is missing, using local fallback.");
+    const fb = fallbackClassify(from, subject, snippet);
+    return { priority: fb.priority, reason: fb.reason };
   }
 
   try {
     const prompt = `Classify the following email for prioritization in an inbox.
+${username || userEmail ? `User Profile Context (to identify personally addressed emails):
+${username ? `- User's Name: ${username}` : ""}
+${userEmail ? `- User's Email: ${userEmail}` : ""}
+` : ""}
 Sender: ${from}
 Subject: ${subject}
 Snippet/Body: ${snippet}
 
+Categorize into:
+- urgent: Needs immediate attention (personal messages, direct questions to the user, calendar invites, time-sensitive work, client requests, managers, or family).
+- normal: Normal personal/work emails, notifications requiring action.
+- low: Mass newsletters, automated receipts, spam, marketing, automated status updates.
+
 ${
   customRules
-    ? `CRITICAL USER INSTRUCTIONS:
-The user has specified custom instructions/rules for what emails are priority (urgent/normal):
+    ? `CRITICAL USER CUSTOM RULES / INSTRUCTIONS:
+You MUST adapt/override the classifications above according to these custom rules specified by the user:
 "${customRules}"
 
-Categorize this email strictly based on the user's instructions. If the email matches the criteria, mark it as 'urgent' or 'normal'. If it does not match, or is generic newsletters, receipts, or spam, mark it as 'low'. Be very strict.`
-    : `Categorize into:
-- urgent: Needs immediate attention (personal messages, direct questions, calendar invites, time-sensitive, client requests, managers).
-- normal: Normal personal/work emails, notifications requiring action.
-- low: Mass newsletters, automated receipts, spam, marketing, automated status updates.`
+Apply these custom rules strictly. If an email matches the user's custom instructions, prioritize it accordingly.`
+    : ""
 }`;
 
     const { object } = await generateObject({
@@ -59,20 +117,26 @@ Categorize this email strictly based on the user's instructions. If the email ma
       reason: object.reason,
     };
   } catch (err) {
-    console.error("[Prioritizer] LLM classification error:", err);
-    return { priority: "normal", reason: "LLM classification failed" };
+    console.error("[Prioritizer] LLM classification error, using local fallback:", err);
+    const fb = fallbackClassify(from, subject, snippet);
+    return { priority: fb.priority, reason: fb.reason };
   }
 }
 
 // Helper to classify multiple emails in a batch (for fast sync)
 async function classifyEmailsBatch(
   emails: Array<{ id: string; from: string; subject: string; snippet: string }>,
-  customRules?: string | null
+  customRules?: string | null,
+  username?: string | null,
+  userEmail?: string | null
 ): Promise<Array<{ id: string; priority: "urgent" | "normal" | "low"; reason: string }>> {
   const apiKey = env.DEEPSEEK_API_KEY;
   if (!apiKey) {
-    console.warn("[Prioritizer] DEEPSEEK_API_KEY is missing, returning default priorities.");
-    return emails.map((e) => ({ id: e.id, priority: "normal", reason: "AI API Key missing" }));
+    console.warn("[Prioritizer] DEEPSEEK_API_KEY is missing, using local fallback.");
+    return emails.map((e) => {
+      const fb = fallbackClassify(e.from, e.subject, e.snippet);
+      return { id: e.id, priority: fb.priority, reason: fb.reason };
+    });
   }
 
   try {
@@ -89,19 +153,24 @@ Snippet: ${e.snippet}`
 
     const prompt = `You are a highly accurate email inbox prioritizer assistant. Your job is to classify each of the following emails into a priority category ('urgent', 'normal', or 'low') and explain why in a short sentence (max 10 words).
 
+${username || userEmail ? `User Profile Context (to identify personally addressed emails):
+${username ? `- User's Name: ${username}` : ""}
+${userEmail ? `- User's Email: ${userEmail}` : ""}
+` : ""}
+
+Standard Categorization Rules:
+- 'urgent': Critical personal messages, direct questions to the user, calendar invites, time-sensitive work, client requests, managers, or family.
+- 'normal': Work-related emails requiring action, standard personal communication.
+- 'low': Newsletters, automated status updates, notifications (e.g. GitHub notifications, Jira logs), receipts, spam, marketing.
+
 ${
   customRules
-    ? `CRITICAL USER INSTRUCTIONS:
-The user has specified custom instructions/rules for identifying priority (urgent/normal) emails:
+    ? `CRITICAL USER CUSTOM RULES / INSTRUCTIONS:
+You MUST adapt/override the standard categorization rules above according to these custom rules specified by the user:
 "${customRules}"
 
-You MUST strictly follow the user's custom instructions.
-If an email matches the user's criteria, mark it as 'urgent' or 'normal' as appropriate.
-If it does NOT match, or if it is a general newsletter, marketing email, automated status update, or receipt, mark it as 'low'. Be very strict.`
-    : `Standard Categorization Rules:
-- 'urgent': Critical personal messages, direct questions, calendar invites, time-sensitive work, client requests, managers, or family.
-- 'normal': Work-related emails requiring action, standard personal communication.
-- 'low': Newsletters, automated status updates, notifications (e.g. GitHub notifications, Jira logs), receipts, spam, marketing.`
+Apply these custom rules strictly. If an email matches the user's custom instructions, prioritize it accordingly.`
+    : ""
 }
 
 Here are the emails to classify:
@@ -126,8 +195,11 @@ Return a list of classifications matching the exact IDs provided.`;
 
     return object.classifications;
   } catch (err) {
-    console.error("[Prioritizer] Error in classifyEmailsBatch:", err);
-    return emails.map((e) => ({ id: e.id, priority: "normal", reason: "" }));
+    console.error("[Prioritizer] Error in classifyEmailsBatch, using local fallback:", err);
+    return emails.map((e) => {
+      const fb = fallbackClassify(e.from, e.subject, e.snippet);
+      return { id: e.id, priority: fb.priority, reason: fb.reason };
+    });
   }
 }
 
@@ -160,16 +232,27 @@ export async function classifyAndSaveEmail(tenantId: string, entityId: string, m
 
     const baseUserId = tenantId.includes("_") ? tenantId.split("_")[0]! : tenantId;
 
-    // Fetch custom priority rules
+    // Fetch custom priority rules, username, and user email context
     const [settings] = await db
-      .select({ priorityInstructions: userSettings.priorityInstructions })
+      .select({ 
+        priorityInstructions: userSettings.priorityInstructions,
+        username: userSettings.username
+      })
       .from(userSettings)
       .where(eq(userSettings.userId, baseUserId))
       .limit(1);
+
+    const [dbUser] = await db
+      .select({ email: user.email })
+      .from(user)
+      .where(eq(user.id, baseUserId))
+      .limit(1);
     
     const customRules = settings?.priorityInstructions;
+    const username = settings?.username;
+    const userEmail = dbUser?.email;
 
-    const classification = await classifyEmail(from, subject, snippet, customRules);
+    const classification = await classifyEmail(from, subject, snippet, customRules, username, userEmail);
 
     // Check if entry already exists in email_priorities
     const [existing] = await db
@@ -214,14 +297,25 @@ export async function syncPriorities(userId: string): Promise<void> {
   try {
     console.log(`[Prioritizer] Checking for unprioritized threads for user: ${userId}`);
 
-    // Fetch custom priority rules
+    // Fetch custom priority rules, username, and user email context
     const [settings] = await db
-      .select({ priorityInstructions: userSettings.priorityInstructions })
+      .select({ 
+        priorityInstructions: userSettings.priorityInstructions,
+        username: userSettings.username
+      })
       .from(userSettings)
       .where(eq(userSettings.userId, userId))
       .limit(1);
 
+    const [dbUser] = await db
+      .select({ email: user.email })
+      .from(user)
+      .where(eq(user.id, userId))
+      .limit(1);
+
     const customRules = settings?.priorityInstructions;
+    const username = settings?.username;
+    const userEmail = dbUser?.email;
 
     const unprioritized = await db
       .select({
@@ -267,7 +361,7 @@ export async function syncPriorities(userId: string): Promise<void> {
       });
 
       console.log(`[Prioritizer] Classifying batch of ${emails.length} emails...`);
-      const results = await classifyEmailsBatch(emails, customRules);
+      const results = await classifyEmailsBatch(emails, customRules, username, userEmail);
 
       for (const res of results) {
         try {

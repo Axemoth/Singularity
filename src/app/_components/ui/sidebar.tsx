@@ -239,7 +239,7 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="flex h-screen w-16 flex-col items-center border-r border-border-subtle bg-bg-raised py-4 sticky top-0">
+      <aside className="flex h-screen w-16 flex-col items-center border-r border-border-subtle bg-bg-raised py-4 sticky top-0 z-30">
         {/* ─── Logo ─── */}
         <Link
           href="/inbox"
