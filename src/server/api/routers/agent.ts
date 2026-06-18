@@ -811,24 +811,24 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
 
         const messagesList = [...historyMessages, promptMsg];
 
-        const models = [
-          (deepseek as any).chat("deepseek-v4-pro", {
-            extraBody: {
-              thinking: { type: "enabled" },
-              reasoning_effort: "high",
-            },
-          }),
-          ...(input.reasoningEnabled
-            ? [
-                google("gemini-2.5-flash"),
-                google("gemini-2.5-flash-lite"),
-              ]
-            : [
-                (deepseek as any).chat("deepseek-v4-flash"),
-                google("gemini-2.5-flash"),
-                google("gemini-2.5-flash-lite"),
-              ]),
-        ];
+        const isReasoning = input.reasoningEnabled !== false;
+
+        const models = isReasoning
+          ? [
+              (deepseek as any).chat("deepseek-v4-pro", {
+                extraBody: {
+                  thinking: { type: "enabled" },
+                  reasoning_effort: "high",
+                },
+              }),
+              google("gemini-2.5-flash"),
+              google("gemini-2.5-flash-lite"),
+            ]
+          : [
+              (deepseek as any).chat("deepseek-v4-flash"),
+              google("gemini-2.5-flash"),
+              google("gemini-2.5-flash-lite"),
+            ];
 
         let response;
         let lastError: unknown = null;
