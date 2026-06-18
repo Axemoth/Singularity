@@ -7,6 +7,36 @@ import { TRPCError } from "@trpc/server";
 import { syncEmbeddings } from "@/server/api/tasks/embeddings";
 import { syncPriorities, isSyncingPriorities } from "@/server/api/tasks/prioritizer";
 
+const headerSafeString = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .refine((value) => !/[\r\n]/.test(value), {
+      message: "Email header values cannot contain line breaks.",
+    });
+
+const requiredHeaderSafeString = (max: number) =>
+  headerSafeString(max).refine((value) => value.length > 0, {
+    message: "Required email header cannot be empty.",
+  });
+
+const extractHeaderEmail = (value: string) => {
+  const trimmed = value.trim();
+  const match = trimmed.match(/<([^<>]+)>$/);
+  return (match?.[1] ?? trimmed).trim();
+};
+
+const emailListSchema = headerSafeString(2000).refine(
+  (value) =>
+    value
+      .split(",")
+      .map((part) => extractHeaderEmail(part))
+      .filter(Boolean)
+      .every((email) => z.string().email().safeParse(email).success),
+  { message: "Expected a comma-separated list of valid email addresses." },
+);
+
 // Helper to construct a base64url encoded MIME email
 export function buildRawEmail(
   to: string,
@@ -16,7 +46,14 @@ export function buildRawEmail(
   bcc?: string,
   parentMessageId?: string
 ) {
+  const assertHeaderSafe = (name: string, value: string | undefined) => {
+    if (value && /[\r\n]/.test(value)) {
+      throw new Error(`${name} header cannot contain line breaks.`);
+    }
+  };
+
   const encodeHeaderValue = (value: string) => {
+    assertHeaderSafe("Encoded", value);
     if (/[^\x00-\x7F]/.test(value)) {
       return `=?UTF-8?B?${Buffer.from(value).toString("base64")}?=`;
     }
@@ -24,6 +61,7 @@ export function buildRawEmail(
   };
 
   const encodeHeaderEmailList = (value: string) => {
+    assertHeaderSafe("Address list", value);
     if (!/[^\x00-\x7F]/.test(value)) return value;
     const parts = value.split(",");
     return parts
@@ -47,6 +85,7 @@ export function buildRawEmail(
   if (cc) emailLines.push(`Cc: ${encodeHeaderEmailList(cc)}`);
   if (bcc) emailLines.push(`Bcc: ${encodeHeaderEmailList(bcc)}`);
   if (parentMessageId) {
+    assertHeaderSafe("Message-ID", parentMessageId);
     emailLines.push(`In-Reply-To: ${parentMessageId}`);
     emailLines.push(`References: ${parentMessageId}`);
   }
@@ -618,12 +657,12 @@ export const gmailRouter = createTRPCRouter({
     .input(
       z.object({
         to: z.string().email().max(320).trim(),
-        subject: z.string().min(1).max(1000).trim(),
+        subject: requiredHeaderSafeString(1000),
         body: z.string().min(1).max(50000).trim(),
-        cc: z.string().max(2000).trim().optional(),
-        bcc: z.string().max(2000).trim().optional(),
+        cc: emailListSchema.optional(),
+        bcc: emailListSchema.optional(),
         threadId: z.string().optional(),
-        parentMessageId: z.string().optional(),
+        parentMessageId: headerSafeString(998).optional(),
         fromEmail: z.string().email().max(320).trim().optional(),
       })
     )
@@ -705,10 +744,10 @@ export const gmailRouter = createTRPCRouter({
     .input(
       z.object({
         to: z.string().email().max(320).trim().optional(),
-        subject: z.string().max(1000).trim().optional(),
+        subject: headerSafeString(1000).optional(),
         body: z.string().min(1).max(50000).trim(),
-        cc: z.string().max(2000).trim().optional(),
-        bcc: z.string().max(2000).trim().optional(),
+        cc: emailListSchema.optional(),
+        bcc: emailListSchema.optional(),
         fromEmail: z.string().email().max(320).trim().optional(),
       })
     )

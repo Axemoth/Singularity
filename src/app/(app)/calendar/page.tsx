@@ -23,6 +23,16 @@ function formatEventTime(start: any, end: any): string {
   return e ? `${fmt(s)} - ${fmt(e)}` : fmt(s);
 }
 
+function toLocalOffsetDateTime(date: string, time: string): string {
+  const localDate = new Date(`${date}T${time}:00`);
+  const offsetMinutes = -localDate.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absOffset = Math.abs(offsetMinutes);
+  const offsetHours = String(Math.floor(absOffset / 60)).padStart(2, "0");
+  const offsetMins = String(absOffset % 60).padStart(2, "0");
+  return `${date}T${time}:00${sign}${offsetHours}:${offsetMins}`;
+}
+
 function getEventDateKey(event: CalendarEvent): string {
   const dt = event.data?.start?.dateTime || event.data?.start?.date;
   if (!dt) return "Unknown";
@@ -1513,8 +1523,8 @@ function CreateEventModal({
     }
     setErrorMsg("");
 
-    const startISO = `${startDate}T${startTime}:00`;
-    const endISO = `${endDate}T${endTime}:00`;
+    const startISO = toLocalOffsetDateTime(startDate, startTime);
+    const endISO = toLocalOffsetDateTime(endDate, endTime);
 
     const attendeeEmails = attendees
       .split(",")

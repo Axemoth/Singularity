@@ -10,6 +10,18 @@ export async function POST(request: NextRequest) {
 		headers[key] = value;
 	});
 
+	const configuredSecret = process.env.CORSAIR_WEBHOOK_SECRET;
+	if (configuredSecret) {
+		const providedSecret =
+			request.headers.get('x-corsair-webhook-secret') ??
+			request.headers.get('x-webhook-secret') ??
+			request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+
+		if (providedSecret !== configuredSecret) {
+			return NextResponse.json({ success: false, message: 'Unauthorized webhook.' }, { status: 401 });
+		}
+	}
+
 	const contentType = request.headers.get('content-type');
 
 	let body: string | Record<string, unknown>;

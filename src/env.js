@@ -22,6 +22,7 @@ export const env = createEnv({
     DODO_PAYMENTS_API_KEY: z.string(),
     DODO_PAYMENTS_ENVIRONMENT: z.enum(["test_mode", "live_mode"]).default("test_mode"),
     DODO_PAYMENTS_WEBHOOK_SECRET: z.string().optional(),
+    CORSAIR_WEBHOOK_SECRET: z.string().optional(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
@@ -53,6 +54,7 @@ export const env = createEnv({
     DODO_PAYMENTS_API_KEY: process.env.DODO_PAYMENTS_API_KEY,
     DODO_PAYMENTS_ENVIRONMENT: process.env.DODO_PAYMENTS_ENVIRONMENT,
     DODO_PAYMENTS_WEBHOOK_SECRET: process.env.DODO_PAYMENTS_WEBHOOK_SECRET,
+    CORSAIR_WEBHOOK_SECRET: process.env.CORSAIR_WEBHOOK_SECRET,
     NODE_ENV: process.env.NODE_ENV,
   },
   /**

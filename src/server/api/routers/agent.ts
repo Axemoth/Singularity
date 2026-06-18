@@ -378,6 +378,16 @@ export const agentRouter = createTRPCRouter({
         const runScriptCalendar = calendarToolsList.find((t) => t.id === "run_script");
 
         let didExecuteWriteTool = false;
+        const isCarefulMode = modelMode === "careful";
+
+        const blockCarefulWrite = (operation: string) => {
+          if (isCarefulMode) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: `${operation} is blocked in Careful mode. Create a draft or ask the user to approve the action instead.`,
+            });
+          }
+        };
 
         const wrappedMcpTools = Object.fromEntries(
           gmailToolsList.map((t) => {
@@ -413,6 +423,7 @@ export const agentRouter = createTRPCRouter({
                   }
 
                   if (isWriteOp) {
+                    blockCarefulWrite(`MCP write tool "${t.id}"`);
                     console.log(`[mcp tool] Detected write operation for tool: ${t.id}, flagging to prevent fallback retry.`);
                     didExecuteWriteTool = true;
                   }
@@ -445,6 +456,7 @@ export const agentRouter = createTRPCRouter({
             fromEmail: z.string().optional().describe("Sender email address (choose one of the user's connected emails)"),
           }),
           execute: async ({ to, subject, body, fromEmail }) => {
+            blockCarefulWrite("Direct email sending");
             console.log(`[send_email tool] Sending email to ${to} via tenant ${userId}...`);
             didExecuteWriteTool = true;
             
@@ -837,18 +849,23 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
           try {
             const modelName = typeof model === "string" ? model : (model?.modelId || "deepseek-v4-pro");
             console.log(`Attempting execution in live chat using model: ${modelName}...`);
+            const tools: any = {
+              ...wrappedMcpTools,
+              create_draft: createDraftTool,
+              search_local: searchLocalTool,
+              search_contacts: searchContactsTool,
+            };
+
+            if (!isCarefulMode) {
+              tools.send_email = sendEmailTool;
+            }
+
              const agent = new Agent({
               id: "singularity-workflow-agent",
               name: "Singularity Workflow Agent",
               model: model,
               instructions: instructions,
-              tools: {
-                ...wrappedMcpTools,
-                send_email: sendEmailTool,
-                create_draft: createDraftTool,
-                search_local: searchLocalTool,
-                search_contacts: searchContactsTool,
-              },
+              tools,
             });
 
             // Set up a 2-minute timeout for the generation to avoid hanging

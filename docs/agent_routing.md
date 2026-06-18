@@ -1,59 +1,66 @@
-# AI Co-Pilot & Agent routing Documentation
+# AI Agent And MCP Routing
 
-This document describes how the AI agent routes requests, switching between Careful and Autonomous modes, and how the DeepThink reasoning engine is integrated and rendered.
+This document describes how Singularity routes AI requests across Gmail, Google Calendar, and local search while keeping write actions safe.
 
----
+## Modes
 
-## ⚙️ AI Agent Operation Modes
+### Careful Mode
 
-Users can configure the AI agent's behavior via the Settings page. This modifies the agent's system instructions and tool constraints.
+Careful mode is the default review-first mode.
 
-### 1. Careful Mode (Review Drafts)
-*   **Default Behavior:** Safety-first mode.
-*   **Mechanism:** Intercepts write operations (sending emails, updating calendar events).
-*   **Gmail Actions:** The agent is restricted from using the direct send tool. If the user asks the agent to send an email, it will compose it and save it as a **Draft** in the user's Gmail instead, notifying the user that it is ready for review.
-*   **Calendar Actions:** Intercepts event creations and prompts the user to review the date/time draft in the chat before scheduling.
+- `send_email` is not exposed to the model in the tool list.
+- Direct email sending is also blocked at tool execution time as a backend guardrail.
+- MCP `run_script` calls are inspected for write operations such as `.create(`, `.update(`, `.delete(`, `.patch(`, `.post(`, and `.send(`.
+- If a script write is attempted in Careful mode, the backend rejects it with `FORBIDDEN`.
+- `create_draft` remains available so the agent can prepare email drafts for review.
 
-### 2. Autonomous Mode (Autopilot)
-*   **Behavior:** Direct action execution.
-*   **Mechanism:** The agent is fully authorized to call write-tools (`send_email`, `create_event`) directly if the user's instruction is clear. If details (like date, time, or recipient) are missing or ambiguous, it will ask clarifying questions in the chat.
+This means safety is enforced by backend code, not only by prompt instructions.
 
----
+### Autonomous Mode
 
-## 🧠 DeepThink Reasoning Engine
+Autonomous mode allows direct writes when the user gives a clear instruction.
 
-Singularity supports DeepThink, allowing the AI to "think" and output reasoning steps before returning a final answer.
+- `send_email` is exposed.
+- MCP write scripts may execute.
+- Ambiguous requests must still be clarified with option buttons before execution.
+- Once any write tool runs, fallback model retries are stopped to avoid duplicate sends or duplicate calendar changes.
 
-### 1. Model Switching
-The agent workspace dynamically loads the correct model based on the DeepThink toggle state in the UI (`reasoningEnabled` parameter):
-*   **DeepThink Enabled (Toggle On):** Loads `deepseek-v4-pro` with thinking/reasoning enabled. This model performs deep planning before answering, showing a `<think>` block in the logs.
-*   **DeepThink Disabled (Toggle Off):** Loads `deepseek-v4-flash`, providing ultra-fast, direct responses.
+## Tenant Routing
 
-### 2. Reasoning Extraction Logic
-The Vercel AI SDK exposes a high-level `response.reasoning` property. However, due to API structure differences, it returns an empty array `[]` (which evaluates as truthy in JavaScript), resulting in blank thinking logs.
+Premium users can connect multiple Gmail and Google Calendar accounts. The agent resolves active tenant IDs from the authenticated user's connected accounts.
 
-To fix this, we implement a fallback extractor in the chat endpoint to pull raw reasoning contents:
-```typescript
-let reasoningText = "";
-if (response.reasoning && typeof response.reasoning === "string") {
-  reasoningText = response.reasoning;
-} else if (response.steps && response.steps[0]) {
-  const choice = response.steps[0].response?.body?.choices?.[0];
-  if (choice?.message?.reasoning_content) {
-    reasoningText = choice.message.reasoning_content;
-  }
-}
-```
-This reasoning text is then enclosed in `<think>...</think>` tags and passed to the frontend to render an expandable "Thinking..." block in the chat.
+- Gmail tools use the selected Gmail tenant, or the first connected Gmail account.
+- Calendar tools use the selected calendar tenant, or the first connected Calendar account.
+- If Gmail and Calendar live in different tenant slots, the backend builds separate MCP tool lists and routes `run_script` calls to the right tenant.
+- User-selected account context is passed as `targetEmail`.
 
----
+## First-Party Tools
 
-## 🛠️ Unified Multi-Tenant Routing
+The agent includes first-party tools for the most important workflows:
 
-Because premium users can connect multiple Gmail and Google Calendar accounts, the agent may need to interact with different tenant slots.
+- `send_email`: sends a MIME email through Gmail. Only available in Autonomous mode.
+- `create_draft`: creates a Gmail draft for review.
+- `search_local`: searches cached Gmail threads and Calendar events through pgvector.
+- `search_contacts`: resolves names from cached email headers.
 
-1. **MCP Client Setup:** During a chat session, the agent retrieves all tenant IDs for the user and initializes separate Mastra MCP tool definitions for each connected account.
-2. **Dynamic Script Execution:** The generic `run_script` tool wrapper receives code snippets from the model. It inspects the code:
-   * If the code references `googlecalendar`, it routes it to the specific tenant ID housing the Google Calendar connection.
-   * If the code references `gmail`, it routes it to the tenant ID housing the Gmail connection.
-3. **Write Protection:** It checks the code for mutations (`.insert()`, `.create()`, `.delete()`). If mutating functions are found, it checks if the user is in Careful Mode, enforcing draft creations instead of execution.
+## MCP Tool Handling
+
+Corsair MCP tools are still available for advanced operations. The wrapper adds:
+
+- tenant routing for Gmail vs Calendar scripts
+- write-operation detection
+- Careful-mode blocking
+- duplicate-write fallback prevention
+
+## Frontend Actions
+
+The agent can return structured action cards for UI-only or approval-based actions:
+
+- open route
+- refresh inbox
+- refresh calendar
+- show draft
+- confirm archive threads
+- confirm delete threads
+
+Approval actions verify thread ownership on the backend before executing.
