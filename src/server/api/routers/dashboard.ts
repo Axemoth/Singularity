@@ -9,6 +9,7 @@ export const dashboardRouter = createTRPCRouter({
       z.object({
         startDate: z.string(),
         endDate: z.string(),
+        emailFilter: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -17,8 +18,8 @@ export const dashboardRouter = createTRPCRouter({
       const end = new Date(input.endDate);
 
       // 1. Fetch connected Gmail accounts
-      const gmailAccounts = await ctx.db
-        .select({ id: corsairAccounts.id })
+      const gmailAccountsQuery = ctx.db
+        .select({ id: corsairAccounts.id, emailAddress: corsairAccounts.emailAddress })
         .from(corsairAccounts)
         .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
         .where(
@@ -31,9 +32,14 @@ export const dashboardRouter = createTRPCRouter({
           )
         );
 
+      let gmailAccounts = await gmailAccountsQuery;
+      if (input.emailFilter && input.emailFilter !== "all") {
+        gmailAccounts = gmailAccounts.filter(acc => acc.emailAddress === input.emailFilter);
+      }
+
       // 2. Fetch connected Calendar accounts
-      const calendarAccounts = await ctx.db
-        .select({ id: corsairAccounts.id })
+      const calendarAccountsQuery = ctx.db
+        .select({ id: corsairAccounts.id, emailAddress: corsairAccounts.emailAddress })
         .from(corsairAccounts)
         .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
         .where(
@@ -45,6 +51,11 @@ export const dashboardRouter = createTRPCRouter({
             eq(corsairIntegrations.name, "googlecalendar")
           )
         );
+
+      let calendarAccounts = await calendarAccountsQuery;
+      if (input.emailFilter && input.emailFilter !== "all") {
+        calendarAccounts = calendarAccounts.filter(acc => acc.emailAddress === input.emailFilter);
+      }
 
       const gmailAccountIds = gmailAccounts.map((a) => a.id);
       const calendarAccountIds = calendarAccounts.map((a) => a.id);

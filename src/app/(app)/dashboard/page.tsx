@@ -28,6 +28,7 @@ export default function DashboardPage() {
   const [timeRange, setTimeRange] = useState<"today" | "7d" | "30d" | "custom">("7d");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
+  const [emailFilter, setEmailFilter] = useState<string>("all");
 
   // Get current local date strings
   const getDates = () => {
@@ -63,9 +64,17 @@ export default function DashboardPage() {
   const { data: gmailStatus, isLoading: isGmailLoading } = api.gmail.getConnectionStatus.useQuery();
   const { data: calendarStatus, isLoading: isCalendarLoading } = api.calendar.getConnectionStatus.useQuery();
 
+  // Combine unique connected email addresses for filtering
+  const allEmails = Array.from(
+    new Set([
+      ...(gmailStatus?.accounts?.map((a: any) => a.emailAddress) ?? []),
+      ...(calendarStatus?.accounts?.map((a: any) => a.emailAddress) ?? []),
+    ])
+  ).filter(Boolean) as string[];
+
   // Fetch dashboard metrics
   const { data: metrics, isLoading: isMetricsLoading, isError } = api.dashboard.getMetrics.useQuery(
-    { startDate, endDate },
+    { startDate, endDate, emailFilter },
     {
       enabled: !!gmailStatus && !!calendarStatus,
       refetchInterval: 30000, // Refresh counts every 30s
@@ -92,8 +101,25 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Date Filters */}
+        {/* Filters */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          {/* Email Filter Dropdown */}
+          {allEmails.length > 1 && (
+            <select
+              value={emailFilter}
+              onChange={(e) => setEmailFilter(e.target.value)}
+              className="bg-bg-raised text-text-primary border border-border-default rounded-xl px-3 py-1.5 text-xs outline-none focus:border-accent-primary focus:ring-1 focus:ring-accent-primary cursor-pointer font-semibold self-start"
+              aria-label="Filter by account"
+            >
+              <option value="all">All Accounts ({allEmails.length})</option>
+              {allEmails.map((email) => (
+                <option key={email} value={email}>
+                  {email}
+                </option>
+              ))}
+            </select>
+          )}
+
           <div className="flex bg-bg-surface/50 p-1 rounded-xl border border-border-default/50 self-start">
             {(["today", "7d", "30d", "custom"] as const).map((mode) => (
               <button
