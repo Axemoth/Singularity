@@ -384,7 +384,7 @@ export const gmailRouter = createTRPCRouter({
       SELECT COUNT(*) AS count
       FROM corsair_entities
       WHERE entity_type = 'threads'
-        AND account_id = ANY(${accountIds})
+        AND account_id IN (${sql.join(accountIds.map(id => sql`${id}`), sql`, `)})
         AND data->'messages'->0->'labelIds' ? 'UNREAD'
     `);
 

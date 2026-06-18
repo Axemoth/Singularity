@@ -79,7 +79,7 @@ export const dashboardRouter = createTRPCRouter({
           FROM corsair_entities,
                jsonb_array_elements(data->'messages') AS msg
           WHERE entity_type = 'threads'
-            AND account_id = ANY(${gmailAccountIds})
+            AND account_id IN (${sql.join(gmailAccountIds.map(id => sql`${id}`), sql`, `)})
             AND msg->'labelIds' ? 'SENT'
             AND (msg->>'internalDate')::bigint >= ${start.getTime()}
             AND (msg->>'internalDate')::bigint <= ${end.getTime()}
@@ -91,7 +91,7 @@ export const dashboardRouter = createTRPCRouter({
           SELECT COUNT(*) AS count
           FROM corsair_entities
           WHERE entity_type = 'threads'
-            AND account_id = ANY(${gmailAccountIds})
+            AND account_id IN (${sql.join(gmailAccountIds.map(id => sql`${id}`), sql`, `)})
             AND data->'messages'->0->'labelIds' ? 'UNREAD'
             AND (data->'messages'->0->>'internalDate')::bigint >= ${start.getTime()}
             AND (data->'messages'->0->>'internalDate')::bigint <= ${end.getTime()}
@@ -113,7 +113,7 @@ export const dashboardRouter = createTRPCRouter({
             ) AS event_data
           FROM corsair_entities
           WHERE entity_type = 'events'
-            AND account_id = ANY(${calendarAccountIds})
+            AND account_id IN (${sql.join(calendarAccountIds.map(id => sql`${id}`), sql`, `)})
             AND COALESCE(data->'start'->>'dateTime', data->'start'->>'date') IS NOT NULL
             AND (
               CASE 
