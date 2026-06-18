@@ -8,9 +8,9 @@ export const searchRouter = createTRPCRouter({
   searchLocal: protectedProcedure
     .input(
       z.object({
-        query: z.string(),
+        query: z.string().min(1).max(500).trim(),
         entityType: z.enum(["all", "threads", "events"]).optional().default("all"),
-        limit: z.number().optional().default(15),
+        limit: z.number().min(1).max(50).optional().default(15),
       })
     )
     .query(async ({ ctx, input }) => {

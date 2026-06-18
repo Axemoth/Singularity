@@ -6,6 +6,10 @@ import {conn} from './db/index';
 import { classifyAndSaveEmail } from './api/tasks/prioritizer';
 
 
+if (!process.env.CORSAIR_KEK) {
+  throw new Error("CORSAIR_KEK environment variable is required. Set it in your .env file.");
+}
+
 export const corsair = createCorsair({
     plugins: [
         gmail({

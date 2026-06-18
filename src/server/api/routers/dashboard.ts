@@ -2,14 +2,23 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsairEntities, corsairAccounts, corsairIntegrations } from "@/server/db/schema";
 import { eq, and, or, like, inArray, sql } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
+
+const dashboardDateSchema = z
+  .string()
+  .trim()
+  .refine((value) => !Number.isNaN(new Date(value).getTime()), {
+    message: "Expected a valid datetime.",
+  })
+  .transform((value) => new Date(value).toISOString());
 
 export const dashboardRouter = createTRPCRouter({
   getMetrics: protectedProcedure
     .input(
       z.object({
-        startDate: z.string(),
-        endDate: z.string(),
-        emailFilter: z.string().optional(),
+        startDate: dashboardDateSchema,
+        endDate: dashboardDateSchema,
+        emailFilter: z.string().max(320).optional(),
       })
     )
     .query(async ({ ctx, input }) => {

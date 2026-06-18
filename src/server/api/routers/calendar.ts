@@ -212,7 +212,7 @@ export const calendarRouter = createTRPCRouter({
   }),
 
   disconnect: protectedProcedure
-    .input(z.object({ accountId: z.string() }))
+    .input(z.object({ accountId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 

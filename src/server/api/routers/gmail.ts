@@ -493,7 +493,7 @@ export const gmailRouter = createTRPCRouter({
   }),
 
   disconnect: protectedProcedure
-    .input(z.object({ accountId: z.string() }))
+    .input(z.object({ accountId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
@@ -620,11 +620,11 @@ export const gmailRouter = createTRPCRouter({
         to: z.string().email().max(320).trim(),
         subject: z.string().min(1).max(1000).trim(),
         body: z.string().min(1).max(50000).trim(),
-        cc: z.string().optional(),
-        bcc: z.string().optional(),
+        cc: z.string().max(2000).trim().optional(),
+        bcc: z.string().max(2000).trim().optional(),
         threadId: z.string().optional(),
         parentMessageId: z.string().optional(),
-        fromEmail: z.string().optional(),
+        fromEmail: z.string().email().max(320).trim().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -707,9 +707,9 @@ export const gmailRouter = createTRPCRouter({
         to: z.string().email().max(320).trim().optional(),
         subject: z.string().max(1000).trim().optional(),
         body: z.string().min(1).max(50000).trim(),
-        cc: z.string().optional(),
-        bcc: z.string().optional(),
-        fromEmail: z.string().optional(),
+        cc: z.string().max(2000).trim().optional(),
+        bcc: z.string().max(2000).trim().optional(),
+        fromEmail: z.string().email().max(320).trim().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -874,7 +874,7 @@ export const gmailRouter = createTRPCRouter({
   }),
 
   setPriorityRules: protectedProcedure
-    .input(z.object({ rules: z.string() }))
+    .input(z.object({ rules: z.string().max(5000).trim() }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       try {
@@ -930,7 +930,7 @@ export const gmailRouter = createTRPCRouter({
   }),
 
   setUsername: protectedProcedure
-    .input(z.object({ username: z.string() }))
+    .input(z.object({ username: z.string().min(1).max(100).trim() }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       try {
