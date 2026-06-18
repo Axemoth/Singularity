@@ -1,6 +1,7 @@
 import { Sidebar } from "@/app/_components/ui/sidebar";
 import { AgentPanel } from "@/app/_components/agent/agent-panel";
 import { ComposePanel } from "@/app/_components/agent/compose-panel";
+import { OnboardingTour } from "@/app/_components/ui/onboarding-tour";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -9,6 +10,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-y-auto">{children}</main>
       <AgentPanel />
       <ComposePanel />
+      <OnboardingTour />
     </div>
   );
 }

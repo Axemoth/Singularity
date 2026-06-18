@@ -553,6 +553,34 @@ function SettingsPageContent() {
                 </div>
               </div>
             )}
+
+            {/* System Tour Card */}
+            <div className="glass rounded-xl border border-border-default overflow-hidden animate-fade-in">
+              <div className="border-b border-border-subtle p-5 bg-bg-raised/40">
+                <h2 className="text-base font-semibold text-text-primary">System Tour</h2>
+                <p className="text-xs text-text-tertiary mt-0.5">
+                  Need a refresher? Re-run the step-by-step tour of the Singularity workspace.
+                </p>
+              </div>
+
+              <div className="p-5 flex flex-col gap-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="text-xs text-text-secondary leading-relaxed font-medium">
+                    This tour will walk you through the Dashboard, Prioritized Inbox, Calendar Sync, and Agent Chat.
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="font-semibold border-neutral-700 hover:bg-text-primary hover:text-bg-base cursor-pointer shrink-0"
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent("start-singularity-tour"));
+                    }}
+                  >
+                    Replay Tour
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

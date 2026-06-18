@@ -283,6 +283,7 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                id={`sidebar-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                 aria-label={item.label}
                 className={`relative flex h-10 w-full items-center gap-3 px-3 rounded-[var(--radius-md)] transition-all duration-150 ${
                   isActive
@@ -326,6 +327,7 @@ export function Sidebar() {
           {/* Settings */}
           <Link
             href="/settings"
+            id="sidebar-nav-settings"
             aria-label="Settings"
             className={`flex h-10 w-full items-center gap-3 px-3 rounded-[var(--radius-md)] transition-all duration-150 ${
               pathname.startsWith('/settings')
