@@ -2,10 +2,32 @@ import { db } from "@/server/db";
 import { corsairEntities, corsairAccounts, emailPriorities, userSettings, user, corsairIntegrations } from "@/server/db/schema";
 import { eq, and, isNull, or, like, desc, inArray } from "drizzle-orm";
 import { createOpenAI } from "@ai-sdk/openai";
-import { generateObject } from "ai";
+import { generateText } from "ai";
 import { z } from "zod";
 import { env } from "@/env";
 import { corsair } from "@/server/corsair";
+
+function cleanAndParseJSON(text: string): any {
+  let clean = text.trim();
+  
+  // Strip markdown code block wrapping if present
+  if (clean.startsWith("```")) {
+    const lines = clean.split("\n");
+    if (lines[0]?.startsWith("```")) lines.shift();
+    if (lines[lines.length - 1]?.startsWith("```")) lines.pop();
+    clean = lines.join("\n").trim();
+  }
+  
+  // Find first '{' and last '}'
+  const firstBrace = clean.indexOf("{");
+  const lastBrace = clean.lastIndexOf("}");
+  
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    clean = clean.substring(firstBrace, lastBrace + 1);
+  }
+  
+  return JSON.parse(clean);
+}
 
 const deepseek = createOpenAI({
   baseURL: "https://api.deepseek.com",
@@ -207,22 +229,24 @@ SPAM CLASSIFICATION SAFETY INSTRUCTIONS:
 - Standard receipts, transaction confirmations, clean newsletters, work status updates, or notifications MUST NEVER be marked as spam (mark them as 'low' priority instead).
 - If there is any doubt whatsoever, set 'isSpam' to false. Do not send important emails to spam!`;
 
-    const { object } = await generateObject({
+    const { text } = await generateText({
       model: (deepseek as any).chat("deepseek-v4-pro"),
-      schema: z.object({
-        priority: z.enum(["urgent", "normal", "low"]),
-        reason: z.string().describe("Brief explanation why this priority was chosen (max 10 words)."),
-        detectedDeadline: z.string().nullable().describe("ISO 8601 datetime format (YYYY-MM-DDTHH:mm:ssZ) if a specific deadline is mentioned in the email (e.g. RSVP by tomorrow, submit report by Friday 5pm). Null if no deadline is specified."),
-        isSpam: z.boolean().describe("True if this is an unsolicited marketing message, junk email, or phishing attempt. False otherwise."),
-      }),
-      prompt,
+      prompt: prompt + `\n\nIMPORTANT: You must return a raw JSON object matching this schema, without any markdown formatting or wrapper backticks:
+{
+  "priority": "urgent" | "normal" | "low",
+  "reason": "Brief explanation why this priority was chosen (max 10 words).",
+  "detectedDeadline": "ISO 8601 datetime format (YYYY-MM-DDTHH:mm:ssZ) if a specific deadline is mentioned in the email, null otherwise.",
+  "isSpam": true | false
+}`,
     });
 
+    const parsed = cleanAndParseJSON(text);
+
     return {
-      priority: object.priority,
-      reason: object.reason,
-      detectedDeadline: object.detectedDeadline,
-      isSpam: object.isSpam,
+      priority: parsed.priority || "normal",
+      reason: parsed.reason || "",
+      detectedDeadline: parsed.detectedDeadline || null,
+      isSpam: !!parsed.isSpam,
     };
   } catch (err) {
     console.error("[Prioritizer] LLM classification error, using local fallback:", err);
@@ -296,23 +320,24 @@ ${emailsListFormatted}
 
 Return a list of classifications matching the exact IDs provided.`;
 
-    const { object } = await generateObject({
+    const { text } = await generateText({
       model: (deepseek as any).chat("deepseek-v4-pro"),
-      schema: z.object({
-        classifications: z.array(
-          z.object({
-            id: z.string().describe("The exact ID of the email as provided in the input list"),
-            priority: z.enum(["urgent", "normal", "low"]),
-            reason: z.string().describe("Brief description of why this category was chosen (max 10 words)"),
-            detectedDeadline: z.string().nullable().describe("ISO 8601 datetime format if a deadline is mentioned, null otherwise"),
-            isSpam: z.boolean().describe("True if this is unsolicited spam or phishing, false otherwise"),
-          })
-        ),
-      }),
-      prompt,
+      prompt: prompt + `\n\nIMPORTANT: You must return a raw JSON object matching this schema, without any markdown formatting or wrapper backticks:
+{
+  "classifications": [
+    {
+      "id": "exact email ID string",
+      "priority": "urgent" | "normal" | "low",
+      "reason": "Brief description of why this category was chosen (max 10 words)",
+      "detectedDeadline": "ISO 8601 string or null",
+      "isSpam": true | false
+    }
+  ]
+}`,
     });
 
-    return object.classifications;
+    const parsed = cleanAndParseJSON(text);
+    return parsed.classifications || [];
   } catch (err) {
     console.error("[Prioritizer] Error in classifyEmailsBatch, using local fallback:", err);
     return emails.map((e) => {

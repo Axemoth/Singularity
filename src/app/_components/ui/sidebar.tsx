@@ -19,6 +19,16 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   {
+    label: 'Dashboard',
+    href: '/dashboard',
+    shortcut: 'G D',
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z" />
+      </svg>
+    ),
+  },
+  {
     label: 'Inbox',
     href: '/inbox',
     shortcut: 'G I',
@@ -54,6 +64,7 @@ const navItems: NavItem[] = [
 
 const shortcuts = [
   { key: 'C', description: 'Compose new email' },
+  { key: 'G D', description: 'Go to Dashboard' },
   { key: 'G I', description: 'Go to Inbox' },
   { key: 'G C', description: 'Go to Calendar' },
   { key: 'G A', description: 'Go to Agent Chat' },
@@ -222,6 +233,7 @@ export function Sidebar() {
         gPressed = false;
         if (gTimer) clearTimeout(gTimer);
         switch (e.key.toLowerCase()) {
+          case 'd': router.push('/dashboard'); break;
           case 'i': router.push('/inbox'); break;
           case 'c': router.push('/calendar'); break;
           case 'a': router.push('/agent'); break;
@@ -239,55 +251,58 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="flex h-screen w-16 flex-col items-center border-r border-border-subtle bg-bg-raised py-4 sticky top-0 z-30">
+      <aside className="flex h-screen w-56 flex-col items-stretch border-r border-border-subtle bg-bg-raised p-4 sticky top-0 z-30">
         {/* ─── Logo ─── */}
         <Link
-          href="/inbox"
-          className="mb-4 flex h-9 w-9 overflow-hidden items-center justify-center rounded-[var(--radius-md)] bg-accent-primary text-text-inverse select-none transition-transform duration-150 hover:scale-105 active:scale-95"
+          href="/dashboard"
+          className="mb-6 flex items-center gap-3 overflow-hidden select-none"
           aria-label="Singularity home"
         >
-          <img src="/logo.png" alt="Singularity Logo" className="h-full w-full object-cover" />
+          <div className="flex h-9 w-9 shrink-0 overflow-hidden items-center justify-center rounded-[var(--radius-md)] bg-accent-primary text-text-inverse transition-transform duration-150 hover:scale-105 active:scale-95">
+            <img src="/logo.png" alt="Singularity Logo" className="h-full w-full object-cover" />
+          </div>
+          <span className="font-bold text-base text-text-primary tracking-tight font-sans">Singularity</span>
         </Link>
 
-        <Tooltip content="Compose" shortcut="C" position="right">
-          <button
-            onClick={() => window.dispatchEvent(new CustomEvent("open-compose"))}
-            className="mb-6 flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-accent-primary text-text-inverse shadow-[var(--shadow-md)] transition-all duration-150 hover:bg-accent-primary-hover hover:shadow-[var(--shadow-glow)] hover:scale-105 active:scale-95"
-            aria-label="Compose"
-          >
-            <ComposeIcon />
-          </button>
-        </Tooltip>
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("open-compose"))}
+          className="mb-6 flex h-10 w-full items-center gap-3 px-4 rounded-[var(--radius-md)] bg-accent-primary text-text-inverse shadow-[var(--shadow-md)] transition-all duration-150 hover:bg-accent-primary-hover hover:shadow-[var(--shadow-glow)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+          aria-label="Compose"
+        >
+          <ComposeIcon />
+          <span className="font-semibold text-sm">Compose</span>
+          <kbd className="ml-auto hidden px-1.5 py-0.5 bg-accent-primary-hover/50 rounded text-[9px] font-semibold opacity-80 sm:inline">C</kbd>
+        </button>
 
         {/* ─── Navigation ─── */}
-        <nav className="flex flex-col items-center gap-1">
+        <nav className="flex flex-col gap-1">
           {navItems.map((item) => {
             const isActive = pathname.startsWith(item.href);
             const isInbox = item.href === '/inbox';
             return (
-              <Tooltip key={item.href} content={item.label} shortcut={item.shortcut} position="right">
-                <Link
-                  href={item.href}
-                  aria-label={item.label}
-                  className={`relative flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] transition-all duration-150 ${
-                    isActive
-                      ? 'bg-accent-primary/15 text-accent-primary'
-                      : 'text-text-tertiary hover:bg-bg-surface hover:text-text-secondary'
-                  }`}
-                >
-                  {/* Active indicator bar */}
-                  {isActive && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-accent-primary animate-scale-in" />
-                  )}
-                  {item.icon}
-                  {/* Unread count badge for inbox */}
-                  {isInbox && unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-primary text-[9px] font-bold text-text-inverse px-0.5 shadow-sm">
-                      {unreadCount > 99 ? '99+' : unreadCount}
-                    </span>
-                  )}
-                </Link>
-              </Tooltip>
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-label={item.label}
+                className={`relative flex h-10 w-full items-center gap-3 px-3 rounded-[var(--radius-md)] transition-all duration-150 ${
+                  isActive
+                    ? 'bg-accent-primary/15 text-accent-primary font-semibold shadow-sm'
+                    : 'text-text-tertiary hover:bg-bg-surface hover:text-text-secondary'
+                }`}
+              >
+                {/* Active indicator bar */}
+                {isActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-accent-primary animate-scale-in" />
+                )}
+                {item.icon}
+                <span className="text-sm font-medium">{item.label}</span>
+                {/* Unread count badge for inbox */}
+                {isInbox && unreadCount > 0 && (
+                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-primary text-[10px] font-bold text-text-inverse px-1.5 shadow-sm animate-scale-in">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </Link>
             );
           })}
         </nav>
@@ -296,54 +311,52 @@ export function Sidebar() {
         <div className="flex-1" />
 
         {/* ─── Bottom section ─── */}
-        <div className="flex flex-col items-center gap-1">
+        <div className="flex flex-col gap-1 border-t border-border-subtle pt-4">
           {/* Help / Keyboard Shortcuts */}
-          <Tooltip content="Keyboard shortcuts" shortcut="?" position="right">
-            <button
-              onClick={() => setShowShortcuts(true)}
-              aria-label="Keyboard shortcuts"
-              className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] text-text-tertiary transition-all duration-150 hover:bg-bg-surface hover:text-text-secondary cursor-pointer"
-            >
-              <HelpIcon />
-            </button>
-          </Tooltip>
+          <button
+            onClick={() => setShowShortcuts(true)}
+            aria-label="Keyboard shortcuts"
+            className="flex h-10 w-full items-center gap-3 px-3 rounded-[var(--radius-md)] text-text-tertiary hover:bg-bg-surface hover:text-text-secondary transition-all duration-150 cursor-pointer"
+          >
+            <HelpIcon />
+            <span className="text-sm font-medium">Shortcuts</span>
+            <kbd className="ml-auto px-1.5 py-0.5 bg-bg-inset border border-border-default rounded text-[9px] font-mono text-text-tertiary font-semibold">?</kbd>
+          </button>
 
           {/* Settings */}
-          <Tooltip content="Settings" shortcut="G S" position="right">
-            <Link
-              href="/settings"
-              aria-label="Settings"
-              className={`flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] transition-all duration-150 ${
-                pathname.startsWith('/settings')
-                  ? 'bg-accent-primary/15 text-accent-primary'
-                  : 'text-text-tertiary hover:bg-bg-surface hover:text-text-secondary'
-              }`}
-            >
-              <SettingsIcon />
-            </Link>
-          </Tooltip>
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            className={`flex h-10 w-full items-center gap-3 px-3 rounded-[var(--radius-md)] transition-all duration-150 ${
+              pathname.startsWith('/settings')
+                ? 'bg-accent-primary/15 text-accent-primary font-semibold shadow-sm'
+                : 'text-text-tertiary hover:bg-bg-surface hover:text-text-secondary'
+            }`}
+          >
+            <SettingsIcon />
+            <span className="text-sm font-medium">Settings</span>
+          </Link>
 
           {/* Theme toggle */}
-          <Tooltip content={theme === 'dark' ? 'Light mode' : 'Dark mode'} position="right">
-            <button
-              onClick={toggleTheme}
-              aria-label="Toggle theme"
-              className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] text-text-tertiary transition-all duration-150 hover:bg-bg-surface hover:text-text-secondary"
-            >
-              {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-            </button>
-          </Tooltip>
+          <button
+            onClick={toggleTheme}
+            aria-label="Toggle theme"
+            className="flex h-10 w-full items-center gap-3 px-3 rounded-[var(--radius-md)] text-text-tertiary hover:bg-bg-surface hover:text-text-secondary transition-all duration-150 cursor-pointer"
+          >
+            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+            <span className="text-sm font-medium">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+          </button>
 
-          {/* User avatar */}
-          <Tooltip content="Settings" position="right">
-            <Link
-              href="/settings"
-              aria-label="Settings"
-              className="mt-1 flex items-center justify-center rounded-full transition-transform duration-150 hover:scale-105 active:scale-95"
-            >
+          {/* User profile */}
+          <div className="flex items-center gap-3 px-3 py-2 mt-2 rounded-xl bg-bg-surface/50 border border-border-subtle/50">
+            <Link href="/settings" className="shrink-0 flex items-center justify-center rounded-full transition-transform duration-150 hover:scale-105 active:scale-95">
               <Avatar name={sessionData?.user?.name ?? 'User'} size="sm" />
             </Link>
-          </Tooltip>
+            <div className="flex flex-col min-w-0 flex-1 leading-tight">
+              <span className="text-xs font-semibold text-text-primary truncate">{sessionData?.user?.name ?? 'User'}</span>
+              <span className="text-[10px] text-text-tertiary truncate">{sessionData?.user?.email ?? ''}</span>
+            </div>
+          </div>
         </div>
       </aside>
 
