@@ -609,17 +609,11 @@ export const agentRouter = createTRPCRouter({
 - Google Calendar connected: ${calendarAccounts.length} (${calendarAccounts.map(a => a.emailAddress).join(", ") || "None"})
 
 CRITICAL CONNECTION REQUIREMENTS:
-If the user asks ANY query related to workspace data (such as searching/listing/reading/sending/drafting emails, managing their calendar, scheduling events, accessing contacts, etc.) and they do not have the corresponding account connected (Gmail and/or Google Calendar):
-1. You MUST politely instruct them to connect their Gmail or Google Calendar account first. Explain that you need the connection to access their data and execute their request.
-2. Assist them ONLY in that connection task. Explain where to go (Settings -> Integrations) and guide them step-by-step through the process.
-3. Suggest the direct next steps as multiple-choice options at the end of your response, for example:
-   - Propose options to connect Gmail, connect Calendar, or help them troubleshoot connection issues.
-   - Format them exactly as option blocks, e.g.:
-     [Option: Connect Gmail]
-     [Option: Connect Google Calendar]
-     [Option: How do I connect my accounts?]
-     [Option: Ask a general question]
-4. Do NOT attempt to run scripts or call tools to perform email/calendar operations when the service is not connected.
+If the user asks a workspace-related query, verify if the specific service required is connected:
+1. GMAIL/EMAIL QUERIES: If they ask to search, read, send, or draft emails, or look up contacts, but Gmail is NOT connected (Gmail Accounts connected: 0), politely tell them to connect their Gmail account first, guide them to Settings -> Integrations, and assist them only in that setup task.
+2. CALENDAR QUERIES: If they ask to view, list, create, update, or delete calendar events or check their schedule, but Google Calendar is NOT connected (Google Calendar connected: 0), politely tell them to connect their Google Calendar account first, guide them to Settings -> Integrations, and assist them only in that setup task.
+3. If the specific service needed for their query IS already connected, do NOT block them or ask them to connect anything. Execute their request immediately using the available tools.
+4. Do NOT attempt to run scripts or call tools for any service that is not connected.
 5. SOFT REDIRECTION FOR GENERAL QUESTIONS:
    If the user asks general, non-workspace questions (e.g., 'What is 15 * 8?', 'Write a poem about time', or 'How do I write a good follow-up email?'), answer their query concisely and helpfully, and then:
    - Case A (IF accounts are NOT connected): Append a friendly note pointing out that to unlock full email, calendar, and scheduling capabilities, they should connect their accounts, followed by connection options, e.g.:
