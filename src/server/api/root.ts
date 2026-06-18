@@ -4,6 +4,7 @@ import { calendarRouter } from "@/server/api/routers/calendar";
 import { agentRouter } from "@/server/api/routers/agent";
 import { adminRouter } from "@/server/api/routers/admin";
 import { dashboardRouter } from "@/server/api/routers/dashboard";
+import { searchRouter } from "@/server/api/routers/search";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 
 /**
@@ -18,6 +19,7 @@ export const appRouter = createTRPCRouter({
   agent: agentRouter,
   admin: adminRouter,
   dashboard: dashboardRouter,
+  search: searchRouter,
 });
 
 // export type definition of API

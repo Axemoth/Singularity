@@ -5,6 +5,7 @@ import { api } from "@/trpc/react";
 import { Button } from "@/app/_components/ui/button";
 import { Badge } from "@/app/_components/ui/badge";
 import { useToast } from "@/app/_components/ui/toast";
+import { SearchInput } from "@/app/_components/ui/search-input";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1228,6 +1229,361 @@ function InboxIcon() {
 }
 
 // ---------------------------------------------------------------------------
+// Search Result List Item & Event Detail Components
+// ---------------------------------------------------------------------------
+
+interface SearchResult {
+  id: string;
+  entityId: string;
+  entityType: "threads" | "events";
+  similarity: number;
+  updatedAt: Date;
+  emailAddress?: string | null;
+  details: {
+    subject?: string;
+    snippet?: string;
+    from?: string;
+    date?: string;
+    isUnread?: boolean;
+    summary?: string;
+    description?: string;
+    location?: string;
+    start?: string;
+    end?: string;
+    attendees?: Array<{ email?: string; displayName?: string; responseStatus?: string }>;
+  };
+}
+
+function SearchResultListItem({
+  result,
+  isSelected,
+  onSelect,
+}: {
+  result: SearchResult;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const isThread = result.entityType === "threads";
+  const matchPct = Math.min(100, Math.max(0, Math.round(result.similarity * 100)));
+  
+  const similarityColor = 
+    matchPct >= 85 
+      ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20" 
+      : matchPct >= 70
+      ? "text-accent-primary bg-accent-primary/10 border-accent-primary/20"
+      : "text-text-tertiary bg-text-tertiary/10 border-border-default";
+
+  if (isThread) {
+    const from = result.details.from;
+    const sender = from ? parseSenderName(from) : "Notification";
+    const subject = result.details.subject || "No Subject";
+    const snippet = truncate(result.details.snippet, 80);
+    const dateVal = Number(result.details.date);
+    const time = isNaN(dateVal) ? "" : formatRelativeTime(result.details.date);
+
+    return (
+      <div
+        className={`relative w-full text-left rounded-xl transition-all duration-150 cursor-pointer group border ${
+          isSelected
+            ? "bg-bg-surface border-border-default shadow-sm"
+            : "border-transparent hover:bg-bg-surface/40"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={onSelect}
+          className="w-full text-left px-3 py-2.5"
+        >
+          <div className="flex items-start gap-2.5">
+            <div className="h-8 w-8 rounded-full flex items-center justify-center bg-accent-primary/10 text-accent-primary shrink-0">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2 mb-0.5">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="truncate text-sm font-semibold text-text-primary">
+                    {sender}
+                  </span>
+                  <span className="text-[9px] px-1.5 py-0.5 bg-accent-primary/5 text-text-tertiary border border-border-default/50 rounded-md font-medium">
+                    Email
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {time && (
+                    <span className="text-[11px] text-text-tertiary tabular-nums">
+                      {time}
+                    </span>
+                  )}
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold border ${similarityColor}`}>
+                    {matchPct}% match
+                  </span>
+                </div>
+              </div>
+              <p className="truncate text-[12.5px] leading-snug font-medium text-text-secondary">
+                {subject}
+              </p>
+              <p className="truncate text-xs text-text-tertiary mt-0.5 leading-relaxed">
+                {snippet}
+              </p>
+            </div>
+          </div>
+        </button>
+      </div>
+    );
+  } else {
+    const summary = result.details.summary || "Untitled Event";
+    const description = truncate(result.details.description || "", 80);
+    const location = result.details.location;
+    
+    let eventTimeText = "";
+    if (result.details.start) {
+      const startDt = new Date(result.details.start);
+      if (!isNaN(startDt.getTime())) {
+        eventTimeText = startDt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      }
+    }
+
+    return (
+      <div
+        className={`relative w-full text-left rounded-xl transition-all duration-150 cursor-pointer group border ${
+          isSelected
+            ? "bg-bg-surface border-border-default shadow-sm"
+            : "border-transparent hover:bg-bg-surface/40"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={onSelect}
+          className="w-full text-left px-3 py-2.5"
+        >
+          <div className="flex items-start gap-2.5">
+            <div className="h-8 w-8 rounded-full flex items-center justify-center bg-amber-500/10 text-amber-500 shrink-0">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2 mb-0.5">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="truncate text-sm font-semibold text-text-primary">
+                    {summary}
+                  </span>
+                  <span className="text-[9px] px-1.5 py-0.5 bg-amber-500/5 text-amber-600 border border-amber-500/20 rounded-md font-medium">
+                    Event
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {eventTimeText && (
+                    <span className="text-[11px] text-text-tertiary tabular-nums">
+                      {eventTimeText}
+                    </span>
+                  )}
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold border ${similarityColor}`}>
+                    {matchPct}% match
+                  </span>
+                </div>
+              </div>
+              <p className="truncate text-[12.5px] leading-snug font-medium text-text-secondary">
+                {location ? `📍 ${location}` : "No Location"}
+              </p>
+              {description && (
+                <p className="truncate text-xs text-text-tertiary mt-0.5 leading-relaxed">
+                  {description}
+                </p>
+              )}
+            </div>
+          </div>
+        </button>
+      </div>
+    );
+  }
+}
+
+function EventDetail({
+  event,
+  onClose,
+}: {
+  event: SearchResult;
+  onClose: () => void;
+}) {
+  const details = event.details;
+  const summary = details.summary || "Untitled Event";
+  const description = details.description || "";
+  const location = details.location || "";
+  const attendees = details.attendees || [];
+  
+  let dateText = "";
+  let timeText = "";
+  if (details.start) {
+    const startDt = new Date(details.start);
+    const endDt = details.end ? new Date(details.end) : null;
+    if (!isNaN(startDt.getTime())) {
+      dateText = startDt.toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+      const fmtTime = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      timeText = endDt && !isNaN(endDt.getTime())
+        ? `${fmtTime(startDt)} - ${fmtTime(endDt)}`
+        : fmtTime(startDt);
+    }
+  }
+
+  const mapLink = location ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}` : null;
+
+  return (
+    <div className="flex flex-col h-full bg-bg-base overflow-y-auto animate-fade-in">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle bg-bg-surface/30 backdrop-blur-md sticky top-0 z-10">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] px-2 py-0.5 bg-amber-500/10 text-amber-600 border border-amber-500/20 rounded-md font-bold uppercase tracking-wider">
+            Calendar Event
+          </span>
+          {event.similarity !== undefined && (
+            <span className="text-[10px] px-2 py-0.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-md font-bold">
+              {Math.min(100, Math.max(0, Math.round(event.similarity * 100)))}% match
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-bg-surface transition-all cursor-pointer"
+          title="Close detail view"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="flex-1 p-6 max-w-3xl mx-auto w-full space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary leading-tight">
+            {summary}
+          </h1>
+          {event.emailAddress && (
+            <p className="text-xs text-text-tertiary mt-1">
+              Organizer: <span className="font-medium">{event.emailAddress}</span>
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-start gap-3 p-4 bg-bg-raised/45 rounded-xl border border-border-subtle">
+          <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 shrink-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">{dateText || "Date TBD"}</h3>
+            <p className="text-xs text-text-secondary mt-0.5">{timeText || "Time TBD"}</p>
+          </div>
+        </div>
+
+        {location && (
+          <div className="flex items-start gap-3 p-4 bg-bg-raised/45 rounded-xl border border-border-subtle">
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 shrink-0">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold text-text-primary">Location</h3>
+              <p className="text-xs text-text-secondary mt-0.5 truncate">{location}</p>
+              {mapLink && (
+                <a
+                  href={mapLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent-primary hover:underline mt-1.5"
+                >
+                  Open in Google Maps
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+
+        {description && (
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">Description</h3>
+            <div className="text-sm text-text-secondary leading-relaxed bg-bg-raised/20 border border-border-subtle rounded-xl p-4 whitespace-pre-wrap">
+              {description}
+            </div>
+          </div>
+        )}
+
+        {attendees.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
+              Attendees ({attendees.length})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {attendees.map((attendee: any, idx: number) => {
+                const displayName = attendee.displayName || attendee.email?.split("@")[0] || "Unknown Attendee";
+                const email = attendee.email || "";
+                
+                const status = attendee.responseStatus || "needsAction";
+                const statusColors = 
+                  status === "accepted" 
+                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
+                    : status === "declined"
+                    ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                    : status === "tentative"
+                    ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                    : "bg-text-tertiary/10 text-text-tertiary border border-border-default";
+
+                return (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2.5 p-2 rounded-xl border border-border-subtle/60 bg-bg-raised/15"
+                  >
+                    <SenderAvatar name={displayName} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-text-primary truncate" title={displayName}>
+                        {displayName}
+                      </p>
+                      {email && (
+                        <p className="text-[10px] text-text-tertiary truncate" title={email}>
+                          {email}
+                        </p>
+                      )}
+                    </div>
+                    <span className={`text-[8.5px] px-1.5 py-0.5 rounded-md font-bold uppercase shrink-0 ${statusColors}`}>
+                      {status === "needsAction" ? "no reply" : status}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Page Component
 // ---------------------------------------------------------------------------
 
@@ -1238,6 +1594,35 @@ export default function InboxPage() {
   const [priorityInput, setPriorityInput] = useState("");
   const [isEditingRules, setIsEditingRules] = useState(false);
   const [selectedEmailFilter, setSelectedEmailFilter] = useState<string>("all");
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchType, setSearchType] = useState<"all" | "threads" | "events">("all");
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "/" && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      if (e.key === "Escape") {
+        if (document.activeElement === searchInputRef.current) {
+          searchInputRef.current?.blur();
+        }
+        setSearchQuery("");
+        setSelectedEventId(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const { data: searchResults, isLoading: isSearchLoading } = api.search.searchLocal.useQuery(
+    { query: searchQuery, entityType: searchType },
+    { enabled: searchQuery.trim().length >= 2 }
+  );
   const toast = useToast();
 
   const utils = api.useUtils();
@@ -1318,7 +1703,13 @@ export default function InboxPage() {
   });
 
   const selectedThread =
-    threads?.find((t) => t.id === selectedThreadId) ?? null;
+    threads?.find((t) => t.id === selectedThreadId) ??
+    (searchResults?.find((r) => r.id === selectedThreadId && r.entityType === "threads") as any) ??
+    null;
+
+  const selectedEvent =
+    searchResults?.find((r) => r.id === selectedEventId && r.entityType === "events") ??
+    null;
 
   const syncInbox = api.gmail.syncInbox.useMutation({
     onSuccess: () => {
@@ -1481,6 +1872,75 @@ export default function InboxPage() {
             />
           </button>
         </div>
+
+        {/* Search Bar */}
+        {gmailStatus?.connected && (
+          <div className="px-3 py-2 border-b border-border-subtle bg-bg-raised/50 flex flex-col gap-2 relative">
+            <div className="flex items-center gap-1.5">
+              <SearchInput
+                ref={searchInputRef}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onClear={() => {
+                  setSearchQuery("");
+                  setSelectedEventId(null);
+                }}
+                placeholder="Semantic search (e.g. 'flight bookings', 'Chase statement')..."
+                shortcutHint="/"
+                className="flex-1"
+              />
+              <button
+                type="button"
+                onClick={() => setIsSearchDropdownOpen(!isSearchDropdownOpen)}
+                className={`p-2 rounded-[var(--radius-md)] border transition-all duration-150 flex items-center justify-center shrink-0 ${
+                  isSearchDropdownOpen || searchType !== "all"
+                    ? "bg-bg-surface border-border-default text-text-primary shadow-sm"
+                    : "bg-transparent border-transparent text-text-tertiary hover:text-text-primary hover:bg-bg-surface"
+                }`}
+                title="Search filters"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Glassmorphic Search Filters Dropdown */}
+            {isSearchDropdownOpen && (
+              <div className="absolute top-[48px] right-3 z-50 w-48 rounded-[var(--radius-lg)] border border-border-default bg-bg-surface/90 backdrop-blur-md p-2 shadow-xl animate-fade-in flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary px-2.5 py-1.5">
+                  Filter Search Type
+                </span>
+                {[
+                  { value: "all", label: "All Content" },
+                  { value: "threads", label: "Emails Only" },
+                  { value: "events", label: "Calendar Only" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setSearchType(opt.value as any);
+                      setIsSearchDropdownOpen(false);
+                    }}
+                    className={`flex items-center justify-between px-2.5 py-1.5 text-xs font-semibold rounded-[var(--radius-md)] text-left transition-all ${
+                      searchType === opt.value
+                        ? "bg-accent-primary/10 text-accent-primary"
+                        : "text-text-secondary hover:text-text-primary hover:bg-bg-inset"
+                    }`}
+                  >
+                    {opt.label}
+                    {searchType === opt.value && (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tabs */}
         {gmailStatus?.connected && threads && threads.length > 0 && (
@@ -1680,7 +2140,57 @@ export default function InboxPage() {
 
         {/* Thread List */}
         <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
+          {searchQuery.trim().length >= 2 ? (
+            isSearchLoading ? (
+              <ThreadListSkeleton />
+            ) : !searchResults || searchResults.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full gap-4 px-6 text-center animate-fade-in">
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-bg-surface border border-border-default text-text-tertiary">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-sm font-bold text-text-primary">
+                    No results found
+                  </p>
+                  <p className="text-xs text-text-tertiary leading-relaxed max-w-[220px]">
+                    We couldn't find any local emails or events matching "{searchQuery}".
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-0.5 p-1.5 animate-fade-in">
+                <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary flex items-center justify-between border-b border-border-subtle/50 pb-1.5 mb-1.5">
+                  <span>Semantic Matches</span>
+                  <span>{searchResults.length} items</span>
+                </div>
+                {searchResults.map((result) => {
+                  const isSelected = 
+                    result.entityType === "threads" 
+                      ? result.id === selectedThreadId 
+                      : result.id === selectedEventId;
+                  return (
+                    <SearchResultListItem
+                      key={result.id}
+                      result={result}
+                      isSelected={isSelected}
+                      onSelect={() => {
+                        if (result.entityType === "threads") {
+                          setSelectedThreadId(result.id);
+                          setSelectedEventId(null);
+                        } else {
+                          setSelectedEventId(result.id);
+                          setSelectedThreadId(null);
+                        }
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            )
+          ) : isLoading ? (
             <ThreadListSkeleton />
           ) : error ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 px-6 text-center">
@@ -1814,7 +2324,7 @@ export default function InboxPage() {
         </div>
       </div>
 
-      {/* ---- Right Panel: Thread Detail ---- */}
+      {/* ---- Right Panel: Thread/Event Detail ---- */}
       <div className="flex-1 flex flex-col bg-bg-base min-w-0">
         {selectedThread ? (
           <ThreadDetail
@@ -1823,6 +2333,11 @@ export default function InboxPage() {
             onDelete={handleDelete}
             isArchiving={archiveMutation.isPending}
             isDeleting={deleteMutation.isPending}
+          />
+        ) : selectedEvent ? (
+          <EventDetail
+            event={selectedEvent}
+            onClose={() => setSelectedEventId(null)}
           />
         ) : (
           <div className="flex flex-col items-center justify-center h-full gap-4 animate-fade-in">
