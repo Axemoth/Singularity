@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { authClient } from "@/server/better-auth/client";
 import { Button } from "@/app/_components/ui/button";
+import { Tooltip } from "@/app/_components/ui/tooltip";
 import { FormattedMessage } from "@/app/_components/agent/formatted-message";
 
 type AgentAction = RouterOutputs["agent"]["chat"]["actions"][number];
@@ -890,7 +891,7 @@ function AgentPageContent() {
     submitMessage();
   };
 
-  const runAction = async (action: AgentAction) => {
+  const runAction = async (action: AgentAction, saveAsDraftOverride?: boolean) => {
     if (action.type === "open_route") {
       router.push(action.href);
       return;
@@ -958,6 +959,14 @@ function AgentPageContent() {
         });
         saveThreadsToStorage(updated);
       }
+      return;
+    }
+
+    if (action.type === "confirm_bulk_email") {
+      confirmAction.mutate({
+        ...action,
+        saveAsDraft: saveAsDraftOverride,
+      });
       return;
     }
 
@@ -1155,7 +1164,7 @@ function AgentPageContent() {
                               key={`${message.id}-${action.type}-${actionIdx}`}
                               className="border border-border-subtle bg-bg-overlay rounded-xl p-5 shadow-sm max-w-xl animate-fade-in space-y-4"
                             >
-                              <div className="flex items-center justify-between border-b border-border-subtle pb-3">
+                              <div className="flex items-center justify-between border-b border-border-subtle pb-3 gap-3">
                                 <div className="min-w-0 pr-2">
                                   <h3 className="text-sm font-semibold text-text-primary flex items-center gap-1.5">
                                     <svg className="h-4 w-4 text-accent-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1167,16 +1176,28 @@ function AgentPageContent() {
                                     Broadcast to {action.recipients.length} recipients
                                   </p>
                                 </div>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="primary"
-                                  isLoading={confirmAction.isPending}
-                                  onClick={() => void runAction(action)}
-                                  className="cursor-pointer font-semibold shrink-0"
-                                >
-                                  Send Broadcast
-                                </Button>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="secondary"
+                                    isLoading={confirmAction.isPending}
+                                    onClick={() => void runAction(action, true)}
+                                    className="cursor-pointer font-semibold"
+                                  >
+                                    Save as Drafts
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="primary"
+                                    isLoading={confirmAction.isPending}
+                                    onClick={() => void runAction(action, false)}
+                                    className="cursor-pointer font-semibold"
+                                  >
+                                    Send Broadcast
+                                  </Button>
+                                </div>
                               </div>
 
                               <div className="space-y-3">
@@ -1492,16 +1513,17 @@ function AgentPageContent() {
 
                 <div className="flex items-center gap-2">
                   {/* File Upload Button */}
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="p-2 rounded-lg bg-bg-surface text-text-secondary border border-border-subtle hover:bg-bg-inset hover:text-text-primary transition-all cursor-pointer flex items-center justify-center shrink-0"
-                    title="Upload CSV contact list"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                    </svg>
-                  </button>
+                  <Tooltip content="Upload a CSV" position="top">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-2 rounded-lg bg-bg-surface text-text-secondary border border-border-subtle hover:bg-bg-inset hover:text-text-primary transition-all cursor-pointer flex items-center justify-center shrink-0"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      </svg>
+                    </button>
+                  </Tooltip>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -1511,22 +1533,23 @@ function AgentPageContent() {
                   />
 
                   {/* Mic Button */}
-                  <button
-                    type="button"
-                    onClick={toggleListening}
-                    className={`p-2 rounded-lg transition-all border cursor-pointer flex items-center justify-center shrink-0 ${
-                      isListening
-                        ? "bg-red-500/10 text-red-500 border-red-500/35 hover:bg-red-500/20 animate-pulse"
-                        : "bg-bg-surface text-text-secondary border-border-subtle hover:bg-bg-inset hover:text-text-primary"
-                    }`}
-                    title={isListening ? "Stop listening" : "Start voice typing"}
-                  >
-                    {isListening ? (
-                      <MicStopIcon className="h-4 w-4" />
-                    ) : (
-                      <MicIcon className="h-4 w-4" />
-                    )}
-                  </button>
+                  <Tooltip content={isListening ? "Stop listening" : "Start voice typing"} position="top">
+                    <button
+                      type="button"
+                      onClick={toggleListening}
+                      className={`p-2 rounded-lg transition-all border cursor-pointer flex items-center justify-center shrink-0 ${
+                        isListening
+                          ? "bg-red-500/10 text-red-500 border-red-500/35 hover:bg-red-500/20 animate-pulse"
+                          : "bg-bg-surface text-text-secondary border-border-subtle hover:bg-bg-inset hover:text-text-primary"
+                      }`}
+                    >
+                      {isListening ? (
+                        <MicStopIcon className="h-4 w-4" />
+                      ) : (
+                        <MicIcon className="h-4 w-4" />
+                      )}
+                    </button>
+                  </Tooltip>
 
                   <Button
                     type="submit"

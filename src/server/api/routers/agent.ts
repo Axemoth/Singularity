@@ -83,6 +83,7 @@ const agentActionSchema = z.discriminatedUnion("type", [
         email: z.string(),
       })
     ),
+    saveAsDraft: z.boolean().optional(),
   }),
 ]);
 
@@ -1022,25 +1023,34 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
               personalizedBody = personalizedBody.replace(emailRegex, recipient.email);
 
               const raw = buildRawEmail(recipient.email, personalizedSubject, personalizedBody);
-              await tenant.gmail.api.messages.send({ raw });
+              if (input.saveAsDraft) {
+                await tenant.gmail.api.drafts.create({
+                  draft: {
+                    message: { raw },
+                  },
+                });
+              } else {
+                await tenant.gmail.api.messages.send({ raw });
+              }
               successCount++;
             } catch (err: any) {
               failureCount++;
               errors.push(`Failed for ${recipient.email}: ${err.message || err}`);
-              console.error(`Bulk send failure for ${recipient.email}:`, err);
+              console.error(`Bulk send/draft failure for ${recipient.email}:`, err);
             }
           }
 
           if (successCount === 0) {
             throw new TRPCError({
               code: "INTERNAL_SERVER_ERROR",
-              message: `Bulk broadcast failed completely. Errors: ${errors.slice(0, 3).join(", ")}`,
+              message: `Bulk operation failed completely. Errors: ${errors.slice(0, 3).join(", ")}`,
             });
           }
 
+          const actionVerb = input.saveAsDraft ? "created drafts for" : "broadcasted to";
           return {
             success: true,
-            message: `Successfully broadcasted to ${successCount} recipients.${
+            message: `Successfully ${actionVerb} ${successCount} recipients.${
               failureCount > 0
                 ? ` Failed for ${failureCount} recipients. Errors: ${errors.slice(0, 3).join(", ")}`
                 : ""
