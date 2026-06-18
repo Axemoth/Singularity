@@ -28,6 +28,14 @@ const agentContextSchema = z
     selectedEventId: z.string().optional(),
     selectedEntityIds: z.array(z.string()).optional(),
     targetEmail: z.string().optional(),
+    csvRecipients: z
+      .array(
+        z.object({
+          name: z.string(),
+          email: z.string(),
+        })
+      )
+      .optional(),
   })
   .optional();
 
@@ -64,6 +72,18 @@ const agentActionSchema = z.discriminatedUnion("type", [
     label: z.string(),
     threadIds: z.array(z.string().trim().min(1)).min(1).max(50),
   }),
+  z.object({
+    type: z.literal("confirm_bulk_email"),
+    label: z.string(),
+    subject: z.string(),
+    body: z.string(),
+    recipients: z.array(
+      z.object({
+        name: z.string(),
+        email: z.string(),
+      })
+    ),
+  }),
 ]);
 
 type AgentContext = z.infer<typeof agentContextSchema>;
@@ -83,18 +103,56 @@ function buildContextPrompt(context: AgentContext) {
     context.selectedEntityIds?.length
       ? `Selected entities: ${context.selectedEntityIds.join(", ")}`
       : null,
+    context.csvRecipients?.length
+      ? `Uploaded CSV Recipients List (names and emails to broadcast to): ${JSON.stringify(context.csvRecipients)}`
+      : null,
   ]
     .filter(Boolean)
     .join("\n");
 }
 
+function parseDraftFromText(text: string) {
+  const draftMatch = text.match(/---DRAFT_START---([\s\S]*?)---DRAFT_END---/i);
+  if (!draftMatch) return null;
+
+  const draftText = draftMatch[1] ?? "";
+  const subjectMatch = draftText.match(/Subject:[ \t]*(.*)/i);
+  const bodyMatch = draftText.match(/Body:\s*([\s\S]*)$/i);
+
+  let body = bodyMatch ? bodyMatch[1]?.trim() : "";
+  if (body) {
+    body = body.replace(/^```[a-z]*\n/i, "").replace(/\n```$/, "");
+  }
+
+  return {
+    subject: (subjectMatch ? subjectMatch[1]?.trim() : null) ?? "No Subject",
+    body: body ?? "",
+  };
+}
+
 function inferFrontendActions(
   message: string,
   context: AgentContext,
+  assistantResponse?: string,
 ): AgentAction[] {
   const normalized = message.toLowerCase();
   const actions: AgentAction[] = [];
   const selectedIds = context?.selectedEntityIds ?? [];
+
+  // If we have CSV recipients and the assistant proposed an email draft, return confirm_bulk_email action card
+  if (context?.csvRecipients?.length && assistantResponse) {
+    const draft = parseDraftFromText(assistantResponse);
+    if (draft) {
+      actions.push({
+        type: "confirm_bulk_email",
+        label: `Send bulk broadcast to ${context.csvRecipients.length} recipients`,
+        subject: draft.subject,
+        body: draft.body,
+        recipients: context.csvRecipients,
+      });
+      return actions;
+    }
+  }
 
   if (/\b(inbox|email|mail)\b/.test(normalized)) {
     actions.push({
@@ -686,7 +744,8 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
    <email body>
    ---DRAFT_END---
    Always keep conversational text outside of this block (preferably before it). This block allows the frontend to render the draft as an interactive, editable review card in the chat.
-7. Tool Confirmations: After successfully calling 'send_email' or 'create_draft', you MUST always output an explicit, friendly confirmation message to the user confirming the action was successful (e.g. 'I have successfully sent the email to [recipient] with the subject "[subject]".' or 'I have saved your draft for [recipient] with the subject "[subject]".'). Do NOT output an empty response.${targetEmailInstruction}${habitsInstruction}${connectionInstructions}${timeInstruction}`;
+7. Tool Confirmations: After successfully calling 'send_email' or 'create_draft', you MUST always output an explicit, friendly confirmation message to the user confirming the action was successful (e.g. 'I have successfully sent the email to [recipient] with the subject "[subject]".' or 'I have saved your draft for [recipient] with the subject "[subject]".'). Do NOT output an empty response.
+8. Bulk Email Broadcasting via CSV Uploads: If input.context contains 'Uploaded CSV Recipients List' (a list of recipients with names and emails), and the user asks to send or draft an email to all of them, do NOT call 'send_email' or 'create_draft' multiple times. Instead, you MUST propose the email draft template (wrapped inside ---DRAFT_START--- and ---DRAFT_END---) using variable tokens like '{name}' and '{email}' inside the draft body, and let the user review it. The frontend will automatically detect the draft and show a bulk broadcast action card so the user can send it to all recipients with one click.${targetEmailInstruction}${habitsInstruction}${connectionInstructions}${timeInstruction}`;
         const contextPrompt = buildContextPrompt(input.context);
 
         const historyMessages = (input.history ?? []).map((msg) => {
@@ -793,7 +852,7 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
         return {
           text: response.text,
           reasoning: (response as any).reasoning || null,
-          actions: inferFrontendActions(input.message, input.context),
+          actions: inferFrontendActions(input.message, input.context, response.text),
           sentEmail,
           createdDraft,
         };
@@ -896,6 +955,97 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
                   : `Moved ${threadAccounts.length} selected threads to trash.`,
             };
           }
+        }
+
+        if (input.type === "confirm_bulk_email") {
+          const recipients = input.recipients;
+          if (!recipients || recipients.length === 0) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Recipient list is empty.",
+            });
+          }
+
+          if (recipients.length > 200) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Bulk email list exceeds the limit of 200 recipients per broadcast.",
+            });
+          }
+
+          const { corsairAccounts, corsairIntegrations } = await import("@/server/db/schema");
+          const { eq, and, or, like } = await import("drizzle-orm");
+
+          // Ensure user has at least one Gmail connection
+          const gmailAccounts = await ctx.db
+            .select({
+              tenantId: corsairAccounts.tenantId,
+              emailAddress: corsairAccounts.emailAddress,
+            })
+            .from(corsairAccounts)
+            .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+            .where(
+              and(
+                eq(corsairIntegrations.name, "gmail"),
+                or(
+                  eq(corsairAccounts.tenantId, userId),
+                  like(corsairAccounts.tenantId, `${userId}\\_%`)
+                )
+              )
+            );
+
+          if (gmailAccounts.length === 0) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "Please connect your Gmail account under Settings first.",
+            });
+          }
+
+          const activeGmailTenantId = gmailAccounts[0]!.tenantId;
+          const tenant = corsair.withTenant(activeGmailTenantId);
+
+          let successCount = 0;
+          let failureCount = 0;
+          const errors: string[] = [];
+
+          for (const recipient of recipients) {
+            try {
+              let personalizedSubject = input.subject;
+              let personalizedBody = input.body;
+
+              const nameRegex = /\{name\}/gi;
+              personalizedSubject = personalizedSubject.replace(nameRegex, recipient.name);
+              personalizedBody = personalizedBody.replace(nameRegex, recipient.name);
+
+              const emailRegex = /\{email\}/gi;
+              personalizedSubject = personalizedSubject.replace(emailRegex, recipient.email);
+              personalizedBody = personalizedBody.replace(emailRegex, recipient.email);
+
+              const raw = buildRawEmail(recipient.email, personalizedSubject, personalizedBody);
+              await tenant.gmail.api.messages.send({ raw });
+              successCount++;
+            } catch (err: any) {
+              failureCount++;
+              errors.push(`Failed for ${recipient.email}: ${err.message || err}`);
+              console.error(`Bulk send failure for ${recipient.email}:`, err);
+            }
+          }
+
+          if (successCount === 0) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: `Bulk broadcast failed completely. Errors: ${errors.slice(0, 3).join(", ")}`,
+            });
+          }
+
+          return {
+            success: true,
+            message: `Successfully broadcasted to ${successCount} recipients.${
+              failureCount > 0
+                ? ` Failed for ${failureCount} recipients. Errors: ${errors.slice(0, 3).join(", ")}`
+                : ""
+            }`,
+          };
         }
 
         return {

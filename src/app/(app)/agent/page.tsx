@@ -131,7 +131,11 @@ function ThinkingBar() {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function actionNeedsConfirmation(action: AgentAction) {
-  return action.type === "confirm_archive_threads" || action.type === "confirm_delete_threads";
+  return (
+    action.type === "confirm_archive_threads" ||
+    action.type === "confirm_delete_threads" ||
+    action.type === "confirm_bulk_email"
+  );
 }
 
 function formatMessageTime(epochMs: number): string {
@@ -161,6 +165,163 @@ function parseOptionsAndCleanText(text: string) {
   return { cleanText, options };
 }
 
+function parseCSVRow(rowText: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < rowText.length; i++) {
+    const char = rowText[i];
+    if (char === '"' || char === "'") {
+      // handle escaped quote
+      if (inQuotes && rowText[i + 1] === char) {
+        current += char;
+        i++; // skip next quote
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+function parseCSV(text: string): {
+  recipients: { name: string; email: string }[];
+  errors: string[];
+  warnings: string[];
+} {
+  const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+  if (lines.length === 0) {
+    return { recipients: [], errors: ["The file is empty."], warnings: [] };
+  }
+
+  const parsedRows = lines.map(line => parseCSVRow(line));
+  const firstRow = parsedRows[0];
+  if (!firstRow || firstRow.length === 0) {
+    return { recipients: [], errors: ["No valid rows found in CSV."], warnings: [] };
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  // Heuristic: Check if first row contains a valid email.
+  const firstRowHasEmail = firstRow.some(cell => emailRegex.test(cell));
+
+  const hasHeaders = !firstRowHasEmail;
+  let emailColIndex = -1;
+  let nameColIndex = -1;
+
+  if (hasHeaders) {
+    // Search headers
+    const headers = firstRow.map(h => h.toLowerCase());
+    
+    // Look for email
+    emailColIndex = headers.findIndex(h => h === "email" || h === "mail" || h === "e-mail" || h === "email address" || h === "email_address");
+    if (emailColIndex === -1) {
+      emailColIndex = headers.findIndex(h => h.includes("email") || h.includes("mail"));
+    }
+
+    // Look for name
+    nameColIndex = headers.findIndex(h => h === "name" || h === "fullname" || h === "full name" || h === "firstname" || h === "first name" || h === "recipient");
+    if (nameColIndex === -1) {
+      nameColIndex = headers.findIndex(h => h.includes("name") || h.includes("user") || h.includes("contact"));
+    }
+  }
+
+  // Fallback: If column indices are not found or we don't have headers, inspect data rows to detect email column
+  const startDataRowIndex = hasHeaders ? 1 : 0;
+  
+  if (emailColIndex === -1) {
+    // Find the column that has the most cells matching emailRegex in the first 5 data rows
+    const colScores: Record<number, number> = {};
+    const sampleRows = parsedRows.slice(startDataRowIndex, startDataRowIndex + 5);
+    sampleRows.forEach(row => {
+      row.forEach((cell, idx) => {
+        if (emailRegex.test(cell)) {
+          colScores[idx] = (colScores[idx] || 0) + 1;
+        }
+      });
+    });
+
+    let bestColIndex = -1;
+    let maxScore = 0;
+    for (const [colIdxStr, score] of Object.entries(colScores)) {
+      const colIdx = parseInt(colIdxStr, 10);
+      if (score > maxScore) {
+        maxScore = score;
+        bestColIndex = colIdx;
+      }
+    }
+    emailColIndex = bestColIndex;
+  }
+
+  // If we still can't find an email column, default to index 1 or the last column if row length > 1, or 0 if row length is 1
+  if (emailColIndex === -1) {
+    const maxRowLength = Math.max(...parsedRows.map(r => r.length));
+    emailColIndex = maxRowLength > 1 ? 1 : 0;
+  }
+
+  // If name column is still not determined, pick the first column that isn't the email column
+  if (nameColIndex === -1 || nameColIndex === emailColIndex) {
+    const maxRowLength = Math.max(...parsedRows.map(r => r.length));
+    nameColIndex = -1;
+    for (let i = 0; i < maxRowLength; i++) {
+      if (i !== emailColIndex) {
+        nameColIndex = i;
+        break;
+      }
+    }
+    // If there's only 1 column, nameColIndex remains -1 (we will default name to email)
+  }
+
+  const recipients: { name: string; email: string }[] = [];
+  const warnings: string[] = [];
+  const errors: string[] = [];
+
+  for (let i = startDataRowIndex; i < parsedRows.length; i++) {
+    const row = parsedRows[i];
+    if (!row || row.length === 0 || (row.length === 1 && row[0] === "")) {
+      continue; // Skip empty rows silently
+    }
+
+    const rawEmail = row[emailColIndex]?.trim() || "";
+    let name = nameColIndex !== -1 ? row[nameColIndex]?.trim() : "";
+
+    // Validation checks
+    if (!rawEmail) {
+      warnings.push(`Row ${i + 1}: Email field is empty.`);
+      continue;
+    }
+
+    if (!emailRegex.test(rawEmail)) {
+      warnings.push(`Row ${i + 1}: "${rawEmail}" is not a valid email address.`);
+      continue;
+    }
+
+    // Clean name: if name is empty, default to email username (part before @)
+    if (!name) {
+      name = rawEmail.split("@")[0] || "Recipient";
+    }
+
+    recipients.push({ name, email: rawEmail });
+  }
+
+  if (recipients.length === 0) {
+    errors.push("No valid recipients parsed from the CSV.");
+  }
+
+  if (recipients.length > 200) {
+    warnings.push("Only the first 200 recipients will be imported. Please limit your list to 200 emails per broadcast.");
+    recipients.splice(200);
+  }
+
+  return { recipients, errors, warnings };
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 function AgentPageContent() {
@@ -177,6 +338,13 @@ function AgentPageContent() {
   const [isReasoningEnabled, setIsReasoningEnabled] = useState(false);
   const [customInputMsgId, setCustomInputMsgId] = useState<string | null>(null);
   const [customInputVal, setCustomInputVal] = useState("");
+
+  // CSV upload states
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [csvRecipients, setCsvRecipients] = useState<{ name: string; email: string }[] | null>(null);
+  const [csvFileName, setCsvFileName] = useState<string | null>(null);
+  const [csvParseError, setCsvParseError] = useState<string | null>(null);
+  const [csvParseWarnings, setCsvParseWarnings] = useState<string[]>([]);
 
   // Speech Recognition States & Refs
   const [isListening, setIsListening] = useState(false);
@@ -443,6 +611,14 @@ function AgentPageContent() {
     setThreads(loadedThreads);
   }, [userId, searchParams]);
 
+  // Clear CSV upload states when switching threads
+  useEffect(() => {
+    setCsvRecipients(null);
+    setCsvFileName(null);
+    setCsvParseError(null);
+    setCsvParseWarnings([]);
+  }, [activeThreadId]);
+
   // Save threads to localStorage on change
   const saveThreadsToStorage = useCallback((updatedThreads: ChatThread[]) => {
     if (!userId) return;
@@ -541,6 +717,10 @@ function AgentPageContent() {
       });
 
       saveThreadsToStorage(updated);
+      setCsvRecipients(null);
+      setCsvFileName(null);
+      setCsvParseError(null);
+      setCsvParseWarnings([]);
       await utils.gmail.listThreads.invalidate();
       await utils.calendar.listEvents.invalidate();
     },
@@ -657,10 +837,53 @@ function AgentPageContent() {
       context: {
         route: "/agent",
         targetEmail: targetEmail ?? undefined,
+        csvRecipients: csvRecipients ?? undefined,
       },
       reasoningEnabled: isReasoningEnabled,
     });
-  }, [input, activeThreadId, activeThread, threads, chatMutation, saveThreadsToStorage, isReasoningEnabled, targetEmail]);
+  }, [input, activeThreadId, activeThread, threads, chatMutation, saveThreadsToStorage, isReasoningEnabled, targetEmail, csvRecipients]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCsvRecipients(null);
+    setCsvFileName(null);
+    setCsvParseError(null);
+    setCsvParseWarnings([]);
+
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setCsvParseError("Only CSV files are supported.");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setCsvParseError("File size exceeds 2MB limit.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      try {
+        const { recipients, errors, warnings } = parseCSV(text);
+        if (errors.length > 0) {
+          setCsvParseError(errors[0] || "Failed to parse CSV file.");
+        } else {
+          setCsvRecipients(recipients);
+          setCsvFileName(file.name);
+          setCsvParseWarnings(warnings);
+        }
+      } catch (err: any) {
+        setCsvParseError(`Parsing error: ${err.message || err}`);
+      }
+    };
+    reader.onerror = () => {
+      setCsvParseError("Failed to read the file.");
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -925,34 +1148,109 @@ function AgentPageContent() {
                   {/* Actions */}
                   {message.actions?.length ? (
                     <div className="space-y-2 mt-1">
-                      {message.actions.map((action, actionIdx) => (
-                        <div
-                          key={`${message.id}-${action.type}-${actionIdx}`}
-                          className="border-border-subtle bg-bg-overlay rounded-xl border p-4 shadow-sm max-w-xl animate-fade-in"
-                        >
-                          <div className="flex items-center justify-between gap-4">
-                            <div>
-                              <p className="text-text-primary text-sm font-semibold">
-                                {action.label}
-                              </p>
-                              <p className="text-text-tertiary mt-1 text-xs leading-relaxed">
-                                {actionNeedsConfirmation(action)
-                                  ? "Requires your approval before modifying external accounts."
-                                  : "Executes in current session context."}
-                              </p>
-                            </div>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant={actionNeedsConfirmation(action) ? "danger" : "secondary"}
-                              isLoading={confirmAction.isPending}
-                              onClick={() => void runAction(action)}
+                      {message.actions.map((action, actionIdx) => {
+                        if (action.type === "confirm_bulk_email") {
+                          return (
+                            <div
+                              key={`${message.id}-${action.type}-${actionIdx}`}
+                              className="border border-border-subtle bg-bg-overlay rounded-xl p-5 shadow-sm max-w-xl animate-fade-in space-y-4"
                             >
-                              {actionNeedsConfirmation(action) ? "Approve" : "Run"}
-                            </Button>
+                              <div className="flex items-center justify-between border-b border-border-subtle pb-3">
+                                <div className="min-w-0 pr-2">
+                                  <h3 className="text-sm font-semibold text-text-primary flex items-center gap-1.5">
+                                    <svg className="h-4 w-4 text-accent-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                    </svg>
+                                    Bulk Review & Send
+                                  </h3>
+                                  <p className="text-xs text-text-tertiary mt-0.5 truncate">
+                                    Broadcast to {action.recipients.length} recipients
+                                  </p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="primary"
+                                  isLoading={confirmAction.isPending}
+                                  onClick={() => void runAction(action)}
+                                  className="cursor-pointer font-semibold shrink-0"
+                                >
+                                  Send Broadcast
+                                </Button>
+                              </div>
+
+                              <div className="space-y-3">
+                                <div>
+                                  <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block mb-1">
+                                    Subject Template
+                                  </label>
+                                  <div className="bg-bg-inset border border-border-subtle rounded-lg px-3 py-2 text-xs font-semibold text-text-primary">
+                                    {action.subject}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block mb-1">
+                                    Body Template
+                                  </label>
+                                  <div className="bg-bg-inset border border-border-subtle rounded-lg px-3 py-2 text-xs text-text-secondary whitespace-pre-wrap font-sans max-h-48 overflow-y-auto leading-relaxed">
+                                    {action.body}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block mb-1 flex items-center justify-between">
+                                    <span>Recipients List</span>
+                                    <span className="text-[9px] text-text-tertiary font-normal uppercase tracking-normal">Scroll to view</span>
+                                  </label>
+                                  <div className="bg-bg-inset border border-border-subtle rounded-lg divide-y divide-border-subtle/50 text-xs text-text-secondary max-h-36 overflow-y-auto">
+                                    {action.recipients.map((r, rIdx) => (
+                                      <div key={rIdx} className="flex justify-between px-3 py-2 gap-4">
+                                        <span className="font-semibold text-text-primary truncate" title={r.name}>
+                                          {r.name}
+                                        </span>
+                                        <span className="text-text-tertiary font-mono truncate" title={r.email}>
+                                          {r.email}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // Default action card
+                        return (
+                          <div
+                            key={`${message.id}-${action.type}-${actionIdx}`}
+                            className="border-border-subtle bg-bg-overlay rounded-xl border p-4 shadow-sm max-w-xl animate-fade-in"
+                          >
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <p className="text-text-primary text-sm font-semibold">
+                                  {action.label}
+                                </p>
+                                <p className="text-text-tertiary mt-1 text-xs leading-relaxed">
+                                  {actionNeedsConfirmation(action)
+                                    ? "Requires your approval before modifying external accounts."
+                                    : "Executes in current session context."}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={actionNeedsConfirmation(action) ? "danger" : "secondary"}
+                                isLoading={confirmAction.isPending}
+                                onClick={() => void runAction(action)}
+                              >
+                                {actionNeedsConfirmation(action) ? "Approve" : "Run"}
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>
@@ -1045,6 +1343,78 @@ function AgentPageContent() {
                   </button>
                 </div>
               )}
+
+              {/* CSV Attachment Chip & Parser Alerts */}
+              {csvFileName && (
+                <div className="flex flex-col gap-1.5 mb-1 animate-fade-in shrink-0">
+                  <div className="flex items-center justify-between bg-bg-surface border border-border-subtle rounded-lg px-2.5 py-1.5 text-[11px] font-medium">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-accent-primary shrink-0">
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </span>
+                      <span className="font-semibold text-text-primary truncate">
+                        {csvFileName}
+                      </span>
+                      <span className="text-text-tertiary font-normal shrink-0">
+                        ({csvRecipients?.length || 0} recipients)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCsvRecipients(null);
+                        setCsvFileName(null);
+                        setCsvParseError(null);
+                        setCsvParseWarnings([]);
+                      }}
+                      className="text-text-tertiary hover:text-text-primary hover:bg-bg-inset p-0.5 rounded transition-colors cursor-pointer"
+                      title="Remove CSV file"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  {csvParseWarnings.length > 0 && (
+                    <div className="text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/15 rounded-lg px-2.5 py-1.5 space-y-0.5 max-h-20 overflow-y-auto">
+                      <div className="font-semibold flex items-center gap-1">
+                        <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        CSV warnings:
+                      </div>
+                      <ul className="list-disc pl-3.5 space-y-0.5">
+                        {csvParseWarnings.map((warn, i) => (
+                          <li key={i}>{warn}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {csvParseError && (
+                <div className="text-[11px] text-red-500 bg-red-500/10 border border-red-500/15 rounded-lg px-2.5 py-1.5 mb-1 animate-fade-in flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="truncate">{csvParseError}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCsvParseError(null)}
+                    className="text-text-tertiary hover:text-text-primary p-0.5 rounded transition-colors cursor-pointer"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+
               <textarea
                 ref={inputRef}
                 value={input}
@@ -1121,6 +1491,25 @@ function AgentPageContent() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {/* File Upload Button */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 rounded-lg bg-bg-surface text-text-secondary border border-border-subtle hover:bg-bg-inset hover:text-text-primary transition-all cursor-pointer flex items-center justify-center shrink-0"
+                    title="Upload CSV contact list"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                    </svg>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+
                   {/* Mic Button */}
                   <button
                     type="button"
