@@ -246,7 +246,6 @@ export default function LandingPage() {
   const [habitsStyle, setHabitsStyle] = useState<"concise" | "detailed">("concise");
   const [habitsGreeting, setHabitsGreeting] = useState<"casual" | "formal">("casual");
   const [habitsSignoff, setHabitsSignoff] = useState<"casual" | "formal">("casual");
-
   const mockEmails = [
     {
       from: "GitHub",
@@ -254,7 +253,10 @@ export default function LandingPage() {
       unread: true,
       time: "2m",
       body: "Your project singularity is live on production! All 14 checks passed successfully. Click to inspect log details.",
-      aiReply: "Thanks for the notification. The logs look pristine, and we are seeing great performance. Keep up the excellent work!"
+      aiReply: "Thanks for the notification. The logs look pristine, and we are seeing great performance. Keep up the excellent work!",
+      priority: "low" as const,
+      emailAddress: "work@singularity.app",
+      reason: "Automated deployment notice"
     },
     {
       from: "Notion Support",
@@ -262,15 +264,21 @@ export default function LandingPage() {
       unread: true,
       time: "1h",
       body: "Here are updates from your workspace. 12 pages modified by Team Singularity. Key updates: 'Landing page redesign proposal'.",
-      aiReply: "Got the updates! Thanks for compiles. I will review the proposal before Q3 planning."
+      aiReply: "Got the updates! Thanks for compiles. I will review the proposal before Q3 planning.",
+      priority: "low" as const,
+      emailAddress: "personal@gmail.com",
+      reason: "Automated activity summary newsletter"
     },
     {
       from: "Linear",
       subj: "Issue SNG-142 resolved",
       unread: false,
       time: "3h",
-      body: "Closed by lead developer. Summary: Fix agent multi-choice button compatibility and reasoning log structures.",
-      aiReply: "Excellent work on this fix. The reasoning log fix is resolving our API latency perfectly."
+      body: "Closed by lead developer. Summary: Fix agent compatibility and reasoning log structures.",
+      aiReply: "Excellent work on this fix. The reasoning log fix is resolving our API latency perfectly.",
+      priority: "normal" as const,
+      emailAddress: "work@singularity.app",
+      reason: "Colleague activity on closed ticket"
     },
     {
       from: "Dev Team",
@@ -278,7 +286,10 @@ export default function LandingPage() {
       unread: false,
       time: "5h",
       body: "Should we schedule the planning meeting for Tuesday morning? I can send over the Agenda doc.",
-      aiReply: "Tuesday morning works perfect. Send over the agenda document and I will add it to the calendar."
+      aiReply: "Tuesday morning works perfect. Send over the agenda document and I will add it to the calendar.",
+      priority: "urgent" as const,
+      emailAddress: "work@singularity.app",
+      reason: "High-priority meeting scheduling request"
     }
   ];
 
@@ -454,37 +465,37 @@ export default function LandingPage() {
                 <span className="ml-3 text-xs font-medium text-text-tertiary">singularity.app/workspace</span>
               </div>
 
-              {/* View / Tab Switcher */}
+              {/* View / Tab Switcher (Visible on mobile/fallback) */}
               <div className="flex items-center rounded-lg bg-bg-base p-1 border border-border-subtle flex-wrap sm:flex-nowrap gap-1">
                 <button
                   onClick={() => { setActiveTab("inbox"); }}
-                  className={`rounded px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                  className={`rounded px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
                     activeTab === "inbox" 
                       ? "bg-bg-raised text-text-primary shadow-xs" 
                       : "text-text-secondary hover:text-text-primary"
                   }`}
                 >
-                  Gmail Inbox
+                  Inbox
                 </button>
                 <button
                   onClick={() => { setActiveTab("calendar"); }}
-                  className={`rounded px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                  className={`rounded px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
                     activeTab === "calendar" 
                       ? "bg-bg-raised text-text-primary shadow-xs" 
                       : "text-text-secondary hover:text-text-primary"
                   }`}
                 >
-                  Calendar View
+                  Calendar
                 </button>
                 <button
                   onClick={() => { setActiveTab("habits"); }}
-                  className={`rounded px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                  className={`rounded px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
                     activeTab === "habits" 
                       ? "bg-bg-raised text-text-primary shadow-xs" 
                       : "text-text-secondary hover:text-text-primary"
                   }`}
                 >
-                  AI Persona & Habits
+                  Settings
                 </button>
               </div>
             </div>
@@ -492,43 +503,115 @@ export default function LandingPage() {
             {/* Simulated app workspace */}
             <div className="flex h-[460px] w-full bg-bg-base text-left">
               
-              {/* Mockup Sidebar */}
-              <div className="hidden w-52 flex-col border-r border-border-subtle bg-bg-raised p-4 sm:flex shrink-0">
-                <div className="mb-6 flex items-center gap-2 px-2">
-                  <div className="h-6 w-6 rounded bg-bg-surface border border-border-default flex items-center justify-center text-text-primary font-bold">
-                    S
+              {/* Mockup Sidebar - faithful to Sidebar.tsx */}
+              <div className="hidden w-16 flex-col items-center border-r border-border-subtle bg-bg-raised py-4 sm:flex shrink-0 justify-between">
+                <div className="flex flex-col items-center gap-1.5 w-full">
+                  {/* Logo */}
+                  <div className="mb-4 flex h-9 w-9 overflow-hidden items-center justify-center rounded-xl bg-accent-primary text-text-inverse select-none">
+                    <img src="/logo.png" alt="Singularity Logo" className="h-full w-full object-cover" />
                   </div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">Workspace</span>
-                </div>
 
-                <div className="space-y-1">
-                  {[
-                    { label: "Inbox", icon: "📥", tab: "inbox" },
-                    { label: "Calendar", icon: "📅", tab: "calendar" },
-                    { label: "AI Habits", icon: "🧠", tab: "habits" },
-                  ].map((item) => (
+                  {/* Compose Button Mock */}
+                  <div className="mb-5 flex h-9 w-9 items-center justify-center rounded-xl bg-accent-primary text-text-inverse shadow-sm opacity-90 cursor-default">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                    </svg>
+                  </div>
+
+                  {/* Navigation */}
+                  <nav className="flex flex-col items-center gap-1.5 w-full">
+                    {/* Inbox Nav Icon */}
                     <button
-                      key={item.label}
-                      onClick={() => { setActiveTab(item.tab as "inbox" | "calendar" | "habits"); }}
-                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
-                        activeTab === item.tab 
-                          ? "bg-bg-surface text-text-primary border border-border-default shadow-xs" 
-                          : "text-text-secondary hover:bg-bg-surface hover:text-text-primary"
+                      onClick={() => setActiveTab("inbox")}
+                      aria-label="Inbox"
+                      className={`relative flex h-10 w-10 items-center justify-center rounded-xl transition-all cursor-pointer ${
+                        activeTab === "inbox"
+                          ? "bg-accent-primary/15 text-accent-primary"
+                          : "text-text-tertiary hover:bg-bg-surface hover:text-text-secondary"
                       }`}
                     >
-                      <span>{item.icon}</span>
-                      <span>{item.label}</span>
+                      {activeTab === "inbox" && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-accent-primary" />
+                      )}
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859M12 3v8.25m0 0l-3-3m3 3l3-3" />
+                      </svg>
                     </button>
-                  ))}
-                  <div className="pt-4 pb-2 px-3 text-[10px] font-bold tracking-wider text-text-tertiary uppercase">AI assistant</div>
-                  <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold text-text-secondary hover:bg-bg-surface hover:text-text-primary">
-                    <span>✨</span>
-                    <span>AI Chat</span>
+
+                    {/* Calendar Nav Icon */}
+                    <button
+                      onClick={() => setActiveTab("calendar")}
+                      aria-label="Calendar"
+                      className={`relative flex h-10 w-10 items-center justify-center rounded-xl transition-all cursor-pointer ${
+                        activeTab === "calendar"
+                          ? "bg-accent-primary/15 text-accent-primary"
+                          : "text-text-tertiary hover:bg-bg-surface hover:text-text-secondary"
+                      }`}
+                    >
+                      {activeTab === "calendar" && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-accent-primary" />
+                      )}
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                      </svg>
+                    </button>
+
+                    {/* Agent Chat Nav Icon */}
+                    <button
+                      onClick={() => setActiveTab("inbox")}
+                      aria-label="Agent Chat"
+                      className="relative flex h-10 w-10 items-center justify-center rounded-xl text-text-tertiary hover:bg-bg-surface hover:text-text-secondary transition-all cursor-pointer"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.091-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.091L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.091 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.091ZM18.25 8.25 18 9.25l-.25-1a2 2 0 0 0-1.25-1.25l-1-.25 1-.25a2 2 0 0 0 1.25-1.25l.25-1 .25 1a2 2 0 0 0 1.25 1.25l1 .25-1 .25a2 2 0 0 0-1.25 1.25ZM17.5 20l-.5 1.75L16.5 20a2.5 2.5 0 0 0-1.75-1.75L13 17.75l1.75-.5A2.5 2.5 0 0 0 16.5 15.5l.5-1.75.5 1.75a2.5 2.5 0 0 0 1.75 1.75l1.75.5-1.75.5A2.5 2.5 0 0 0 17.5 20Z" />
+                      </svg>
+                    </button>
+                  </nav>
+                </div>
+
+                <div className="flex flex-col items-center gap-1.5 w-full">
+                  {/* Shortcuts icon */}
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl text-text-tertiary hover:bg-bg-surface hover:text-text-secondary cursor-default">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                    </svg>
+                  </div>
+
+                  {/* Settings tab icon */}
+                  <button
+                    onClick={() => setActiveTab("habits")}
+                    aria-label="Settings"
+                    className={`relative flex h-10 w-10 items-center justify-center rounded-xl transition-all cursor-pointer ${
+                      activeTab === "habits"
+                        ? "bg-accent-primary/15 text-accent-primary"
+                        : "text-text-tertiary hover:bg-bg-surface hover:text-text-secondary"
+                    }`}
+                  >
+                    {activeTab === "habits" && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-accent-primary" />
+                    )}
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+                    </svg>
                   </button>
-                  <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold text-text-secondary hover:bg-bg-surface hover:text-text-primary">
-                    <span>⚙️</span>
-                    <span>Settings</span>
-                  </button>
+
+                  {/* Theme icon indicator */}
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl text-text-tertiary">
+                    {theme === "dark" ? (
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+                      </svg>
+                    ) : (
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+                      </svg>
+                    )}
+                  </div>
+
+                  {/* Avatar indicator */}
+                  <div className="mt-1 flex h-7 w-7 items-center justify-center rounded-full bg-accent-primary text-text-inverse text-[10px] font-bold select-none cursor-default">
+                    U
+                  </div>
                 </div>
               </div>
 
@@ -537,50 +620,140 @@ export default function LandingPage() {
                 <>
                   {/* Email List Column */}
                   <div className="flex w-full flex-col border-r border-border-subtle bg-bg-raised md:w-80 shrink-0">
-                    <div className="border-b border-border-subtle px-4 py-3.5 flex items-center justify-between">
-                      <span className="text-xs font-bold text-text-primary">Primary Inbox</span>
-                      <span className="rounded bg-bg-surface border border-border-default px-2 py-0.5 text-[10px] font-semibold text-text-primary">2 unread</span>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto divide-y divide-border-subtle/50">
-                      {mockEmails.map((email, idx) => (
-                        <div
-                          key={idx}
-                          onClick={() => { setSelectedEmail(idx); }}
-                          className={`flex cursor-pointer items-start gap-3 px-4 py-3 transition-colors ${
-                            selectedEmail === idx 
-                              ? "bg-bg-surface border-l-2 border-accent-primary" 
-                              : "hover:bg-bg-surface/50"
+                    {/* List filter tabs */}
+                    <div className="flex border-b border-border-subtle px-3 py-1.5 bg-bg-raised/20 shrink-0 gap-1 overflow-x-auto scrollbar-none">
+                      {[
+                        { label: "All", count: 4 },
+                        { label: "Priority", count: 1 },
+                        { label: "Other", count: 3 },
+                        { label: "Sent", count: null },
+                        { label: "Drafts", count: null },
+                      ].map((t) => (
+                        <span
+                          key={t.label}
+                          className={`px-2.5 py-1 text-[10px] font-bold rounded-md border border-transparent cursor-default shrink-0 ${
+                            t.label === "All"
+                              ? "bg-bg-surface text-text-primary border-border-default shadow-sm"
+                              : "text-text-tertiary hover:text-text-secondary"
                           }`}
                         >
-                          <div className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-bg-surface border border-border-default text-xs font-bold text-text-primary`}>
-                            {email.from[0]}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className={`truncate text-xs ${email.unread ? "font-semibold text-text-primary" : "text-text-secondary"}`}>
-                                {email.from}
-                              </span>
-                              <span className="text-[10px] text-text-tertiary">{email.time}</span>
-                            </div>
-                            <span className={`block truncate text-xs ${email.unread ? "text-text-secondary font-medium" : "text-text-tertiary"}`}>
-                              {email.subj}
+                          {t.label}
+                          {t.count !== null && (
+                            <span className="ml-1 px-1.5 py-0.2 text-[8px] rounded-full bg-text-tertiary/10 text-text-tertiary">
+                              {t.count}
                             </span>
-                          </div>
-                          {email.unread && (
-                            <div className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent-primary" />
                           )}
-                        </div>
+                        </span>
                       ))}
+                    </div>
+
+                    {/* Account filter pills */}
+                    <div className="flex gap-1.5 px-3 py-2 border-b border-border-subtle bg-bg-raised/10 overflow-x-auto scrollbar-none shrink-0">
+                      <span className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider rounded-md border bg-bg-surface text-text-primary border-border-default shadow-sm shrink-0 cursor-default">
+                        All Accounts
+                      </span>
+                      <span className="px-2.5 py-1 text-[9px] font-bold rounded-md border border-transparent text-text-tertiary hover:text-text-secondary shrink-0 cursor-default">
+                        work@singularity.app
+                      </span>
+                      <span className="px-2.5 py-1 text-[9px] font-bold rounded-md border border-transparent text-text-tertiary hover:text-text-secondary shrink-0 cursor-default">
+                        personal@gmail.com
+                      </span>
+                    </div>
+
+                    {/* Threads List */}
+                    <div className="flex-1 overflow-y-auto divide-y divide-border-subtle/50">
+                      {mockEmails.map((email, idx) => {
+                        const initials = email.from.split(' ').slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
+                        const colors = ["#06b6d4", "#8b5cf6", "#f59e0b", "#10b981", "#3b82f6", "#ef4444"];
+                        const charSum = email.from.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                        const avatarBg = colors[charSum % colors.length];
+
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => { setSelectedEmail(idx); }}
+                            className={`flex cursor-pointer items-start gap-2.5 px-3.5 py-2.5 transition-colors ${
+                              selectedEmail === idx 
+                                ? "bg-bg-surface border-l-2 border-accent-primary" 
+                                : "hover:bg-bg-surface/50"
+                            }`}
+                          >
+                            <span
+                              className="h-7 w-7 shrink-0 rounded-full flex items-center justify-center font-bold text-white text-[10px] select-none"
+                              style={{ backgroundColor: avatarBg }}
+                            >
+                              {initials || '?'}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1 mb-0.5">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  {email.unread && (
+                                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-primary animate-pulse" />
+                                  )}
+                                  {!email.unread && email.priority === "urgent" && (
+                                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-danger" />
+                                  )}
+                                  {!email.unread && email.priority === "normal" && (
+                                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-warning" />
+                                  )}
+                                  <span className={`truncate text-xs ${email.unread ? "font-semibold text-text-primary" : "text-text-secondary"}`}>
+                                    {email.from}
+                                  </span>
+                                  {email.emailAddress && (
+                                    <span className="text-[8px] px-1.5 py-0.2 bg-accent-primary/10 text-accent-primary border border-accent-primary/20 rounded-md font-medium truncate shrink-0">
+                                      {email.emailAddress.split('@')[0]}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[9px] text-text-tertiary shrink-0">{email.time}</span>
+                              </div>
+                              <span className={`block truncate text-xs ${email.unread ? "text-text-secondary font-medium" : "text-text-tertiary"}`}>
+                                {email.subj}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* Interactive Details + AI replies */}
+                  {/* Email Detail View */}
                   <div className="hidden flex-1 flex-col bg-bg-base p-5 md:flex overflow-hidden">
                     {/* Header */}
                     <div className="border-b border-border-subtle pb-4 shrink-0">
                       <h3 className="text-sm font-bold text-text-primary">{mockEmails[selectedEmail]?.subj}</h3>
-                      <p className="text-xs text-text-secondary mt-1">From: <span className="font-semibold">{mockEmails[selectedEmail]?.from}</span></p>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-1.5">
+                        <p className="text-xs text-text-secondary">From: <span className="font-semibold">{mockEmails[selectedEmail]?.from}</span></p>
+                        
+                        {/* Simulated PrioritySelector Pill */}
+                        <div className="flex items-center gap-1.5">
+                          {(() => {
+                            const p = mockEmails[selectedEmail]?.priority ?? "low";
+                            const colorClass = p === "urgent" 
+                              ? "bg-accent-danger/15 text-accent-danger border border-accent-danger/30" 
+                              : p === "normal" 
+                              ? "bg-accent-info/15 text-accent-info border border-accent-info/30" 
+                              : "bg-bg-surface border border-border-subtle text-text-tertiary";
+                            const dotColor = p === "urgent" 
+                              ? "bg-accent-danger" 
+                              : p === "normal" 
+                              ? "bg-accent-info" 
+                              : "bg-text-tertiary";
+                            return (
+                              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${colorClass}`}>
+                                <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotColor}`} />
+                                {p}
+                              </span>
+                            );
+                          })()}
+
+                          {mockEmails[selectedEmail]?.reason && (
+                            <span className="text-[10px] text-text-tertiary italic truncate max-w-[180px]">
+                              "{mockEmails[selectedEmail]?.reason}"
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     {/* Body */}
@@ -591,9 +764,7 @@ export default function LandingPage() {
                     {/* Dynamic AI Co-Pilot block */}
                     <div className="rounded-xl border border-border-default bg-bg-raised p-4 shadow-sm shrink-0">
                       <div className="flex items-center justify-between pb-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-bold text-text-primary">✨ AI Smart Reply</span>
-                        </div>
+                        <span className="text-xs font-bold text-text-primary">✨ AI Smart Reply</span>
 
                         {aiDraftState === "idle" && (
                           <button
@@ -634,32 +805,136 @@ export default function LandingPage() {
 
               {activeTab === "calendar" && (
                 // CALENDAR WORKFLOW VIEW
-                <div className="flex w-full flex-col bg-bg-raised p-6 overflow-hidden">
-                  <div className="flex items-center justify-between border-b border-border-subtle pb-4 shrink-0">
-                    <div>
-                      <h3 className="text-sm font-bold text-text-primary">Google Calendar</h3>
-                      <p className="text-xs text-text-tertiary">Unified daily schedule</p>
+                <div className="flex w-full flex-col bg-bg-raised p-4 sm:p-6 overflow-hidden">
+                  {/* Calendar Navigation Header & Switcher */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border-subtle pb-4 shrink-0 gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="rounded bg-bg-surface border border-border-default px-2 py-1 text-xs font-semibold text-text-primary select-none cursor-default">
+                        &larr;
+                      </span>
+                      <span className="rounded bg-bg-surface border border-border-default px-2.5 py-1 text-xs font-bold text-text-primary select-none cursor-default">
+                        Today
+                      </span>
+                      <span className="rounded bg-bg-surface border border-border-default px-2 py-1 text-xs font-semibold text-text-primary select-none cursor-default">
+                        &rarr;
+                      </span>
+                      <span className="text-xs font-bold text-text-primary ml-1.5">
+                        Tuesday, Jun 16, 2026
+                      </span>
                     </div>
-                    <span className="rounded bg-bg-surface border border-border-default px-3 py-1 text-xs font-bold text-text-primary">
-                      Tuesday, Jun 16
+
+                    {/* View Switcher Tabs */}
+                    <div className="flex bg-bg-base border border-border-subtle rounded-lg p-1 gap-1 shrink-0">
+                      {["List", "Day", "Week", "Month"].map((v) => (
+                        <span
+                          key={v}
+                          className={`px-2.5 py-1 text-[10px] font-bold rounded cursor-default ${
+                            v === "Day"
+                              ? "bg-bg-surface text-text-primary border border-border-default shadow-sm"
+                              : "text-text-tertiary"
+                          }`}
+                        >
+                          {v}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Calendar Accounts Pills */}
+                  <div className="flex gap-1.5 py-2.5 border-b border-border-subtle bg-bg-raised/10 overflow-x-auto scrollbar-none shrink-0">
+                    <span className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider rounded-md border bg-bg-surface text-text-primary border-border-default shadow-sm shrink-0 cursor-default">
+                      All Accounts
+                    </span>
+                    <span className="px-2.5 py-1 text-[9px] font-bold rounded-md border border-transparent text-text-tertiary shrink-0 cursor-default">
+                      work@singularity.app
+                    </span>
+                    <span className="px-2.5 py-1 text-[9px] font-bold rounded-md border border-transparent text-text-tertiary shrink-0 cursor-default">
+                      personal@gmail.com
                     </span>
                   </div>
 
                   {/* Hourly mock blocks */}
-                  <div className="flex-1 overflow-y-auto py-4 space-y-3">
+                  <div className="flex-1 overflow-y-auto py-2 divide-y divide-border-subtle/30 pr-1">
                     {[
-                      { time: "09:00 AM", event: "Weekly Development Alignment", tag: "Calendar", color: "border-text-secondary bg-bg-surface/50 text-text-primary" },
-                      { time: "11:00 AM", event: "Client Feedback Call", tag: "Email Invite Sync", color: "border-text-primary bg-bg-surface text-text-primary" },
-                      { time: "12:30 PM", event: "Team Lunch & Sync", tag: "Calendar", color: "border-text-secondary bg-bg-surface/50 text-text-primary" },
-                      { time: "02:00 PM", event: "Deep Work: Landing Page builds", tag: "Focus Time", color: "border-text-primary bg-bg-surface text-text-primary font-semibold" },
-                    ].map((item, idx) => (
-                      <div key={idx} className={`flex items-start gap-4 rounded-xl border-l-4 p-3 shadow-xs ${item.color} border-border-default`}>
-                        <div className="w-20 text-xs font-bold opacity-80">{item.time}</div>
-                        <div className="flex-1">
-                          <h4 className="text-xs font-bold">{item.event}</h4>
-                          <span className="inline-block mt-1 rounded bg-bg-raised px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-text-secondary border border-border-default">
-                            {item.tag}
-                          </span>
+                      { 
+                        time: "09:00 AM", 
+                        events: [
+                          { summary: "Weekly Development Alignment", range: "09:00 AM – 09:30 AM", location: "Google Meet", account: "work" }
+                        ] 
+                      },
+                      { 
+                        time: "10:00 AM", 
+                        events: [] 
+                      },
+                      { 
+                        time: "11:00 AM", 
+                        events: [
+                          { summary: "Client Feedback Call", range: "11:00 AM – 11:45 AM", location: "Zoom", account: "work" }
+                        ] 
+                      },
+                      { 
+                        time: "12:00 PM", 
+                        events: [
+                          { summary: "Team Lunch & Sync", range: "12:00 PM – 01:00 PM", location: "Cafeteria", account: "personal" }
+                        ] 
+                      },
+                      { 
+                        time: "01:00 PM", 
+                        events: [] 
+                      },
+                      { 
+                        time: "02:00 PM", 
+                        events: [
+                          { summary: "Deep Work: Landing Page builds", range: "02:00 PM – 04:00 PM", location: null, account: "work" }
+                        ] 
+                      },
+                    ].map((slot, idx) => (
+                      <div key={idx} className="flex min-h-[64px] hover:bg-bg-surface/10 transition-colors">
+                        {/* Hour Label */}
+                        <div className="w-16 shrink-0 py-2.5 px-3 text-right text-[10px] font-bold text-text-tertiary border-r border-border-subtle/30 select-none">
+                          {slot.time}
+                        </div>
+
+                        {/* Slots Content area */}
+                        <div className="flex-1 p-2 flex gap-2 overflow-x-auto scrollbar-none relative">
+                          {slot.events.length > 0 ? (
+                            slot.events.map((event, eIdx) => (
+                              <div
+                                key={eIdx}
+                                className="group/card flex-1 min-w-[200px] max-w-sm p-2 bg-bg-surface/60 border border-border-subtle rounded-md transition-all text-left shadow-2xs relative overflow-hidden flex flex-col justify-between"
+                              >
+                                {/* Left border indicator */}
+                                <div className="absolute top-0 left-0 bottom-0 w-[3px] bg-accent-info" />
+                                <div className="pl-2">
+                                  <div className="text-[11px] font-semibold text-text-primary truncate">
+                                    {event.summary}
+                                  </div>
+                                  <div className="flex items-center justify-between mt-1 flex-wrap sm:flex-nowrap gap-1">
+                                    <span className="text-[9px] text-accent-info font-bold">
+                                      {event.range}
+                                    </span>
+                                    {event.location && (
+                                      <span className="text-[9px] text-text-tertiary truncate max-w-[100px] flex items-center gap-0.5">
+                                        <span>📍</span>
+                                        <span className="truncate">{event.location}</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="pl-2 mt-1 flex items-center justify-between">
+                                  <span className="text-[8px] px-1 bg-accent-primary/10 text-accent-primary border border-accent-primary/20 rounded font-medium">
+                                    {event.account}
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-start opacity-0 hover:opacity-100 transition-opacity pl-2 select-none">
+                              <span className="text-[9px] text-accent-primary font-bold flex items-center gap-1 cursor-default">
+                                ➕ Add event
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -668,161 +943,246 @@ export default function LandingPage() {
               )}
 
               {activeTab === "habits" && (
-                <div className="flex flex-1 overflow-hidden">
+                <div className="flex flex-col flex-1 bg-bg-base overflow-hidden">
                   
-                  {/* Left Column: Habits controls */}
-                  <div className="flex w-full flex-col border-r border-border-subtle bg-bg-raised md:w-80 overflow-y-auto p-4 gap-4 shrink-0">
-                    <div className="border-b border-border-subtle pb-2.5">
-                      <span className="text-xs font-bold text-text-primary">Interactive AI Trainer</span>
-                      <p className="text-[10px] text-text-tertiary mt-0.5">Toggle preferences to see how the AI adapts live.</p>
-                    </div>
-
-                    {/* Tone Select */}
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">Tone & Style</span>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <button
-                          onClick={() => setHabitsTone("friendly")}
-                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
-                            habitsTone === "friendly"
-                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
-                              : "border-border-default text-text-secondary hover:bg-bg-surface"
-                          }`}
-                        >
-                          Friendly
-                        </button>
-                        <button
-                          onClick={() => setHabitsTone("professional")}
-                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
-                            habitsTone === "professional"
-                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
-                              : "border-border-default text-text-secondary hover:bg-bg-surface"
-                          }`}
-                        >
-                          Professional
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Length Select */}
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">Draft Length</span>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <button
-                          onClick={() => setHabitsStyle("concise")}
-                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
-                            habitsStyle === "concise"
-                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
-                              : "border-border-default text-text-secondary hover:bg-bg-surface"
-                          }`}
-                        >
-                          Concise
-                        </button>
-                        <button
-                          onClick={() => setHabitsStyle("detailed")}
-                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
-                            habitsStyle === "detailed"
-                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
-                              : "border-border-default text-text-secondary hover:bg-bg-surface"
-                          }`}
-                        >
-                          Detailed
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Greeting Select */}
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">Greeting</span>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <button
-                          onClick={() => setHabitsGreeting("casual")}
-                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
-                            habitsGreeting === "casual"
-                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
-                              : "border-border-default text-text-secondary hover:bg-bg-surface"
-                          }`}
-                        >
-                          Casual ("Hi")
-                        </button>
-                        <button
-                          onClick={() => setHabitsGreeting("formal")}
-                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
-                            habitsGreeting === "formal"
-                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
-                              : "border-border-default text-text-secondary hover:bg-bg-surface"
-                          }`}
-                        >
-                          Formal ("Dear")
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Signoff Select */}
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">Sign-off</span>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <button
-                          onClick={() => setHabitsSignoff("casual")}
-                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
-                            habitsSignoff === "casual"
-                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
-                              : "border-border-default text-text-secondary hover:bg-bg-surface"
-                          }`}
-                        >
-                          Casual ("Best")
-                        </button>
-                        <button
-                          onClick={() => setHabitsSignoff("formal")}
-                          className={`px-2 py-1.5 text-[10px] font-semibold border rounded-lg transition-all cursor-pointer ${
-                            habitsSignoff === "formal"
-                              ? "border-accent-primary bg-accent-primary/5 text-text-primary"
-                              : "border-border-default text-text-secondary hover:bg-bg-surface"
-                          }`}
-                        >
-                          Formal ("Sincerely")
-                        </button>
-                      </div>
-                    </div>
+                  {/* Mock Settings Tab Bar */}
+                  <div className="flex border-b border-border-subtle px-4 py-1.5 bg-bg-raised/35 shrink-0 gap-2 overflow-x-auto scrollbar-none">
+                    {["Workspace", "Account", "AI Persona & Habits"].map((tab) => (
+                      <span
+                        key={tab}
+                        className={`px-3 py-1 text-xs font-semibold rounded-md border cursor-default shrink-0 transition-all ${
+                          tab === "AI Persona & Habits"
+                            ? "bg-bg-surface text-text-primary border-border-default shadow-xs"
+                            : "text-text-tertiary border-transparent hover:text-text-secondary"
+                        }`}
+                      >
+                        {tab}
+                      </span>
+                    ))}
                   </div>
 
-                  {/* Right Column: Live Output */}
-                  <div className="hidden flex-1 flex-col bg-bg-base p-5 md:flex overflow-hidden">
-                    <div className="border-b border-border-subtle pb-3 shrink-0">
-                      <h3 className="text-xs font-bold text-text-primary">AI Copilot Draft Editor</h3>
-                      <p className="text-[10px] text-text-secondary mt-0.5">Scoped to Acme Integration email template</p>
-                    </div>
-
-                    <div className="flex-1 py-4 overflow-y-auto">
-                      <div className="rounded-xl border border-border-default bg-bg-surface/50 p-4 font-mono text-[11px] leading-relaxed text-text-primary whitespace-pre-wrap min-h-[160px]">
-                        {(() => {
-                          const greeting = habitsGreeting === "casual" ? "Hi Team Acme," : "Dear Acme Partnership Board,";
-                          
-                          let body = "";
-                          if (habitsStyle === "concise") {
-                            body = habitsTone === "friendly" 
-                              ? "We'd love to integrate our email workflows with your API! Let's schedule a quick sync." 
-                              : "We formally propose integrating our email workflows with your API. Let us know when you can review the technical specs.";
-                          } else {
-                            body = habitsTone === "friendly"
-                              ? "I hope you are having an amazing week! We have been looking closely at the Acme API capabilities and believe a direct integration with Singularity would be a game-changer for both our users. It would allow seamless cross-platform syncs in under 2 seconds. Let's find 15 mins to discuss this!"
-                              : "We are writing to formally propose a workflow integration between Singularity and the Acme API. Our research indicates that a combined solution would significantly reduce synchronization latency for enterprise customers. We have attached the technical specifications below for your engineering review.";
-                          }
-
-                          const signoff = habitsSignoff === "casual" ? "Best,\nRushil" : "Sincerely,\nRushil Parmar\nSingularity Team";
-
-                          return `${greeting}\n\n${body}\n\n${signoff}`;
-                        })()}
+                  {/* Main Settings Panel */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {/* Header Banner */}
+                    <div className="rounded-xl p-4 border border-border-default bg-gradient-to-br from-bg-raised/40 via-bg-surface/10 to-accent-primary/5 relative overflow-hidden shrink-0">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-primary/10 border border-accent-primary/20 text-accent-primary">
+                          <svg className="h-5 w-5 text-accent-primary animate-pulse" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.467 5.99 5.99 0 0 0-1.925 3.546 5.974 5.974 0 0 1-2.133-1A3.75 3.75 0 0 0 12 18Z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-bold text-text-primary">AI Persona & Workspace Habits</h4>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-accent-primary/10 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-accent-primary">
+                              <span className="h-1.5 w-1.5 rounded-full bg-accent-primary animate-ping" />
+                              Active Learning
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-text-secondary mt-1 leading-relaxed">
+                            Singularity constantly analyzes your sent replies, communication speed, and scheduling history to adapt your AI co-pilot.
+                          </p>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Simulated Context Pill */}
-                    <div className="rounded-lg bg-bg-raised border border-border-subtle px-3 py-2 text-[10px] flex items-center justify-between shrink-0">
-                      <span className="text-text-secondary font-medium">✨ AI Adaptation Status</span>
-                      <span className="text-accent-success font-semibold flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-accent-success animate-pulse-subtle" />
-                        Autodiscovered habits applied
-                      </span>
+                    {/* Mini Stats Grid */}
+                    <div className="grid grid-cols-3 gap-3 shrink-0">
+                      {[
+                        { label: "Manual Corrections", count: 12, desc: "Refines few-shot rules" },
+                        { label: "Emails Prioritized", count: 847, desc: "AI triaged emails" },
+                        { label: "Spam Guard Filtered", count: 153, desc: "Junk mails auto-blocked" },
+                      ].map((s) => (
+                        <div key={s.label} className="p-2.5 rounded-lg border border-border-default bg-bg-surface/30">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-text-tertiary block truncate">{s.label}</span>
+                          <span className="text-lg font-bold text-text-primary block mt-0.5">{s.count}</span>
+                          <span className="text-[8px] text-text-tertiary block truncate mt-0.5">{s.desc}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Split View */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Left: Toggles */}
+                      <div className="flex flex-col gap-3 rounded-xl border border-border-default bg-bg-raised p-4">
+                        <div className="border-b border-border-subtle pb-2">
+                          <span className="text-xs font-bold text-text-primary">Interactive AI Trainer</span>
+                          <p className="text-[9px] text-text-tertiary mt-0.5">Toggle styles to see how the AI adapts.</p>
+                        </div>
+
+                        {/* Tone select */}
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-text-tertiary">Tone & Style</span>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              onClick={() => setHabitsTone("friendly")}
+                              className={`px-2 py-1 text-[9px] font-semibold border rounded-md transition-all cursor-pointer ${
+                                habitsTone === "friendly"
+                                  ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                                  : "border-border-default text-text-secondary hover:bg-bg-surface"
+                              }`}
+                            >
+                              Friendly
+                            </button>
+                            <button
+                              onClick={() => setHabitsTone("professional")}
+                              className={`px-2 py-1 text-[9px] font-semibold border rounded-md transition-all cursor-pointer ${
+                                habitsTone === "professional"
+                                  ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                                  : "border-border-default text-text-secondary hover:bg-bg-surface"
+                              }`}
+                            >
+                              Professional
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Length select */}
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-text-tertiary">Draft Length</span>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              onClick={() => setHabitsStyle("concise")}
+                              className={`px-2 py-1 text-[9px] font-semibold border rounded-md transition-all cursor-pointer ${
+                                habitsStyle === "concise"
+                                  ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                                  : "border-border-default text-text-secondary hover:bg-bg-surface"
+                              }`}
+                            >
+                              Concise
+                            </button>
+                            <button
+                              onClick={() => setHabitsStyle("detailed")}
+                              className={`px-2 py-1 text-[9px] font-semibold border rounded-md transition-all cursor-pointer ${
+                                habitsStyle === "detailed"
+                                  ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                                  : "border-border-default text-text-secondary hover:bg-bg-surface"
+                              }`}
+                            >
+                              Detailed
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Greeting select */}
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-text-tertiary">Greeting</span>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              onClick={() => setHabitsGreeting("casual")}
+                              className={`px-2 py-1 text-[9px] font-semibold border rounded-md transition-all cursor-pointer ${
+                                habitsGreeting === "casual"
+                                  ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                                  : "border-border-default text-text-secondary hover:bg-bg-surface"
+                              }`}
+                            >
+                              Casual ("Hi")
+                            </button>
+                            <button
+                              onClick={() => setHabitsGreeting("formal")}
+                              className={`px-2 py-1 text-[9px] font-semibold border rounded-md transition-all cursor-pointer ${
+                                habitsGreeting === "formal"
+                                  ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                                  : "border-border-default text-text-secondary hover:bg-bg-surface"
+                              }`}
+                            >
+                              Formal ("Dear")
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Signoff select */}
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-text-tertiary">Sign-off</span>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              onClick={() => setHabitsSignoff("casual")}
+                              className={`px-2 py-1 text-[9px] font-semibold border rounded-md transition-all cursor-pointer ${
+                                habitsSignoff === "casual"
+                                  ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                                  : "border-border-default text-text-secondary hover:bg-bg-surface"
+                              }`}
+                            >
+                              Casual ("Best")
+                            </button>
+                            <button
+                              onClick={() => setHabitsSignoff("formal")}
+                              className={`px-2 py-1 text-[9px] font-semibold border rounded-md transition-all cursor-pointer ${
+                                habitsSignoff === "formal"
+                                  ? "border-accent-primary bg-accent-primary/5 text-text-primary"
+                                  : "border-border-default text-text-secondary hover:bg-bg-surface"
+                              }`}
+                            >
+                              Formal ("Sincerely")
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Live Preview & Discovered Stats */}
+                      <div className="flex flex-col gap-4">
+                        {/* Live Preview Box */}
+                        <div className="flex flex-col gap-2 rounded-xl border border-border-default bg-bg-raised p-4">
+                          <div className="border-b border-border-subtle pb-2">
+                            <span className="text-xs font-bold text-text-primary">Live AI Copilot Draft Editor</span>
+                            <p className="text-[9px] text-text-secondary mt-0.5">Adapts dynamically to trainer settings</p>
+                          </div>
+                          <div className="rounded-lg bg-bg-surface/50 border border-border-subtle p-3 font-mono text-[10px] leading-relaxed text-text-primary whitespace-pre-wrap min-h-[140px]">
+                            {(() => {
+                              const greeting = habitsGreeting === "casual" ? "Hi Team Acme," : "Dear Acme Partnership Board,";
+                              let body = "";
+                              if (habitsStyle === "concise") {
+                                body = habitsTone === "friendly" 
+                                  ? "We'd love to integrate our email workflows with your API! Let's schedule a quick sync." 
+                                  : "We formally propose integrating our email workflows with your API. Let us know when you can review the technical specs.";
+                              } else {
+                                body = habitsTone === "friendly"
+                                  ? "I hope you are having an amazing week! We have been looking closely at the Acme API capabilities and believe a direct integration with Singularity would be a game-changer for both our users. It would allow seamless cross-platform syncs in under 2 seconds. Let's find 15 mins to discuss this!"
+                                  : "We are writing to formally propose a workflow integration between Singularity and the Acme API. Our research indicates that a combined solution would significantly reduce synchronization latency for enterprise customers. We have attached the technical specifications below for your engineering review.";
+                              }
+                              const signoff = habitsSignoff === "casual" ? "Best,\nRushil" : "Sincerely,\nRushil Parmar\nSingularity Team";
+                              return `${greeting}\n\n${body}\n\n${signoff}`;
+                            })()}
+                          </div>
+                        </div>
+
+                        {/* Discovered Insights Box */}
+                        <div className="rounded-xl border border-border-default bg-bg-surface/40 p-4 space-y-2.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary block border-b border-border-subtle pb-1.5">
+                            Discovered Writing Style Insights
+                          </span>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-text-secondary">Email Tone</span>
+                            <span className="text-xs font-bold text-text-primary uppercase tracking-wide">
+                              {habitsTone === "friendly" ? "Friendly & Conversational" : "Formal & Professional"}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-text-secondary">Writing Style</span>
+                            <span className="text-xs font-bold text-text-primary uppercase tracking-wide">
+                              {habitsStyle === "concise" ? "Concise & Brief" : "Detailed & Structured"}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-text-secondary">Greeting Preference</span>
+                            <span className="text-xs font-bold text-text-primary uppercase tracking-wide">
+                              {habitsGreeting === "casual" ? "Casual (Hi/Hello)" : "Formal (Dear)"}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-text-secondary">Sign-off Style</span>
+                            <span className="text-xs font-bold text-text-primary uppercase tracking-wide">
+                              {habitsSignoff === "casual" ? "Appreciative (Best)" : "Formal (Sincerely)"}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs pt-2 border-t border-border-subtle/50">
+                            <span className="text-text-secondary font-medium">Primary Collaborators</span>
+                            <span className="text-[10px] font-semibold text-text-primary max-w-[140px] truncate">
+                              Sarah K. (Design), Raj M. (CTO)
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -877,18 +1237,18 @@ export default function LandingPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
-          {features.map((f, i) => (
+          {features.map((f) => (
             <div
               key={f.title}
-              className={`group relative overflow-hidden rounded-2xl border border-border-default bg-bg-raised p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-accent-primary hover:shadow-lg ${
-                i < 2 ? "lg:col-span-2 sm:col-span-1" : "lg:col-span-1 sm:col-span-1"
-              } ${i >= 2 && i < 5 ? "" : ""}`}
+              className="group relative overflow-hidden rounded-2xl border border-border-default bg-bg-raised p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-accent-primary hover:shadow-lg flex flex-col justify-between"
             >
-              <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-bg-surface border border-border-default text-text-primary shadow-xs">
-                {f.icon}
+              <div>
+                <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-bg-surface border border-border-default text-text-primary shadow-xs">
+                  {f.icon}
+                </div>
+                <h3 className="mb-2 text-base font-bold text-text-primary">{f.title}</h3>
+                <p className="text-sm leading-relaxed text-text-secondary">{f.desc}</p>
               </div>
-              <h3 className="mb-2 text-base font-bold text-text-primary">{f.title}</h3>
-              <p className="text-sm leading-relaxed text-text-secondary">{f.desc}</p>
             </div>
           ))}
         </div>
