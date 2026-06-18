@@ -288,9 +288,28 @@ export const agentRouter = createTRPCRouter({
           }
         }
 
+        const primaryCalendarTenantId = calendarAccounts[0]?.tenantId ?? userId;
+        let activeCalendarTenantId = primaryCalendarTenantId;
+        if (input.context?.targetEmail) {
+          const matched = calendarAccounts.find(
+            (a) => a.emailAddress?.toLowerCase() === input.context?.targetEmail?.toLowerCase()
+          );
+          if (matched) {
+            activeCalendarTenantId = matched.tenantId;
+          }
+        }
+
+        // Determine which tenant to use for building the general Mastra tools provider
+        let activeTenantId = activeGmailTenantId;
+        if (input.context?.route?.includes("calendar")) {
+          activeTenantId = activeCalendarTenantId;
+        } else if (gmailAccounts.length === 0 && calendarAccounts.length > 0) {
+          activeTenantId = activeCalendarTenantId;
+        }
+
         let didExecuteWriteTool = false;
         const provider = new MastraProvider();
-        const toolsList = await provider.build({ corsair: corsair.withTenant(activeGmailTenantId) });
+        const toolsList = await provider.build({ corsair: corsair.withTenant(activeTenantId) });
 
         const wrappedMcpTools = Object.fromEntries(
           toolsList.map((t) => {
