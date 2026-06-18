@@ -241,9 +241,7 @@ function InteractiveDraftCard({ initialDraft }: { initialDraft: DraftData }) {
   );
 }
 
-export function FormattedMessage({ role, text, reasoning }: FormattedMessageProps) {
-  const [showThinking, setShowThinking] = useState(false);
-
+export function FormattedMessage({ role, text }: FormattedMessageProps) {
   // If user or system message, render text directly (with markdown support for assistant/system)
   if (role === "user") {
     return <div className="whitespace-pre-wrap">{text}</div>;
@@ -253,14 +251,10 @@ export function FormattedMessage({ role, text, reasoning }: FormattedMessageProp
   const thinkRegex = /<think>([\s\S]*?)<\/think>/;
   const match = text.match(thinkRegex);
 
-  let inlineThinking = "";
   let cleanText = text;
   if (match) {
-    inlineThinking = match[1]?.trim() ?? "";
     cleanText = text.replace(thinkRegex, "").trim();
   }
-
-  const thinkingText = reasoning || inlineThinking;
 
   const draftData = role === "assistant" ? parseDraftFromResponse(cleanText) : null;
   const displayCleanText = draftData 
@@ -269,43 +263,6 @@ export function FormattedMessage({ role, text, reasoning }: FormattedMessageProp
 
   return (
     <div className="space-y-2.5 w-full">
-      {/* Collapsible Thinking Process Block */}
-      {thinkingText && (
-        <div className="border border-border-subtle bg-bg-raised/20 rounded-xl overflow-hidden max-w-full shadow-sm">
-          <button
-            type="button"
-            onClick={() => setShowThinking(!showThinking)}
-            className="w-full flex items-center justify-between px-3.5 py-2 text-left text-xs font-semibold text-text-secondary hover:bg-bg-surface/50 transition-colors"
-          >
-            <div className="flex items-center gap-2 text-text-tertiary">
-              <svg className="h-4 w-4 text-accent-primary animate-pulse" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.467 5.99 5.99 0 0 0-1.925 3.546 5.974 5.974 0 0 1-2.133-1A3.75 3.75 0 0 0 12 18Z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0-.495-7.467 5.99 5.99 0 0 0 1.925 3.546 5.974 5.974 0 0 1 2.133-1A3.75 3.75 0 0 0 12 18Z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM12.75 6a.75.75 0 1 0-1.5 0v3.75a.75.75 0 1 0 1.5 0V6ZM12 15a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" />
-              </svg>
-              <span className="uppercase tracking-wider text-[10px] font-bold">Thinking Process</span>
-            </div>
-            <svg
-              className={`h-4 w-4 text-text-tertiary transition-transform duration-250 ${
-                showThinking ? "rotate-180" : ""
-              }`}
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-            </svg>
-          </button>
-          
-          {showThinking && (
-            <div className="border-t border-border-subtle/50 px-4 py-3 text-[11px] font-mono leading-relaxed text-text-tertiary whitespace-pre-wrap break-words max-h-56 overflow-y-auto bg-bg-inset/30">
-              {thinkingText}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Main Response Markdown */}
       <FormattedText text={displayCleanText} role={role} />
 
