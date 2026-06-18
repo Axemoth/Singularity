@@ -135,7 +135,7 @@ export const calendarRouter = createTRPCRouter({
           .orderBy(desc(corsairEntities.updatedAt));
       }
 
-      return events;
+      return events.filter((e) => (e.data as any)?.status !== "cancelled");
     }),
 
   syncCalendar: protectedProcedure.mutation(async ({ ctx }) => {
@@ -446,6 +446,13 @@ export const calendarRouter = createTRPCRouter({
           calendarId: input.calendarId,
           id: input.id,
         });
+        // Delete from local cache
+        await ctx.db.delete(corsairEntities).where(
+          and(
+            eq(corsairEntities.entityId, input.id),
+            eq(corsairEntities.entityType, "events")
+          )
+        );
         return res;
       } catch (err: any) {
         console.error("Failed to delete calendar event:", err);

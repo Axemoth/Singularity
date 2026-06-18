@@ -299,7 +299,7 @@ export function FormattedMessage({ role, text, reasoning }: FormattedMessageProp
           </button>
           
           {showThinking && (
-            <div className="border-t border-border-subtle/50 px-4 py-3 text-[11px] font-mono leading-relaxed text-text-tertiary whitespace-pre-wrap max-h-56 overflow-y-auto bg-bg-inset/30">
+            <div className="border-t border-border-subtle/50 px-4 py-3 text-[11px] font-mono leading-relaxed text-text-tertiary whitespace-pre-wrap break-words max-h-56 overflow-y-auto bg-bg-inset/30">
               {thinkingText}
             </div>
           )}
@@ -358,7 +358,7 @@ function renderMarkdownLines(text: string, blockIdx: number) {
   const flushList = (key: string) => {
     if (listItems.length > 0) {
       elements.push(
-        <ul key={key} className="list-disc pl-5 my-2.5 space-y-1.5 text-text-primary text-[13px] leading-relaxed">
+        <ul key={key} className="list-disc pl-5 my-2.5 space-y-1.5 text-text-primary text-[13px] leading-relaxed break-words">
           {listItems}
         </ul>
       );
@@ -439,7 +439,7 @@ function renderMarkdownLines(text: string, blockIdx: number) {
     else {
       flushList(`list-${blockIdx}-${i}`);
       elements.push(
-        <p key={`p-${blockIdx}-${i}`} className="text-text-primary text-[13px] leading-relaxed my-1.5">
+        <p key={`p-${blockIdx}-${i}`} className="text-text-primary text-[13px] leading-relaxed my-1.5 break-words">
           {renderInlineMarkdown(line)}
         </p>
       );

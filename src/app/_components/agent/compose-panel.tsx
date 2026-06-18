@@ -33,6 +33,41 @@ function CloseIcon() {
   );
 }
 
+function MicIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+      <path d="M19 10v2a7 7 0 01-14 0v-2" />
+      <line x1="12" y1="19" x2="12" y2="23" />
+      <line x1="8" y1="23" x2="16" y2="23" />
+    </svg>
+  );
+}
+
+function MicStopIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+    </svg>
+  );
+}
+
 // ─── Thinking Bar ────────────────────────────────────────────────────────────
 
 function ThinkingBar() {
@@ -274,6 +309,126 @@ export function ComposePanel() {
   const [isReasoningEnabled, setIsReasoningEnabled] = useState(false);
   const [customInputMsgId, setCustomInputMsgId] = useState<string | null>(null);
   const [customInputVal, setCustomInputVal] = useState("");
+
+  // Speech Recognition States & Refs
+  const [isListening, setIsListening] = useState(false);
+  const [speechLanguage, setSpeechLanguage] = useState<"en-US" | "hi-IN">("en-US");
+  const recognitionRef = useRef<any>(null);
+  const inputBeforeSpeechRef = useRef("");
+
+  // Clean up recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
+
+  // Stop recognition when panel closes
+  useEffect(() => {
+    if (!isOpen && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+  }, [isOpen]);
+
+  const toggleListening = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const SpeechRecognitionClass =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognitionClass) {
+      alert("Speech recognition is not supported in this browser.");
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+    } else {
+      inputBeforeSpeechRef.current = aiInput;
+      
+      const recognition = new SpeechRecognitionClass();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = speechLanguage;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        let transcript = "";
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        
+        const baseText = inputBeforeSpeechRef.current;
+        const spacing = baseText && !baseText.endsWith(" ") ? " " : "";
+        setAiInput(baseText + spacing + transcript);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    }
+  }, [isListening, speechLanguage, aiInput]);
+
+  const handleLanguageToggle = useCallback((lang: "en-US" | "hi-IN") => {
+    setSpeechLanguage(lang);
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setTimeout(() => {
+        const SpeechRecognitionClass =
+          (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognitionClass) return;
+
+        inputBeforeSpeechRef.current = aiInput;
+        const recognition = new SpeechRecognitionClass();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = lang;
+
+        recognition.onstart = () => {
+          setIsListening(true);
+        };
+
+        recognition.onresult = (event: any) => {
+          let transcript = "";
+          for (let i = 0; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          const baseText = inputBeforeSpeechRef.current;
+          const spacing = baseText && !baseText.endsWith(" ") ? " " : "";
+          setAiInput(baseText + spacing + transcript);
+        };
+
+        recognition.onerror = (event: any) => {
+          console.error("Speech recognition error:", event.error);
+          setIsListening(false);
+        };
+
+        recognition.onend = () => {
+          setIsListening(false);
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
+      }, 300);
+    }
+  }, [isListening, aiInput]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
@@ -736,11 +891,11 @@ If you are only asking a question or cannot draft the email yet, do NOT output t
                   className={`flex flex-col ${message.role === "user" ? "items-end" : "items-start"}`}
                 >
                   <div
-                    className={`max-w-[90%] rounded-[var(--radius-md)] px-3 py-2 text-[12.5px] leading-relaxed whitespace-pre-wrap ${
+                    className={`max-w-[90%] rounded-[var(--radius-md)] px-3 py-2 text-[12.5px] leading-relaxed whitespace-pre-wrap break-words ${
                       message.role === "user"
-                        ? "bg-accent-primary text-text-inverse border border-accent-primary"
+                        ? "bg-accent-primary text-text-inverse"
                         : message.role === "system"
-                          ? "bg-bg-inset text-text-secondary border border-border-subtle font-mono text-[11px]"
+                          ? "bg-bg-inset text-text-secondary border border-border-subtle font-mono"
                           : "bg-bg-surface text-text-primary border border-border-subtle"
                     }`}
                   >
@@ -855,7 +1010,7 @@ If you are only asking a question or cannot draft the email yet, do NOT output t
             </div>
 
             {/* Input Form */}
-            <form onSubmit={handleChatSubmit} className="flex flex-col gap-2 rounded-xl border border-transparent bg-bg-surface p-2 shadow-sm focus-within:shadow-md transition-all focus-within:bg-bg-base">
+            <form onSubmit={handleChatSubmit} className="flex flex-col gap-2 rounded-xl border-none bg-bg-surface p-2 shadow-sm focus-within:shadow-md transition-all focus-within:bg-bg-base outline-none focus-within:outline-none focus-within:ring-0">
               <textarea
                 ref={chatInputRef}
                 value={aiInput}
@@ -868,7 +1023,7 @@ If you are only asking a question or cannot draft the email yet, do NOT output t
                 }}
                 rows={2}
                 placeholder="Ask AI to write, rewrite, or polish your email..."
-                className="bg-transparent text-text-primary placeholder:text-text-tertiary w-full resize-none px-2 py-1 text-xs outline-none border-none focus:ring-0"
+                className="bg-transparent text-text-primary placeholder:text-text-tertiary w-full resize-none px-2 py-1 text-xs outline-none border-none focus:outline-none focus:ring-0"
               />
               <div className="flex items-center justify-between px-1 border-t border-border-subtle/50 pt-2">
                 {/* Deepthink Toggle */}
@@ -896,14 +1051,60 @@ If you are only asking a question or cannot draft the email yet, do NOT output t
                   </span>
                 </div>
 
-                <Button
-                  type="submit"
-                  isLoading={chat.isPending}
-                  size="sm"
-                  className="font-semibold px-4 py-1.5 text-xs"
-                >
-                  Send
-                </Button>
+                  <div className="flex items-center gap-2">
+                    {/* Language Toggle Pill */}
+                    <div className="flex items-center bg-bg-inset border border-border-subtle rounded-lg p-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleLanguageToggle("en-US")}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                          speechLanguage === "en-US"
+                            ? "bg-accent-primary text-text-inverse shadow-xs"
+                            : "text-text-tertiary hover:text-text-secondary"
+                        }`}
+                      >
+                        EN
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleLanguageToggle("hi-IN")}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                          speechLanguage === "hi-IN"
+                            ? "bg-accent-primary text-text-inverse shadow-xs"
+                            : "text-text-tertiary hover:text-text-secondary"
+                        }`}
+                      >
+                        HI
+                      </button>
+                    </div>
+
+                    {/* Mic Button */}
+                    <button
+                      type="button"
+                      onClick={toggleListening}
+                      className={`p-2 rounded-lg transition-all border cursor-pointer flex items-center justify-center shrink-0 ${
+                        isListening
+                          ? "bg-red-500/10 text-red-500 border-red-500/35 hover:bg-red-500/20 animate-pulse"
+                          : "bg-bg-surface text-text-secondary border-border-subtle hover:bg-bg-inset hover:text-text-primary"
+                      }`}
+                      title={isListening ? "Stop listening" : "Start voice typing"}
+                    >
+                      {isListening ? (
+                        <MicStopIcon className="h-4 w-4" />
+                      ) : (
+                        <MicIcon className="h-4 w-4" />
+                      )}
+                    </button>
+
+                    <Button
+                      type="submit"
+                      isLoading={chat.isPending}
+                      size="sm"
+                      className="font-semibold px-4 py-1.5 text-xs"
+                    >
+                      Send
+                    </Button>
+                  </div>
               </div>
             </form>
           </div>

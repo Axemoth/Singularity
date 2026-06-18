@@ -173,6 +173,34 @@ function PlusIcon({ className }: { className?: string }) {
   );
 }
 
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  );
+}
+
+function SpinnerIcon({ className }: { className?: string }) {
+  return (
+    <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+    </svg>
+  );
+}
+
 // ─── Skeleton ──────────────────────────────────────────────────────────────────
 
 function EventSkeleton() {
@@ -203,7 +231,15 @@ function EventSkeleton() {
 
 // ─── Event Card ────────────────────────────────────────────────────────────────
 
-function EventCard({ event }: { event: CalendarEvent }) {
+function EventCard({
+  event,
+  onDelete,
+  isDeleting,
+}: {
+  event: CalendarEvent;
+  onDelete: (id: string) => void;
+  isDeleting: boolean;
+}) {
   const data = event.data;
   const title = data.summary || "Untitled Event";
   const time = formatEventTime(data.start, data.end);
@@ -219,9 +255,9 @@ function EventCard({ event }: { event: CalendarEvent }) {
       href={data.htmlLink ?? undefined}
       target="_blank"
       rel="noopener noreferrer"
-      className={`block rounded-[var(--radius-md)] border border-border-subtle bg-bg-raised p-4 transition-colors duration-[var(--transition-fast)] hover:border-border-default ${
+      className={`group relative block rounded-[var(--radius-md)] border border-border-subtle bg-bg-raised p-4 transition-colors duration-[var(--transition-fast)] hover:border-border-default ${
         data.htmlLink ? "cursor-pointer" : "cursor-default"
-      }`}
+      } ${isDeleting ? "opacity-50 pointer-events-none" : ""}`}
     >
       <div className="flex gap-4">
         {/* Time column */}
@@ -230,7 +266,7 @@ function EventCard({ event }: { event: CalendarEvent }) {
         </div>
 
         {/* Details column */}
-        <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="min-w-0 flex-1 space-y-1.5 pr-8">
           {/* Title + status badges */}
           <div className="flex items-center gap-2">
             <h3
@@ -270,13 +306,40 @@ function EventCard({ event }: { event: CalendarEvent }) {
           )}
         </div>
       </div>
+
+      {/* Delete Button */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onDelete(event.entityId);
+        }}
+        disabled={isDeleting}
+        className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg text-text-tertiary hover:text-accent-danger hover:bg-accent-danger/10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-[var(--transition-fast)] cursor-pointer"
+        title="Delete Event"
+      >
+        {isDeleting ? (
+          <SpinnerIcon className="h-4 w-4" />
+        ) : (
+          <TrashIcon className="h-4 w-4" />
+        )}
+      </button>
     </a>
   );
 }
 
 // ─── Date Group ────────────────────────────────────────────────────────────────
 
-function DateGroupSection({ group }: { group: DateGroup }) {
+function DateGroupSection({
+  group,
+  onDelete,
+  deletingIds,
+}: {
+  group: DateGroup;
+  onDelete: (id: string) => void;
+  deletingIds: Record<string, boolean>;
+}) {
   const isToday = group.heading === "Today";
 
   return (
@@ -302,7 +365,12 @@ function DateGroupSection({ group }: { group: DateGroup }) {
       {/* Event list */}
       <div className="space-y-2">
         {group.events.map((event) => (
-          <EventCard key={event.id} event={event} />
+          <EventCard
+            key={event.id}
+            event={event}
+            onDelete={onDelete}
+            isDeleting={!!deletingIds[event.entityId]}
+          />
         ))}
       </div>
     </section>
@@ -315,10 +383,14 @@ function WeekView({
   currentDate,
   eventsByDate,
   onDateClick,
+  onDelete,
+  deletingIds,
 }: {
   currentDate: Date;
   eventsByDate: Map<string, CalendarEvent[]>;
   onDateClick: (date: string) => void;
+  onDelete: (id: string) => void;
+  deletingIds: Record<string, boolean>;
 }) {
   const startOfWeek = useMemo(() => {
     const d = new Date(currentDate);
@@ -398,17 +470,20 @@ function WeekView({
                   sortedEvents.map((event) => {
                     const title = event.data.summary || "Untitled Event";
                     const time = formatEventTime(event.data.start, event.data.end);
+                    const isDeleting = !!deletingIds[event.entityId];
                     return (
                       <a
                         key={event.id}
                         href={event.data.htmlLink ?? undefined}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group/card block p-2.5 bg-bg-surface/50 hover:bg-bg-surface border border-border-subtle/60 hover:border-border-default rounded-[var(--radius-sm)] transition-all duration-[var(--transition-fast)] text-left shadow-2xs hover:shadow-xs relative overflow-hidden"
+                        className={`group/card block p-2.5 bg-bg-surface/50 hover:bg-bg-surface border border-border-subtle/60 hover:border-border-default rounded-[var(--radius-sm)] transition-all duration-[var(--transition-fast)] text-left shadow-2xs hover:shadow-xs relative overflow-hidden ${
+                          isDeleting ? "opacity-50 pointer-events-none" : ""
+                        }`}
                       >
                         {/* Left border indicator */}
                         <div className="absolute top-0 left-0 bottom-0 w-[3px] bg-accent-info/70 group-hover/card:bg-accent-info" />
-                        <div className="pl-1.5">
+                        <div className="pl-1.5 pr-4">
                           <div className="text-[10px] text-accent-info font-bold mb-1 tracking-wide">
                             {time}
                           </div>
@@ -422,6 +497,25 @@ function WeekView({
                             </div>
                           )}
                         </div>
+
+                        {/* Delete Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onDelete(event.entityId);
+                          }}
+                          disabled={isDeleting}
+                          className="absolute right-1 top-1 p-1 rounded text-text-tertiary hover:text-accent-danger hover:bg-accent-danger/10 opacity-0 group-hover/card:opacity-100 transition-all duration-[var(--transition-fast)] cursor-pointer"
+                          title="Delete Event"
+                        >
+                          {isDeleting ? (
+                            <SpinnerIcon className="h-3 w-3" />
+                          ) : (
+                            <TrashIcon className="h-3 w-3" />
+                          )}
+                        </button>
                       </a>
                     );
                   })
@@ -587,10 +681,14 @@ function DayView({
   currentDate,
   eventsByDate,
   onSlotClick,
+  onDelete,
+  deletingIds,
 }: {
   currentDate: Date;
   eventsByDate: Map<string, CalendarEvent[]>;
   onSlotClick: (date: string, time: string) => void;
+  onDelete: (id: string) => void;
+  deletingIds: Record<string, boolean>;
 }) {
   const getDayKey = (d: Date) => {
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -658,18 +756,21 @@ function DayView({
                   hourEvents.map((event) => {
                     const title = event.data.summary || "Untitled Event";
                     const timeRange = formatEventTime(event.data.start, event.data.end);
+                    const isDeleting = !!deletingIds[event.entityId];
                     return (
                       <a
                         key={event.id}
                         href={event.data.htmlLink ?? undefined}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group/card flex-1 min-w-[220px] max-w-md p-2.5 bg-bg-surface/50 hover:bg-bg-surface border border-border-subtle/60 hover:border-border-default rounded-[var(--radius-sm)] transition-all duration-[var(--transition-fast)] text-left shadow-2xs hover:shadow-xs relative overflow-hidden flex flex-col justify-between"
+                        className={`group/card flex-1 min-w-[220px] max-w-md p-2.5 bg-bg-surface/50 hover:bg-bg-surface border border-border-subtle/60 hover:border-border-default rounded-[var(--radius-sm)] transition-all duration-[var(--transition-fast)] text-left shadow-2xs hover:shadow-xs relative overflow-hidden flex flex-col justify-between ${
+                          isDeleting ? "opacity-50 pointer-events-none" : ""
+                        }`}
                       >
                         {/* Left border indicator */}
                         <div className="absolute top-0 left-0 bottom-0 w-[3px] bg-accent-info/70 group-hover/card:bg-accent-info" />
-                        <div className="pl-1.5">
-                          <div className="text-xs font-semibold text-text-primary truncate">
+                        <div className="pl-1.5 pr-6">
+                          <div className="text-xs font-semibold text-text-primary truncate" title={title}>
                             {title}
                           </div>
                           <div className="flex items-center justify-between mt-1.5">
@@ -684,6 +785,25 @@ function DayView({
                             )}
                           </div>
                         </div>
+
+                        {/* Delete Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onDelete(event.entityId);
+                          }}
+                          disabled={isDeleting}
+                          className="absolute right-1 top-1 p-1 rounded text-text-tertiary hover:text-accent-danger hover:bg-accent-danger/10 opacity-0 group-hover/card:opacity-100 transition-all duration-[var(--transition-fast)] cursor-pointer"
+                          title="Delete Event"
+                        >
+                          {isDeleting ? (
+                            <SpinnerIcon className="h-3.5 w-3.5" />
+                          ) : (
+                            <TrashIcon className="h-3.5 w-3.5" />
+                          )}
+                        </button>
                       </a>
                     );
                   })
@@ -715,6 +835,7 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [selectedCalendars, setSelectedCalendars] = useState<Record<string, boolean>>({});
+  const [deletingIds, setDeletingIds] = useState<Record<string, boolean>>({});
 
   const toggleCalendar = (emailAddress: string) => {
     setSelectedCalendars((prev) => ({
@@ -800,6 +921,35 @@ export default function CalendarPage() {
       void utils.calendar.listEvents.invalidate();
     },
   });
+
+  const deleteMutation = api.calendar.deleteEvent.useMutation({
+    onMutate: (variables) => {
+      setDeletingIds((prev) => ({ ...prev, [variables.id]: true }));
+    },
+    onSuccess: async () => {
+      toast("Event deleted successfully", "success");
+      await utils.calendar.listEvents.invalidate();
+    },
+    onError: (err) => {
+      console.error("[Delete] Calendar delete failed:", err);
+      toast(`Delete failed: ${err.message || err}`, "error");
+    },
+    onSettled: (data, error, variables) => {
+      setDeletingIds((prev) => {
+        const copy = { ...prev };
+        delete copy[variables.id];
+        return copy;
+      });
+    },
+  });
+
+  const handleDeleteEvent = async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync({ id });
+    } catch (err) {
+      // Handled in onError
+    }
+  };
 
   const isRefreshing = isFetching || syncCalendar.isPending;
 
@@ -1121,7 +1271,12 @@ export default function CalendarPage() {
                 {groups.length > 0 ? (
                   <div className="space-y-8 animate-fade-in">
                     {groups.map((group) => (
-                      <DateGroupSection key={group.dateKey} group={group} />
+                      <DateGroupSection
+                        key={group.dateKey}
+                        group={group}
+                        onDelete={handleDeleteEvent}
+                        deletingIds={deletingIds}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -1139,7 +1294,12 @@ export default function CalendarPage() {
                   <div className="space-y-8 animate-fade-in">
                     {groups.length > 0 ? (
                       groups.map((group) => (
-                        <DateGroupSection key={group.dateKey} group={group} />
+                        <DateGroupSection
+                          key={group.dateKey}
+                          group={group}
+                          onDelete={handleDeleteEvent}
+                          deletingIds={deletingIds}
+                        />
                       ))
                     ) : (
                       <div className="rounded-[var(--radius-md)] border border-border-subtle bg-bg-raised p-8 text-center">
@@ -1161,6 +1321,8 @@ export default function CalendarPage() {
                       setSelectedTime(time);
                       setIsCreateOpen(true);
                     }}
+                    onDelete={handleDeleteEvent}
+                    deletingIds={deletingIds}
                   />
                 )}
 
@@ -1173,6 +1335,8 @@ export default function CalendarPage() {
                       setSelectedTime("");
                       setIsCreateOpen(true);
                     }}
+                    onDelete={handleDeleteEvent}
+                    deletingIds={deletingIds}
                   />
                 )}
 
