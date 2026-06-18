@@ -1,6 +1,7 @@
 import "@/styles/globals.css";
 import { type Metadata } from "next";
 import { Geist } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { TRPCReactProvider } from "@/trpc/react";
 import { ThemeProvider } from "@/app/_components/theme-provider";
 import { ToastProvider } from "@/app/_components/ui/toast";
@@ -28,6 +29,7 @@ export default function RootLayout({
             <ToastProvider>{children}</ToastProvider>
           </TRPCReactProvider>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
