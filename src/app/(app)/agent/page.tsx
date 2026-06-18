@@ -1091,7 +1091,8 @@ function AgentPageContent() {
                 }}
                 rows={2}
                 placeholder="Ask the agent... (Type / for commands, @ for email accounts)"
-                className="bg-transparent text-text-primary placeholder:text-text-tertiary w-full resize-none px-2 py-1 text-sm outline-none border-none focus:outline-none focus:ring-0"
+                className="bg-transparent text-text-primary placeholder:text-text-tertiary w-full resize-none px-2 py-1 text-sm outline-none border-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
+                style={{ outline: "none", boxShadow: "none" }}
               />
               <div className="flex items-center justify-between px-1 border-t border-border-subtle/50 pt-2.5">
                 {/* Deepthink Toggle */}
@@ -1120,32 +1121,6 @@ function AgentPageContent() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* Language Toggle Pill */}
-                  <div className="flex items-center bg-bg-inset border border-border-subtle rounded-lg p-0.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleLanguageToggle("en-US")}
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                        speechLanguage === "en-US"
-                          ? "bg-accent-primary text-text-inverse shadow-xs"
-                          : "text-text-tertiary hover:text-text-secondary"
-                      }`}
-                    >
-                      EN
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleLanguageToggle("hi-IN")}
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                        speechLanguage === "hi-IN"
-                          ? "bg-accent-primary text-text-inverse shadow-xs"
-                          : "text-text-tertiary hover:text-text-secondary"
-                      }`}
-                    >
-                      HI
-                    </button>
-                  </div>
-
                   {/* Mic Button */}
                   <button
                     type="button"
