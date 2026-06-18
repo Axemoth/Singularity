@@ -359,19 +359,28 @@ export const agentRouter = createTRPCRouter({
         }
 
         // Determine which tenant to use for building the general Mastra tools provider
-        let activeTenantId = activeGmailTenantId;
-        if (input.context?.route?.includes("calendar")) {
-          activeTenantId = activeCalendarTenantId;
-        } else if (gmailAccounts.length === 0 && calendarAccounts.length > 0) {
-          activeTenantId = activeCalendarTenantId;
+        let gmailToolsList: any[] = [];
+        let calendarToolsList: any[] = [];
+        const provider = new MastraProvider();
+
+        if (activeGmailTenantId === activeCalendarTenantId) {
+          gmailToolsList = await provider.build({ corsair: corsair.withTenant(activeGmailTenantId) });
+          calendarToolsList = gmailToolsList;
+        } else {
+          console.log(`[agent] Building Mastra tools for separate tenants: Gmail=${activeGmailTenantId}, Calendar=${activeCalendarTenantId}`);
+          [gmailToolsList, calendarToolsList] = await Promise.all([
+            provider.build({ corsair: corsair.withTenant(activeGmailTenantId) }),
+            provider.build({ corsair: corsair.withTenant(activeCalendarTenantId) })
+          ]);
         }
 
+        const runScriptGmail = gmailToolsList.find((t) => t.id === "run_script");
+        const runScriptCalendar = calendarToolsList.find((t) => t.id === "run_script");
+
         let didExecuteWriteTool = false;
-        const provider = new MastraProvider();
-        const toolsList = await provider.build({ corsair: corsair.withTenant(activeTenantId) });
 
         const wrappedMcpTools = Object.fromEntries(
-          toolsList.map((t) => {
+          gmailToolsList.map((t) => {
             const originalExecute = t.execute;
             return [
               t.id,
@@ -379,7 +388,7 @@ export const agentRouter = createTRPCRouter({
                 ...t,
                 execute: async (args: any, context: any) => {
                   const idLower = t.id.toLowerCase();
-                  const isWriteOp = 
+                  let isWriteOp = 
                     idLower.includes("insert") || 
                     idLower.includes("create") || 
                     idLower.includes("delete") || 
@@ -387,10 +396,38 @@ export const agentRouter = createTRPCRouter({
                     idLower.includes("send") || 
                     idLower.includes("patch") || 
                     idLower.includes("post");
+
+                  if (t.id === "run_script" && args?.code) {
+                    const codeStr = String(args.code);
+                    if (
+                      codeStr.includes(".insert(") ||
+                      codeStr.includes(".create(") ||
+                      codeStr.includes(".delete(") ||
+                      codeStr.includes(".update(") ||
+                      codeStr.includes(".patch(") ||
+                      codeStr.includes(".post(") ||
+                      codeStr.includes(".send(")
+                    ) {
+                      isWriteOp = true;
+                    }
+                  }
+
                   if (isWriteOp) {
                     console.log(`[mcp tool] Detected write operation for tool: ${t.id}, flagging to prevent fallback retry.`);
                     didExecuteWriteTool = true;
                   }
+
+                  if (t.id === "run_script" && args?.code) {
+                    const codeStr = String(args.code);
+                    if (codeStr.includes("googlecalendar") && runScriptCalendar?.execute) {
+                      console.log(`[run_script] Routing calendar script to Calendar Tenant: ${activeCalendarTenantId}`);
+                      return runScriptCalendar.execute(args, context);
+                    } else if (runScriptGmail?.execute) {
+                      console.log(`[run_script] Routing script to Gmail Tenant: ${activeGmailTenantId}`);
+                      return runScriptGmail.execute(args, context);
+                    }
+                  }
+
                   return originalExecute ? originalExecute(args, context) : undefined;
                 }
               }

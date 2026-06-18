@@ -46,8 +46,19 @@ export async function GET(request: NextRequest) {
             return NextResponse.redirect(new URL(`/settings?error=limit_reached&plugin=${plugin}`, process.env.APP_URL));
         }
 
-        // 3. Generate a unique tenant ID for this new connection
-        const uniqueTenantId = `${session.user.id}_${Date.now()}`;
+        // 3. Reuse an existing tenant ID if one exists to prevent multi-account mismatch, otherwise generate a unique one
+        const allUserAccounts = await db
+            .select({ tenantId: corsairAccounts.tenantId })
+            .from(corsairAccounts)
+            .where(
+                or(
+                    eq(corsairAccounts.tenantId, session.user.id),
+                    like(corsairAccounts.tenantId, `${session.user.id}\\_%`)
+                )
+            )
+            .limit(1);
+
+        const uniqueTenantId = allUserAccounts[0]?.tenantId ?? `${session.user.id}_${Date.now()}`;
 
         const { url, state } = await generateOAuthUrl(corsair, plugin, {
             tenantId: uniqueTenantId,

@@ -58,3 +58,5 @@ yarn-error.log*
 /src/server/test*.ts
 /src/server/execute*.ts
 /src/server/get-event.ts
+/src/server/migrate*.ts
+/src/server/clean-db.ts
