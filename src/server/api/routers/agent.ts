@@ -883,9 +883,16 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
         const sentEmail = toolCalls.some((tc: any) => tc.toolName === "send_email");
         const createdDraft = toolCalls.some((tc: any) => tc.toolName === "create_draft");
 
+        const rawReasoning = (response as any).reasoning;
+        const reasoning = 
+          (typeof rawReasoning === "string" && rawReasoning) || 
+          (Array.isArray(rawReasoning) && rawReasoning.length > 0 && rawReasoning.join("\n")) || 
+          (response as any).steps?.[0]?.response?.body?.choices?.[0]?.message?.reasoning_content || 
+          null;
+
         return {
           text: response.text,
-          reasoning: (response as any).reasoning || null,
+          reasoning,
           actions: inferFrontendActions(input.message, input.context, response.text),
           sentEmail,
           createdDraft,
