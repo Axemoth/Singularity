@@ -54,3 +54,7 @@ yarn-error.log*
 # temporary scratch/debug files
 /src/server/test_debug.ts
 /src/server/test_import*.ts
+/src/server/inspect*.ts
+/src/server/test*.ts
+/src/server/execute*.ts
+/src/server/get-event.ts
