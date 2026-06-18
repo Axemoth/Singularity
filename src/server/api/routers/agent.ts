@@ -592,6 +592,18 @@ export const agentRouter = createTRPCRouter({
           ? `\n\nLEARNED USER HABITS (Mimic this user's work style and preferences strictly):\n${learntHabits}`
           : "";
 
+        const now = new Date();
+        const formattedDate = now.toLocaleString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "numeric",
+          minute: "numeric",
+          timeZoneName: "short"
+        });
+        const timeInstruction = `\n\nCURRENT TIME AND DATE: ${formattedDate}. Any reference to dates/times (like '19 June', 'tomorrow', 'next week') MUST be resolved relative to this exact date, and specifically, the year MUST default to ${now.getFullYear()} unless a different year is explicitly specified.`;
+
         const connectionInstructions = `\n\nCONNECTION STATUS:
 - Gmail Accounts connected: ${gmailAccounts.length} (${gmailAccounts.map(a => a.emailAddress).join(", ") || "None"})
 - Google Calendar connected: ${calendarAccounts.length} (${calendarAccounts.map(a => a.emailAddress).join(", ") || "None"})
@@ -661,7 +673,7 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
    <email body>
    ---DRAFT_END---
    Always keep conversational text outside of this block (preferably before it). This block allows the frontend to render the draft as an interactive, editable review card in the chat.
-7. Tool Confirmations: After successfully calling 'send_email' or 'create_draft', you MUST always output an explicit, friendly confirmation message to the user confirming the action was successful (e.g. 'I have successfully sent the email to [recipient] with the subject "[subject]".' or 'I have saved your draft for [recipient] with the subject "[subject]".'). Do NOT output an empty response.${targetEmailInstruction}${habitsInstruction}${connectionInstructions}`;
+7. Tool Confirmations: After successfully calling 'send_email' or 'create_draft', you MUST always output an explicit, friendly confirmation message to the user confirming the action was successful (e.g. 'I have successfully sent the email to [recipient] with the subject "[subject]".' or 'I have saved your draft for [recipient] with the subject "[subject]".'). Do NOT output an empty response.${targetEmailInstruction}${habitsInstruction}${connectionInstructions}${timeInstruction}`;
         const contextPrompt = buildContextPrompt(input.context);
 
         const historyMessages = (input.history ?? []).map((msg) => {
