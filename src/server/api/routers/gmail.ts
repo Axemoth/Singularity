@@ -5,7 +5,7 @@ import { corsairEntities, corsairAccounts, corsairIntegrations, emailPriorities,
 import { eq, and, desc, or, like, inArray, count } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { syncEmbeddings } from "@/server/api/tasks/embeddings";
-import { syncPriorities } from "@/server/api/tasks/prioritizer";
+import { syncPriorities, isSyncingPriorities } from "@/server/api/tasks/prioritizer";
 
 // Helper to construct a base64url encoded MIME email
 export function buildRawEmail(
@@ -773,6 +773,10 @@ export const gmailRouter = createTRPCRouter({
       console.error("Failed to get priority rules:", err);
       return "";
     }
+  }),
+
+  isPrioritizing: protectedProcedure.query(({ ctx }) => {
+    return isSyncingPriorities(ctx.session.user.id);
   }),
 
   setPriorityRules: protectedProcedure

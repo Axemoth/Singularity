@@ -1187,6 +1187,21 @@ export default function InboxPage() {
 
   const { data: gmailStatus, isLoading: isStatusLoading } = api.gmail.getConnectionStatus.useQuery();
 
+  const { data: isPrioritizing } = api.gmail.isPrioritizing.useQuery(undefined, {
+    refetchInterval: (data) => (data ? 2000 : 8000),
+  });
+
+  const [prevIsPrioritizing, setPrevIsPrioritizing] = useState(false);
+
+  useEffect(() => {
+    if (isPrioritizing) {
+      setPrevIsPrioritizing(true);
+    } else if (prevIsPrioritizing && !isPrioritizing) {
+      setPrevIsPrioritizing(false);
+      void utils.gmail.listThreads.invalidate();
+    }
+  }, [isPrioritizing, prevIsPrioritizing, utils]);
+
   const {
     data: threads,
     isLoading: isThreadsLoading,
@@ -1563,6 +1578,19 @@ export default function InboxPage() {
                 "{dbPriorityRules}"
               </div>
             )}
+          </div>
+        )}
+
+        {/* Prioritization Loader Bar */}
+        {isPrioritizing && (
+          <div className="px-4 py-2.5 bg-accent-primary/10 border-b border-accent-primary/20 flex items-center gap-3 animate-fade-in shrink-0">
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-primary opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-primary"></span>
+            </span>
+            <span className="text-[11px] font-semibold text-accent-primary leading-tight">
+              AI Prioritizer is sorting your inbox according to your custom rules...
+            </span>
           </div>
         )}
 

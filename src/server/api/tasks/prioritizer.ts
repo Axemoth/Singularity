@@ -29,6 +29,13 @@ function cleanAndParseJSON(text: string): any {
   return JSON.parse(clean);
 }
 
+function getMessageHeader(msg: any, name: string): string {
+  if (!msg) return "";
+  if (msg[name.toLowerCase()]) return msg[name.toLowerCase()];
+  const headers = msg.payload?.headers ?? [];
+  return headers.find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? "";
+}
+
 const deepseek = createOpenAI({
   baseURL: "https://api.deepseek.com",
   apiKey: env.DEEPSEEK_API_KEY ?? "",
@@ -370,8 +377,8 @@ export async function classifyAndSaveEmail(tenantId: string, entityId: string, m
     }
 
     // Extract headers safely from message
-    const from = message.from ?? "";
-    const subject = message.subject ?? "";
+    const from = getMessageHeader(message, "from");
+    const subject = getMessageHeader(message, "subject");
     const snippet = message.snippet ?? message.body ?? "";
 
     const baseUserId = tenantId.includes("_") ? tenantId.split("_")[0]! : tenantId;
@@ -613,7 +620,7 @@ export async function syncPriorities(userId: string): Promise<void> {
         const threadData = thread.data as any;
         const messages = threadData.messages ?? [];
         const firstMessage = messages[0] ?? {};
-        const fromEmail = firstMessage.from ?? "";
+        const fromEmail = getMessageHeader(firstMessage, "from");
         
         const stats = await getSenderInteractionStats(userId, fromEmail);
         const statsStr = `Sender Relationship Context:
@@ -626,7 +633,7 @@ export async function syncPriorities(userId: string): Promise<void> {
         emails.push({
           id: thread.id,
           from: fromEmail,
-          subject: firstMessage.subject ?? threadData.snippet ?? "No Subject",
+          subject: getMessageHeader(firstMessage, "subject") || threadData.snippet || "No Subject",
           snippet: threadData.snippet ?? "",
         });
       }
@@ -1079,4 +1086,8 @@ export async function learnUserHabits(userId: string): Promise<string> {
     console.error("[Prioritizer] Error in learnUserHabits:", err);
     return "Error learning habits.";
   }
+}
+
+export function isSyncingPriorities(userId: string): boolean {
+  return activeSyncs.has(userId);
 }
