@@ -855,7 +855,7 @@ If you are only asking a question or cannot draft the email yet, do NOT output t
             </div>
 
             {/* Input Form */}
-            <form onSubmit={handleChatSubmit} className="flex flex-col gap-2 rounded-xl border border-border-default bg-bg-inset p-2 focus-within:border-accent-primary transition-colors focus-within:bg-bg-base">
+            <form onSubmit={handleChatSubmit} className="flex flex-col gap-2 rounded-xl border border-transparent bg-bg-surface p-2 shadow-sm focus-within:shadow-md transition-all focus-within:bg-bg-base">
               <textarea
                 ref={chatInputRef}
                 value={aiInput}

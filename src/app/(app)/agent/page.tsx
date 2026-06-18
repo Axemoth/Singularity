@@ -885,7 +885,7 @@ function AgentPageContent() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-xl border border-border-default bg-bg-inset p-2.5 focus-within:border-accent-primary transition-colors focus-within:bg-bg-base">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-xl border border-transparent bg-bg-surface p-2.5 shadow-sm focus-within:shadow-md transition-all focus-within:bg-bg-base">
               {targetEmail && (
                 <div className="flex items-center gap-1.5 bg-accent-primary/10 text-accent-primary border border-accent-primary/20 rounded-full px-2.5 py-1 text-[11px] font-medium w-fit mb-1 animate-fade-in shrink-0">
                   <span>Targeting: {targetEmail}</span>
