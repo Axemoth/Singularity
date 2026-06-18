@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsairEntities, corsairAccounts, corsairIntegrations } from "@/server/db/schema";
-import { eq, and, or, like, inArray } from "drizzle-orm";
+import { eq, and, or, like, inArray, sql } from "drizzle-orm";
 
 export const dashboardRouter = createTRPCRouter({
   getMetrics: protectedProcedure
@@ -73,81 +73,75 @@ export const dashboardRouter = createTRPCRouter({
 
       // 3. Fetch threads (emails) if Gmail is connected
       if (gmailAccountIds.length > 0) {
-        const threads = await ctx.db
-          .select({
-            data: corsairEntities.data,
-          })
-          .from(corsairEntities)
-          .where(
-            and(
-              eq(corsairEntities.entityType, "threads"),
-              inArray(corsairEntities.accountId, gmailAccountIds)
-            )
-          );
+        // Query sent messages count in database
+        const sentResult = await ctx.db.execute(sql`
+          SELECT COUNT(*) AS count
+          FROM corsair_entities,
+               jsonb_array_elements(data->'messages') AS msg
+          WHERE entity_type = 'threads'
+            AND account_id = ANY(${gmailAccountIds})
+            AND msg->'labelIds' ? 'SENT'
+            AND (msg->>'internalDate')::bigint >= ${start.getTime()}
+            AND (msg->>'internalDate')::bigint <= ${end.getTime()}
+        `);
+        sentCount = Number((sentResult[0] as any)?.count ?? 0);
 
-        for (const t of threads) {
-          const threadData = t.data as any;
-          const messages = (threadData.messages ?? []) as any[];
-
-          // Count sent messages in the thread that fall in the range
-          for (const msg of messages) {
-            const isSent = msg.labelIds?.includes("SENT");
-            const internalDateMs = msg.internalDate ? Number(msg.internalDate) : null;
-            if (isSent && internalDateMs) {
-              const msgDate = new Date(internalDateMs);
-              if (msgDate >= start && msgDate <= end) {
-                sentCount++;
-              }
-            }
-          }
-
-          // Count unread threads where the first message has UNREAD and its date is in the range
-          const firstMsg = messages[0];
-          if (firstMsg) {
-            const isUnread = firstMsg.labelIds?.includes("UNREAD");
-            const internalDateMs = firstMsg.internalDate ? Number(firstMsg.internalDate) : null;
-            if (isUnread && internalDateMs) {
-              const threadDate = new Date(internalDateMs);
-              if (threadDate >= start && threadDate <= end) {
-                unreadCount++;
-              }
-            }
-          }
-        }
+        // Query unread threads count in database
+        const unreadResult = await ctx.db.execute(sql`
+          SELECT COUNT(*) AS count
+          FROM corsair_entities
+          WHERE entity_type = 'threads'
+            AND account_id = ANY(${gmailAccountIds})
+            AND data->'messages'->0->'labelIds' ? 'UNREAD'
+            AND (data->'messages'->0->>'internalDate')::bigint >= ${start.getTime()}
+            AND (data->'messages'->0->>'internalDate')::bigint <= ${end.getTime()}
+        `);
+        unreadCount = Number((unreadResult[0] as any)?.count ?? 0);
       }
 
       // 4. Fetch calendar events if Calendar is connected
       if (calendarAccountIds.length > 0) {
-        const events = await ctx.db
-          .select({
-            id: corsairEntities.id,
-            data: corsairEntities.data,
-          })
-          .from(corsairEntities)
-          .where(
-            and(
-              eq(corsairEntities.entityType, "events"),
-              inArray(corsairEntities.accountId, calendarAccountIds)
-            )
-          );
+        const eventsResult = await ctx.db.execute(sql`
+          SELECT 
+            id,
+            jsonb_build_object(
+              'summary', data->>'summary',
+              'location', data->>'location',
+              'description', data->>'description',
+              'start', data->'start',
+              'end', data->'end'
+            ) AS event_data
+          FROM corsair_entities
+          WHERE entity_type = 'events'
+            AND account_id = ANY(${calendarAccountIds})
+            AND COALESCE(data->'start'->>'dateTime', data->'start'->>'date') IS NOT NULL
+            AND (
+              CASE 
+                WHEN (data->'start'->>'dateTime') IS NOT NULL THEN (data->'start'->>'dateTime')::timestamptz
+                ELSE (data->'start'->>'date')::timestamptz
+              END
+            ) >= ${start.toISOString()}::timestamptz
+            AND (
+              CASE 
+                WHEN (data->'start'->>'dateTime') IS NOT NULL THEN (data->'start'->>'dateTime')::timestamptz
+                ELSE (data->'start'->>'date')::timestamptz
+              END
+            ) <= ${end.toISOString()}::timestamptz
+        `);
 
-        for (const e of events) {
-          const eventData = e.data as any;
+        for (const row of eventsResult) {
+          const eId = (row as any).id;
+          const eventData = (row as any).event_data;
           const startStr = eventData.start?.dateTime || eventData.start?.date;
           const endStr = eventData.end?.dateTime || eventData.end?.date;
-          if (startStr) {
-            const eventStart = new Date(startStr);
-            if (eventStart >= start && eventStart <= end) {
-              scheduledEvents.push({
-                id: e.id,
-                summary: eventData.summary ?? "No Title",
-                start: startStr,
-                end: endStr ?? startStr,
-                location: eventData.location,
-                description: eventData.description,
-              });
-            }
-          }
+          scheduledEvents.push({
+            id: eId,
+            summary: eventData.summary ?? "No Title",
+            start: startStr,
+            end: endStr ?? startStr,
+            location: eventData.location || undefined,
+            description: eventData.description || undefined,
+          });
         }
 
         // Sort events by start date chronologically

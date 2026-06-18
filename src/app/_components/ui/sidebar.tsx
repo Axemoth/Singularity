@@ -186,17 +186,14 @@ export function Sidebar() {
   const [showShortcuts, setShowShortcuts] = useState(false);
 
   // Fetch unread count for inbox badge
-  const { data: threads } = api.gmail.listThreads.useQuery(
-    { refresh: false },
-    { refetchInterval: 60000 } // refresh every 60s
+  const { data: unreadCount = 0 } = api.gmail.getUnreadCount.useQuery(
+    undefined,
+    {
+      refetchInterval: 300000, // refresh every 5m instead of 60s
+      refetchOnWindowFocus: true,
+      refetchOnMount: true,
+    }
   );
-
-  const unreadCount = threads
-    ? threads.filter((t: any) => {
-        const msgs = (t.data as any)?.messages ?? [];
-        return msgs[0]?.labelIds?.includes('UNREAD');
-      }).length
-    : 0;
 
   // Global '?' keyboard shortcut to open shortcuts modal
   useEffect(() => {

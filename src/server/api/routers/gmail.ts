@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
 import { corsairEntities, corsairAccounts, corsairIntegrations, emailPriorities, userSettings, user } from "@/server/db/schema";
-import { eq, and, desc, or, like, inArray, count } from "drizzle-orm";
+import { eq, and, desc, or, like, inArray, count, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { syncEmbeddings } from "@/server/api/tasks/embeddings";
 import { syncPriorities, isSyncingPriorities } from "@/server/api/tasks/prioritizer";
@@ -147,7 +147,30 @@ export const gmailRouter = createTRPCRouter({
         .select({
           id: corsairEntities.id,
           entityId: corsairEntities.entityId,
-          data: corsairEntities.data,
+          data: sql<any>`
+            jsonb_build_object(
+              'id', ${corsairEntities.data}->'id',
+              'historyId', ${corsairEntities.data}->'historyId',
+              'messages', (
+                SELECT jsonb_agg(
+                  jsonb_build_object(
+                    'id', msg->'id',
+                    'snippet', msg->'snippet',
+                    'labelIds', msg->'labelIds',
+                    'internalDate', msg->'internalDate',
+                    'payload', jsonb_build_object(
+                      'headers', (
+                        SELECT jsonb_agg(h)
+                        FROM jsonb_to_recordset(msg->'payload'->'headers') AS h(name text, value text)
+                        WHERE lower(h.name) IN ('from', 'subject')
+                      )
+                    )
+                  )
+                )
+                FROM jsonb_array_elements(${corsairEntities.data}->'messages') AS msg
+              )
+            )
+          `,
           updatedAt: corsairEntities.updatedAt,
           priority: emailPriorities.priority,
           priorityReason: emailPriorities.reason,
@@ -220,7 +243,30 @@ export const gmailRouter = createTRPCRouter({
           .select({
             id: corsairEntities.id,
             entityId: corsairEntities.entityId,
-            data: corsairEntities.data,
+            data: sql<any>`
+              jsonb_build_object(
+                'id', ${corsairEntities.data}->'id',
+                'historyId', ${corsairEntities.data}->'historyId',
+                'messages', (
+                  SELECT jsonb_agg(
+                    jsonb_build_object(
+                      'id', msg->'id',
+                      'snippet', msg->'snippet',
+                      'labelIds', msg->'labelIds',
+                      'internalDate', msg->'internalDate',
+                      'payload', jsonb_build_object(
+                        'headers', (
+                          SELECT jsonb_agg(h)
+                          FROM jsonb_to_recordset(msg->'payload'->'headers') AS h(name text, value text)
+                          WHERE lower(h.name) IN ('from', 'subject')
+                        )
+                      )
+                    )
+                  )
+                  FROM jsonb_array_elements(${corsairEntities.data}->'messages') AS msg
+                )
+              )
+            `,
             updatedAt: corsairEntities.updatedAt,
             priority: emailPriorities.priority,
             priorityReason: emailPriorities.reason,
@@ -313,6 +359,37 @@ export const gmailRouter = createTRPCRouter({
 
       return uniqueThreads;
     }),
+
+  getUnreadCount: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+
+    const accounts = await ctx.db
+      .select({ id: corsairAccounts.id })
+      .from(corsairAccounts)
+      .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+      .where(
+        and(
+          or(
+            eq(corsairAccounts.tenantId, userId),
+            like(corsairAccounts.tenantId, `${userId}\\_%`)
+          ),
+          eq(corsairIntegrations.name, "gmail")
+        )
+      );
+
+    if (accounts.length === 0) return 0;
+    const accountIds = accounts.map((a) => a.id);
+
+    const result = await ctx.db.execute(sql`
+      SELECT COUNT(*) AS count
+      FROM corsair_entities
+      WHERE entity_type = 'threads'
+        AND account_id = ANY(${accountIds})
+        AND data->'messages'->0->'labelIds' ? 'UNREAD'
+    `);
+
+    return Number((result[0] as any)?.count ?? 0);
+  }),
 
   syncInbox: protectedProcedure.mutation(async ({ ctx }) => {
     const userId = ctx.session.user.id;

@@ -774,28 +774,24 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
 
         const messagesList = [...historyMessages, promptMsg];
 
-        const models = input.reasoningEnabled
-          ? [
-              (deepseek as any).chat("deepseek-v4-pro", {
-                extraBody: {
-                  thinking: { type: "enabled" },
-                  reasoning_effort: "high",
-                },
-              }),
-              google("gemini-2.5-flash"),
-              google("gemini-2.5-flash-lite"),
-            ]
-          : [
-              (deepseek as any).chat("deepseek-v4-flash"),
-              google("gemini-2.5-flash"),
-              google("gemini-2.5-flash-lite"),
-              (deepseek as any).chat("deepseek-v4-pro", {
-                extraBody: {
-                  thinking: { type: "enabled" },
-                  reasoning_effort: "high",
-                },
-              }),
-            ];
+        const models = [
+          (deepseek as any).chat("deepseek-v4-pro", {
+            extraBody: {
+              thinking: { type: "enabled" },
+              reasoning_effort: "high",
+            },
+          }),
+          ...(input.reasoningEnabled
+            ? [
+                google("gemini-2.5-flash"),
+                google("gemini-2.5-flash-lite"),
+              ]
+            : [
+                (deepseek as any).chat("deepseek-v4-flash"),
+                google("gemini-2.5-flash"),
+                google("gemini-2.5-flash-lite"),
+              ]),
+        ];
 
         let response;
         let lastError: unknown = null;
@@ -819,7 +815,7 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
             });
 
             // Set up a 2-minute timeout for the generation to avoid hanging
-            const generatePromise = agent.generate(messagesList as any);
+            const generatePromise = agent.generate(messagesList as any, { maxSteps: 5 });
 
             const timeoutPromise = new Promise<never>((_, reject) =>
               setTimeout(() => reject(new Error("Model execution timed out after 2 minutes.")), 120000)

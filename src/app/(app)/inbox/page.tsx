@@ -207,8 +207,8 @@ function ThreadListItem({
   const subjectHeader = getMessageHeader(firstMessage, "subject");
   
   const sender = fromHeader ? parseSenderName(fromHeader) : "Notification";
-  const subject = subjectHeader || truncate(threadData.snippet, 40) || "No Subject";
-  const snippet = truncate(threadData.snippet, 80);
+  const subject = subjectHeader || truncate(firstMessage?.snippet ?? threadData.snippet, 40) || "No Subject";
+  const snippet = truncate(firstMessage?.snippet ?? threadData.snippet, 80);
   
   const messages = threadData.messages ?? [];
   const latestMessage = messages[messages.length - 1];
