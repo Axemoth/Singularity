@@ -217,10 +217,12 @@ function ThreadListItem({
 
   return (
     <div
-      className={`relative w-full text-left rounded-[var(--radius-md)] transition-all duration-[var(--transition-fast)] cursor-pointer group ${
+      className={`relative w-full text-left rounded-xl transition-all duration-150 cursor-pointer group border ${
         isSelected
-          ? "bg-bg-surface border border-border-default shadow-sm"
-          : "border border-transparent hover:bg-bg-surface/60"
+          ? `bg-bg-surface border-border-default shadow-sm ${isUnread ? 'border-l-[3px] border-l-accent-primary rounded-l-none' : ''}`
+          : isUnread
+          ? "bg-bg-raised border-border-subtle border-l-[3px] border-l-accent-primary rounded-l-none hover:bg-bg-surface/40 shadow-sm"
+          : "border-transparent hover:bg-bg-surface/40"
       }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -236,17 +238,10 @@ function ThreadListItem({
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 mb-0.5">
-              <div className="flex items-center gap-1.5 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap min-w-0">
                 {/* Unread dot */}
-                {isUnread && !isSelected && (
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-accent-primary" />
-                )}
-                {/* Priority dot */}
-                {!isUnread && priority === "urgent" && (
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-accent-danger" />
-                )}
-                {!isUnread && priority === "normal" && (
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-accent-warning" />
+                {isUnread && (
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-primary mr-0.5 animate-pulse-subtle" />
                 )}
                 <span
                   className={`truncate text-sm ${
@@ -259,10 +254,19 @@ function ThreadListItem({
                 </span>
                 {thread.emailAddress && (
                   <span 
-                    className="text-[9px] px-1.5 py-0.5 bg-accent-primary/10 text-accent-primary border border-accent-primary/20 rounded-md font-medium truncate max-w-[90px] shrink-0"
+                    className="text-[9px] px-1.5 py-0.5 bg-accent-primary/5 text-text-tertiary border border-border-default/50 rounded-md font-medium truncate max-w-[80px] shrink-0"
                     title={thread.emailAddress}
                   >
                     {thread.emailAddress.split('@')[0]}
+                  </span>
+                )}
+                {priority && priority !== "low" && (
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${
+                    priority === "urgent" 
+                      ? "bg-accent-danger/10 text-accent-danger border border-accent-danger/20" 
+                      : "bg-accent-info/10 text-accent-info border border-accent-info/20"
+                  }`}>
+                    {priority}
                   </span>
                 )}
               </div>
@@ -774,6 +778,21 @@ function ThreadDetail({
   const messages: GmailMessage[] =
     fullThreadData.messages ?? threadData.messages ?? [];
 
+  // Track expanded state of messages in the thread
+  const [expandedMessages, setExpandedMessages] = useState<Record<string, boolean>>({});
+
+  // Auto-expand only the latest message when thread changes
+  useEffect(() => {
+    if (messages.length > 0) {
+      const initial: Record<string, boolean> = {};
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg?.id) {
+        initial[lastMsg.id] = true;
+      }
+      setExpandedMessages(initial);
+    }
+  }, [thread.entityId, messages.length]);
+
   return (
     <div className="flex h-full flex-col animate-fade-in">
       {/* Toolbar */}
@@ -838,9 +857,23 @@ function ThreadDetail({
           </div>
         ) : (
           <div className="flex flex-col divide-y divide-border-subtle pb-8">
-            {messages.map((msg, idx) => (
-              <MessageCard key={msg.id ?? idx} message={msg} />
-            ))}
+            {messages.map((msg, idx) => {
+              const msgId = msg.id ?? `msg-${idx}`;
+              const isExpanded = !!expandedMessages[msgId];
+              return (
+                <MessageCard 
+                  key={msgId} 
+                  message={msg} 
+                  isExpanded={isExpanded}
+                  onToggle={() => {
+                    setExpandedMessages(prev => ({
+                      ...prev,
+                      [msgId]: !prev[msgId]
+                    }));
+                  }}
+                />
+              );
+            })}
             <div className="px-6 py-4 border-t border-border-subtle bg-bg-raised/10">
               <InlineReplyForm 
                 thread={thread} 
@@ -1005,7 +1038,15 @@ function SafeEmailRenderer({ htmlContent }: { htmlContent: string }) {
   );
 }
 
-function MessageCard({ message }: { message: GmailMessage }) {
+function MessageCard({ 
+  message,
+  isExpanded,
+  onToggle
+}: { 
+  message: GmailMessage;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
   const fromHeader = getMessageHeader(message, "from");
   const toHeader = getMessageHeader(message, "to");
   const sender = parseSenderName(fromHeader);
@@ -1041,23 +1082,66 @@ function MessageCard({ message }: { message: GmailMessage }) {
     htmlContent = message.snippet || "";
   }
 
-  return (
-    <div className="px-6 py-5 animate-fade-in">
-      <div className="flex items-start justify-between gap-4 mb-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-text-primary">{sender}</p>
-          {message.to && (
-            <p className="text-xs text-text-tertiary mt-0.5 truncate">
-              To: {message.to}
-            </p>
-          )}
+  if (!isExpanded) {
+    return (
+      <div 
+        onClick={onToggle}
+        className="px-6 py-3.5 flex items-center justify-between gap-4 bg-bg-raised/35 hover:bg-bg-surface/50 border-b border-border-subtle cursor-pointer transition-all duration-150 animate-fade-in group select-none"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <SenderAvatar name={sender} size="sm" />
+          <span className="text-xs font-semibold text-text-secondary group-hover:text-text-primary truncate shrink-0 max-w-[120px]">
+            {sender}
+          </span>
+          <span className="text-xs text-text-tertiary truncate leading-none font-medium">
+            {message.snippet}
+          </span>
         </div>
-        <span className="shrink-0 text-xs text-text-tertiary tabular-nums">
-          {date}
-        </span>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <span className="text-[11px] text-text-tertiary tabular-nums">
+            {formatRelativeTime(message.internalDate)}
+          </span>
+          <svg className="h-4 w-4 text-text-tertiary group-hover:text-text-secondary transition-transform duration-200" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        </div>
       </div>
-      <div className="prose-email text-sm text-text-secondary leading-relaxed max-w-none">
-        <SafeEmailRenderer htmlContent={htmlContent} />
+    );
+  }
+
+  return (
+    <div className="border-b border-border-subtle animate-fade-in">
+      {/* Clickable Header to collapse */}
+      <div 
+        onClick={onToggle}
+        className="px-6 py-4 flex items-start justify-between gap-4 cursor-pointer hover:bg-bg-surface/25 transition-all duration-150 select-none"
+      >
+        <div className="flex items-start gap-3 min-w-0">
+          <SenderAvatar name={sender} size="md" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-text-primary">{sender}</p>
+            {message.to && (
+              <p className="text-[11px] text-text-tertiary mt-0.5 truncate">
+                To: {message.to}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="text-xs text-text-tertiary tabular-nums">
+            {date}
+          </span>
+          <svg className="h-4 w-4 text-text-tertiary rotate-180 transition-transform duration-200" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        </div>
+      </div>
+      
+      {/* Message Body */}
+      <div className="px-6 pb-6 pl-[62px]">
+        <div className="prose-email text-sm text-text-secondary leading-relaxed max-w-none">
+          <SafeEmailRenderer htmlContent={htmlContent} />
+        </div>
       </div>
     </div>
   );

@@ -28,7 +28,7 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     title: "2. Prioritized Inbox 📥",
-    description: "Your emails are classified by AI. Priority items stay highlighted, while newsletters and receipts are grouped under the Digest tab.",
+    description: "Scan messages quickly with solid unread left borders and inline priority tags. Open threads to see collapsible conversation cards.",
     path: "/inbox",
     selector: "#sidebar-nav-inbox",
     buttonText: "Next: Calendar",
@@ -45,6 +45,13 @@ const TOUR_STEPS: TourStep[] = [
     description: "Collaborate with your AI Copilot. Ask it to draft replies, parse uploaded contact lists, or run background tasks.",
     path: "/agent",
     selector: "#sidebar-nav-agent",
+    buttonText: "Next: Settings",
+  },
+  {
+    title: "5. Settings & Tuning ⚙️",
+    description: "Configure your custom AI priority instructions, choose operation modes, or replay this tour anytime.",
+    path: "/settings",
+    selector: "#sidebar-nav-settings",
     buttonText: "Finish Tour",
   },
 ];
