@@ -241,7 +241,7 @@ function InteractiveDraftCard({ initialDraft }: { initialDraft: DraftData }) {
   );
 }
 
-export function FormattedMessage({ role, text }: FormattedMessageProps) {
+export function FormattedMessage({ role, text, reasoning }: FormattedMessageProps) {
   // If user or system message, render text directly (with markdown support for assistant/system)
   if (role === "user") {
     return <div className="whitespace-pre-wrap">{text}</div>;
@@ -263,6 +263,19 @@ export function FormattedMessage({ role, text }: FormattedMessageProps) {
 
   return (
     <div className="space-y-2.5 w-full">
+      {/* Reasoning Section (DeepThink) */}
+      {reasoning && (
+        <details className="group rounded-lg border border-border-subtle bg-bg-surface/50">
+          <summary className="cursor-pointer px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-text-tertiary hover:text-text-secondary select-none flex items-center gap-1.5">
+            <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            Reasoning
+          </summary>
+          <div className="px-3 pb-2.5 text-xs text-text-secondary whitespace-pre-wrap opacity-75">
+            {reasoning}
+          </div>
+        </details>
+      )}
+
       {/* Main Response Markdown */}
       <FormattedText text={displayCleanText} role={role} />
 

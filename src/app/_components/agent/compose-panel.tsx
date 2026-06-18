@@ -296,12 +296,23 @@ export function ComposePanel() {
     enabled: isOpen,
   });
 
-  // Inject signature if body is empty when username loads or panel opens
+  // Track whether signature was already injected for the current panel session
+  const signatureInjectedRef = useRef(false);
+
+  // Reset the injection flag when the panel closes
   useEffect(() => {
-    if (isOpen && dbUsername && !body.trim()) {
+    if (!isOpen) {
+      signatureInjectedRef.current = false;
+    }
+  }, [isOpen]);
+
+  // Inject signature only once when panel opens with empty body
+  useEffect(() => {
+    if (isOpen && dbUsername && !body.trim() && !signatureInjectedRef.current) {
+      signatureInjectedRef.current = true;
       setBody(`\n\nBest regards,\n${dbUsername}`);
     }
-  }, [isOpen, dbUsername, body]);
+  }, [isOpen, dbUsername]);
 
   // Right column AI copilot state
   const [aiInput, setAiInput] = useState("");

@@ -10,6 +10,7 @@ import {
   vector,
   index,
   integer,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const createTable = pgTableCreator((name) => `pg-drizzle_${name}`);
@@ -113,7 +114,9 @@ export const corsairAccounts = pgTable('corsair_accounts', {
     config: jsonb('config').notNull().default({}),
     dek: text('dek'),
     emailAddress: text('email_address'),
-});
+}, (table) => [
+    index('corsair_accounts_tenant_id_idx').on(table.tenantId),
+]);
 
 export const corsairEntities = pgTable('corsair_entities', {
     id: text('id').primaryKey(),
@@ -124,7 +127,12 @@ export const corsairEntities = pgTable('corsair_entities', {
     entityType: text('entity_type').notNull(),
     version: text('version').notNull(),
     data: jsonb('data').notNull().default({}),
-});
+}, (table) => [
+    index('corsair_entities_account_id_idx').on(table.accountId),
+    index('corsair_entities_entity_type_idx').on(table.entityType),
+    index('corsair_entities_entity_id_idx').on(table.entityId),
+    uniqueIndex('corsair_entities_account_entity_uniq').on(table.accountId, table.entityId, table.entityType),
+]);
 
 export const corsairEmbeddings = pgTable('corsair_embeddings', {
     id: text('id').primaryKey(),
@@ -166,7 +174,11 @@ export const emailPriorities = pgTable("email_priorities", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}, (table) => [
+  index('email_priorities_tenant_id_idx').on(table.tenantId),
+  index('email_priorities_email_id_idx').on(table.emailId),
+  uniqueIndex('email_priorities_tenant_email_uniq').on(table.tenantId, table.emailId),
+]);
 
 export const userSettings = pgTable("user_settings", {
   userId: text("user_id")

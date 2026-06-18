@@ -614,6 +614,7 @@ export async function syncPriorities(userId: string): Promise<void> {
       const batch = unprioritized.slice(i, i + batchSize);
       
       const interactionContexts: Record<string, string> = {};
+      const interactionStatsCache: Record<string, { sentCount: number; receivedCount: number; total: number }> = {};
       const emails = [];
 
       for (const thread of batch) {
@@ -623,6 +624,7 @@ export async function syncPriorities(userId: string): Promise<void> {
         const fromEmail = getMessageHeader(firstMessage, "from");
         
         const stats = await getSenderInteractionStats(userId, fromEmail);
+        interactionStatsCache[thread.id] = stats;
         const statsStr = `Sender Relationship Context:
 - Emails sent to this sender: ${stats.sentCount}
 - Emails received from this sender: ${stats.receivedCount}
@@ -659,7 +661,7 @@ export async function syncPriorities(userId: string): Promise<void> {
           const firstMessage = messages[0] ?? {};
           const fromEmail = firstMessage.from ?? "";
 
-          const stats = await getSenderInteractionStats(userId, fromEmail);
+          const stats = interactionStatsCache[res.id] ?? { sentCount: 0, receivedCount: 0, total: 0 };
           const cleanFrom = fromEmail.toLowerCase().match(/<([^>]+)>/)?.[1] ?? fromEmail.toLowerCase().trim();
           const cleanUserEmail = userEmail?.toLowerCase() ?? "";
           const userDomain = cleanUserEmail.split("@")[1];

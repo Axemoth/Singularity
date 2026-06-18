@@ -43,6 +43,9 @@ export async function isPremiumUser(email: string): Promise<boolean> {
         return true;
       }
     }
+
+    // No active subscriptions found — clear the cached premium flag
+    await db.update(user).set({ premium: false }).where(eq(user.email, email));
   } catch (err) {
     console.error("[Subscription] Failed to verify subscription status via Dodo Payments:", err);
   }

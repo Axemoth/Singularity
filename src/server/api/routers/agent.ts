@@ -503,7 +503,7 @@ export const agentRouter = createTRPCRouter({
             try {
               // 1. Trigger syncEmbeddings to ensure any newly cached items are embedded
               const { syncEmbeddings } = await import("@/server/api/tasks/embeddings");
-              await syncEmbeddings(userId).catch((err) => {
+              void syncEmbeddings(userId).catch((err) => {
                 console.error("[search_local] Background embedding sync failed:", err);
               });
 
@@ -891,7 +891,7 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
           null;
 
         return {
-          text: response.text,
+          text: response.text || "I completed the requested actions but have nothing additional to say.",
           reasoning,
           actions: inferFrontendActions(input.message, input.context, response.text),
           sentEmail,
@@ -1077,6 +1077,11 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
               failureCount++;
               errors.push(`Failed for ${recipient.email}: ${err.message || err}`);
               console.error(`Bulk send/draft failure for ${recipient.email}:`, err);
+            }
+
+            // Rate limit: 200ms delay between sends to avoid hitting Gmail API quotas
+            if (successCount + failureCount < recipients.length) {
+              await new Promise((resolve) => setTimeout(resolve, 200));
             }
           }
 
