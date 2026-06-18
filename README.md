@@ -8,7 +8,10 @@ Singularity is a high-performance, Superhuman-style email and calendar workflow 
 
 *   **Unified Inbox**: A minimalist, keyboard-shortcut-driven interface to read, compose, reply, and manage your emails. Includes full support for Inbox, Sent, and Drafts categories.
 *   **Google Calendar Sync**: View your daily schedule and upcoming events side-by-side with your emails—no tab-switching required.
-*   **AI Co-Pilot**: Summarize long email threads, draft response templates, write manual messages, or let the AI write contextual replies with smart action buttons.
+*   **Local Semantic Vector Search**: Lightning-fast (< 1s) natural language search across local cached email histories and calendar events. Uses PostgreSQL vector cosine similarity index (`hnsw`) and Gemini embeddings with a premium glassmorphic UI.
+*   **Multi-Account OAuth Syncing**: Connect up to 3 separate Gmail or Calendar accounts (for premium users) without overwrites. System automatically groups matching pairs under unified tenant ID slots.
+*   **AI Co-Pilot & Agent Behavior**: Summarize email threads, draft contextual replies, and configure behavior using **Careful Mode** (approves drafts) or **Autonomous Mode** (autopilot).
+*   **DeepThink Reasoning Toggle**: Toggle between `deepseek-v4-pro` (rich reasoning/thinking output visible in chat) and `deepseek-v4-flash` (high-speed execution) modes in the agent workspace.
 *   **Better Auth Integration**: Secure, session-based authentication with Google OAuth.
 *   **Premium Theme System**: Beautifully responsive design supporting both light and dark modes with a persistent theme switcher.
 *   **Production Ready**: Out-of-the-box support for serverless deployment on **Vercel** or containerized deployment on **Azure Container Apps** (Dockerized).
@@ -20,7 +23,7 @@ Singularity is a high-performance, Superhuman-style email and calendar workflow 
 *   **Framework**: Next.js 15 (App Router, Server Actions, Standalone Output)
 *   **Language**: TypeScript
 *   **Styling**: Tailwind CSS v4
-*   **Database**: PostgreSQL
+*   **Database**: PostgreSQL with `pgvector` extension
 *   **ORM**: Drizzle ORM
 *   **Authentication**: Better Auth (Google Provider)
 *   **API Layer**: tRPC (Client & Server)
@@ -137,3 +140,13 @@ We have pre-configured a standalone Docker build setup.
 2. Push the built image to your **Azure Container Registry (ACR)**.
 3. Deploy to **Azure Container Apps** pointing to target port `3000`.
 4. Remember to update the `APP_URL` environment variable inside your Container App configuration to match your live Azure URL.
+
+---
+
+## 📖 Detailed System Documentation
+
+For deep technical insights, architecture overviews, and implementation guides, refer to the following documentation in the `docs/` directory:
+
+*   [Local Semantic Vector Search](file:///c:/Users/ASUS/Desktop/Axehuman/singularity/docs/semantic_search.md): Details the vector embedding pipeline, the PostgreSQL HNSW index, similarity ranking algorithms, and UI integration.
+*   [Multi-Account Integrations & Tenant Slots](file:///c:/Users/ASUS/Desktop/Axehuman/singularity/docs/multi_account_integrations.md): Explains how Google OAuth connections are established, the unified pairing logic, and how we handle up to 3 separate connection slots for premium accounts without conflicts.
+*   [AI Co-Pilot & Agent Modes](file:///c:/Users/ASUS/Desktop/Axehuman/singularity/docs/agent_routing.md): Outlines the Careful vs. Autonomous modes, the DeepThink reasoning toggle, and how the model-mode switching (careful, quick) is implemented behind the scenes.
