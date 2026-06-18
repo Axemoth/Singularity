@@ -258,6 +258,25 @@ export const agentRouter = createTRPCRouter({
           )
           .orderBy(corsairAccounts.createdAt);
 
+        // Query all connected Calendar accounts for this user
+        const calendarAccounts = await ctx.db
+          .select({
+            tenantId: corsairAccounts.tenantId,
+            emailAddress: corsairAccounts.emailAddress,
+          })
+          .from(corsairAccounts)
+          .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+          .where(
+            and(
+              or(
+                eq(corsairAccounts.tenantId, userId),
+                like(corsairAccounts.tenantId, `${userId}\\_%`)
+              ),
+              eq(corsairIntegrations.name, "googlecalendar")
+            )
+          )
+          .orderBy(corsairAccounts.createdAt);
+
         const primaryGmailTenantId = gmailAccounts[0]?.tenantId ?? userId;
         let activeGmailTenantId = primaryGmailTenantId;
         if (input.context?.targetEmail) {
@@ -573,6 +592,33 @@ export const agentRouter = createTRPCRouter({
           ? `\n\nLEARNED USER HABITS (Mimic this user's work style and preferences strictly):\n${learntHabits}`
           : "";
 
+        const connectionInstructions = `\n\nCONNECTION STATUS:
+- Gmail Accounts connected: ${gmailAccounts.length} (${gmailAccounts.map(a => a.emailAddress).join(", ") || "None"})
+- Google Calendar connected: ${calendarAccounts.length} (${calendarAccounts.map(a => a.emailAddress).join(", ") || "None"})
+
+CRITICAL CONNECTION REQUIREMENTS:
+If the user asks ANY query related to workspace data (such as searching/listing/reading/sending/drafting emails, managing their calendar, scheduling events, accessing contacts, etc.) and they do not have the corresponding account connected (Gmail and/or Google Calendar):
+1. You MUST politely instruct them to connect their Gmail or Google Calendar account first. Explain that you need the connection to access their data and execute their request.
+2. Assist them ONLY in that connection task. Explain where to go (Settings -> Integrations) and guide them step-by-step through the process.
+3. Suggest the direct next steps as multiple-choice options at the end of your response, for example:
+   - Propose options to connect Gmail, connect Calendar, or help them troubleshoot connection issues.
+   - Format them exactly as option blocks, e.g.:
+     [Option: Connect Gmail]
+     [Option: Connect Google Calendar]
+     [Option: How do I connect my accounts?]
+     [Option: Ask a general question]
+4. Do NOT attempt to run scripts or call tools to perform email/calendar operations when the service is not connected.
+5. SOFT REDIRECTION FOR GENERAL QUESTIONS:
+   If the user asks general, non-workspace questions (e.g., 'What is 15 * 8?', 'Write a poem about time', or 'How do I write a good follow-up email?'), answer their query concisely and helpfully, and then:
+   - Case A (IF accounts are NOT connected): Append a friendly note pointing out that to unlock full email, calendar, and scheduling capabilities, they should connect their accounts, followed by connection options, e.g.:
+     [Option: Connect Gmail]
+     [Option: Connect Google Calendar]
+     [Option: Ask a workspace query]
+   - Case B (IF accounts ARE connected): Append a friendly note reminding them that they can ask workspace/Gmail/Calendar related queries next, followed by option buttons to test these features, e.g.:
+     [Option: Search my emails]
+     [Option: Check my schedule]
+     [Option: Draft an email]`;
+
         // System instructions (completely static to maximize DeepSeek/Gemini prompt caching)
         const instructions = `You have access to Corsair tools. Use list_operations to discover available APIs, get_schema to understand required arguments, and run_script to execute them.
 The 'corsair' variable is already pre-scoped to your active tenant, so you must NOT call '.withTenant()' yourself. Simply run operations directly on 'corsair', e.g. const res = await corsair.gmail.api.threads.list({}); return res;
@@ -615,7 +661,7 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
    <email body>
    ---DRAFT_END---
    Always keep conversational text outside of this block (preferably before it). This block allows the frontend to render the draft as an interactive, editable review card in the chat.
-7. Tool Confirmations: After successfully calling 'send_email' or 'create_draft', you MUST always output an explicit, friendly confirmation message to the user confirming the action was successful (e.g. 'I have successfully sent the email to [recipient] with the subject "[subject]".' or 'I have saved your draft for [recipient] with the subject "[subject]".'). Do NOT output an empty response.${targetEmailInstruction}${habitsInstruction}`;
+7. Tool Confirmations: After successfully calling 'send_email' or 'create_draft', you MUST always output an explicit, friendly confirmation message to the user confirming the action was successful (e.g. 'I have successfully sent the email to [recipient] with the subject "[subject]".' or 'I have saved your draft for [recipient] with the subject "[subject]".'). Do NOT output an empty response.${targetEmailInstruction}${habitsInstruction}${connectionInstructions}`;
         const contextPrompt = buildContextPrompt(input.context);
 
         const historyMessages = (input.history ?? []).map((msg) => {

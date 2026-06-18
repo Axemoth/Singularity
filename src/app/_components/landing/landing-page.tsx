@@ -15,17 +15,8 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
       </svg>
     ),
-    title: "Unified Inbox",
-    desc: "All your Gmail threads in one place. Sent, Drafts, everything - beautifully organised.",
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-      </svg>
-    ),
-    title: "Calendar Workflow",
-    desc: "See your schedule at a glance. No tab-switching, no context loss - just flow.",
+    title: "Unified Workspace",
+    desc: "Your Gmail messages and Google Calendar events merged into a single, cohesive workspace. No tab-switching required.",
   },
   {
     icon: (
@@ -35,7 +26,7 @@ const features = [
       </svg>
     ),
     title: "AI Co-Pilot",
-    desc: "Draft emails, summarise threads, and automate actions. Use the '@' trigger to target specific connected accounts.",
+    desc: "Draft emails, summarize complex threads, and execute tasks via natural chat. Use '@' to target specific accounts.",
   },
   {
     icon: (
@@ -44,7 +35,7 @@ const features = [
       </svg>
     ),
     title: "Smart Prioritizer",
-    desc: "AI classifies every email as Urgent, Normal, or Low. Learns from your manual overrides with a feedback loop.",
+    desc: "AI triages every incoming email as Urgent, Normal, or Low. Learns and refines constantly from your manual feedback loop.",
   },
   {
     icon: (
@@ -52,8 +43,8 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
       </svg>
     ),
-    title: "Spam Guard",
-    desc: "Phishing and junk mail auto-detected and moved to Gmail spam. Important emails are never misclassified.",
+    title: "Spam Guard & Security",
+    desc: "Phishing and junk mail auto-detected and safely blocked. Your data never leaves your account, operating strictly via secure OAuth.",
   },
   {
     icon: (
@@ -62,25 +53,7 @@ const features = [
       </svg>
     ),
     title: "Deadline Alerts",
-    desc: "AI scans emails for actionable deadlines and auto-escalates priority as the due date approaches.",
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-      </svg>
-    ),
-    title: "Smart Compose",
-    desc: "Write better emails faster. Describe what you need and let the AI compose it for you.",
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-      </svg>
-    ),
-    title: "Instant Actions",
-    desc: "Reply, forward, archive or schedule - type '/' for quick command autocompletes like /prioritize or /draft.",
+    desc: "AI automatically scans messages for due dates and actionable deadlines, escalating priority as the due date draws near.",
   },
   {
     icon: (
@@ -88,17 +61,8 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5" />
       </svg>
     ),
-    title: "AI That Learns You",
-    desc: "Discovers your writing tone, greeting style, reply speed, and calendar habits. Grows smarter with every interaction.",
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-      </svg>
-    ),
-    title: "Privacy First",
-    desc: "Your data never leaves your Google account. We operate strictly within OAuth scopes.",
+    title: "Adaptive AI Habits",
+    desc: "Discovers your unique communication tone, reply templates, greeting choices, and calendar scheduling patterns to mimic your voice.",
   },
 ];
 
@@ -1236,11 +1200,11 @@ export default function LandingPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((f) => (
             <div
               key={f.title}
-              className="group relative overflow-hidden rounded-2xl border border-border-default bg-bg-raised p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-accent-primary hover:shadow-lg flex flex-col justify-between"
+              className="group relative overflow-hidden rounded-2xl border border-border-default bg-bg-raised p-6 shadow-xs transition-all duration-300 hover:bg-bg-surface/60 flex flex-col justify-between"
             >
               <div>
                 <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-bg-surface border border-border-default text-text-primary shadow-xs">
