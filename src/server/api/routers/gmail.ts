@@ -537,13 +537,21 @@ export const gmailRouter = createTRPCRouter({
     }),
 
   getThread: protectedProcedure
-    .input(z.object({ id: z.string().trim().min(1) }))
+    .input(
+      z.object({
+        id: z.string().trim().min(1),
+        refresh: z.boolean().optional().default(false),
+      })
+    )
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
       // Securely look up the thread entity ensuring it belongs to the current user
       const [threadAccount] = await ctx.db
-        .select({ tenantId: corsairAccounts.tenantId })
+        .select({ 
+          tenantId: corsairAccounts.tenantId,
+          data: corsairEntities.data,
+        })
         .from(corsairEntities)
         .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
         .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
@@ -565,6 +573,15 @@ export const gmailRouter = createTRPCRouter({
           code: "NOT_FOUND",
           message: "Thread not found or you do not have permission to access it.",
         });
+      }
+
+      // If not forced refresh, try to serve from local cached data
+      if (!input.refresh && threadAccount.data) {
+        const cachedThread = threadAccount.data as any;
+        if (cachedThread.messages && cachedThread.messages.length > 0) {
+          console.info(`[getThread] Serving thread ${input.id} from local database cache.`);
+          return cachedThread;
+        }
       }
 
       const tenantId = threadAccount.tenantId;

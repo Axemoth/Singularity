@@ -77,7 +77,7 @@ export default function DashboardPage() {
     { startDate, endDate, emailFilter },
     {
       enabled: !!gmailStatus && !!calendarStatus,
-      refetchInterval: 30000, // Refresh counts every 30s
+      refetchInterval: 120000, // Refresh counts every 2m
     }
   );
 
