@@ -104,7 +104,7 @@ export default function TermsOfServicePage() {
                 For questions about these Terms, please contact support at:
               </p>
               <p className="font-semibold text-text-primary">
-                Email: dipti.gorasia@gmail.com
+                Email: rushil.gorasia@gmail.com
               </p>
             </section>
           </div>

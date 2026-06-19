@@ -139,7 +139,7 @@ export default function PrivacyPolicyPage() {
                   <strong>User-Initiated Deletion:</strong> You can disconnect your Google account or delete your Singularity account at any time through the Settings panel in the application.
                 </li>
                 <li>
-                  <strong>Data Purge:</strong> Upon account deletion or disconnection, all associated Google user data, access tokens, and cached emails/events are permanently and securely deleted from our databases within 30 days. You can also request manual deletion of all your stored data by contacting us directly at <span className="font-semibold">dipti.gorasia@gmail.com</span>.
+                  <strong>Data Purge:</strong> Upon account deletion or disconnection, all associated Google user data, access tokens, and cached emails/events are permanently and securely deleted from our databases within 30 days. You can also request manual deletion of all your stored data by contacting us directly at <span className="font-semibold">rushil.gorasia@gmail.com</span>.
                 </li>
               </ul>
             </section>
@@ -157,7 +157,7 @@ export default function PrivacyPolicyPage() {
                 If you have any questions or feedback regarding this Privacy Policy, please contact us at:
               </p>
               <p className="font-semibold text-text-primary">
-                Email: dipti.gorasia@gmail.com
+                Email: rushil.gorasia@gmail.com
               </p>
             </section>
           </div>
