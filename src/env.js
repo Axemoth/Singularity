@@ -20,7 +20,9 @@ export const env = createEnv({
     APP_URL: z.string().url(),
     DATABASE_URL: z.string().url(),
     DODO_PAYMENTS_API_KEY: z.string(),
-    DODO_PAYMENTS_ENVIRONMENT: z.enum(["test_mode", "live_mode"]).default("test_mode"),
+    DODO_PAYMENTS_ENVIRONMENT: z
+      .enum(["test_mode", "live_mode"])
+      .default("test_mode"),
     DODO_PAYMENTS_WEBHOOK_SECRET: z.string().optional(),
     CORSAIR_WEBHOOK_SECRET: z.string().optional(),
     NODE_ENV: z

@@ -30,12 +30,12 @@ Use this checklist before recording or presenting the project.
 
 ## Rubric Evidence
 
-| Rubric Area | Evidence |
-|---|---|
-| Corsair Integration | OAuth connect routes, webhook route, tenant-scoped Corsair calls |
-| Gmail Workflow | Inbox, compose, reply, drafts, archive, delete, priority |
-| Calendar Workflow | List/day/week/month views, create/delete events, sync |
-| Productivity UX | Keyboard shortcuts, dashboard, search, command-style agent |
-| AI and MCP Usage | Mastra agent, Corsair MCP tools, local search, safety modes |
-| Engineering Quality | Zod validation, ownership checks, typecheck, docs |
-| Demo and Documentation | README, architecture doc, docs folder, this checklist |
+| Rubric Area            | Evidence                                                         |
+| ---------------------- | ---------------------------------------------------------------- |
+| Corsair Integration    | OAuth connect routes, webhook route, tenant-scoped Corsair calls |
+| Gmail Workflow         | Inbox, compose, reply, drafts, archive, delete, priority         |
+| Calendar Workflow      | List/day/week/month views, create/delete events, sync            |
+| Productivity UX        | Keyboard shortcuts, dashboard, search, command-style agent       |
+| AI and MCP Usage       | Mastra agent, Corsair MCP tools, local search, safety modes      |
+| Engineering Quality    | Zod validation, ownership checks, typecheck, docs                |
+| Demo and Documentation | README, architecture doc, docs folder, this checklist            |

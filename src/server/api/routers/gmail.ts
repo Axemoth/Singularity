@@ -1,11 +1,21 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
-import { corsairEntities, corsairAccounts, corsairIntegrations, emailPriorities, userSettings, user } from "@/server/db/schema";
+import {
+  corsairEntities,
+  corsairAccounts,
+  corsairIntegrations,
+  emailPriorities,
+  userSettings,
+  user,
+} from "@/server/db/schema";
 import { eq, and, desc, or, like, inArray, count, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { syncEmbeddings } from "@/server/api/tasks/embeddings";
-import { syncPriorities, isSyncingPriorities } from "@/server/api/tasks/prioritizer";
+import {
+  syncPriorities,
+  isSyncingPriorities,
+} from "@/server/api/tasks/prioritizer";
 
 const headerSafeString = (max: number) =>
   z
@@ -44,7 +54,7 @@ export function buildRawEmail(
   body: string,
   cc?: string,
   bcc?: string,
-  parentMessageId?: string
+  parentMessageId?: string,
 ) {
   const assertHeaderSafe = (name: string, value: string | undefined) => {
     if (value && /[\r\n]/.test(value)) {
@@ -109,7 +119,7 @@ export const gmailRouter = createTRPCRouter({
     .input(
       z.object({
         refresh: z.boolean().optional().default(false),
-      })
+      }),
     )
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
@@ -122,15 +132,18 @@ export const gmailRouter = createTRPCRouter({
           emailAddress: corsairAccounts.emailAddress,
         })
         .from(corsairAccounts)
-        .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+        .innerJoin(
+          corsairIntegrations,
+          eq(corsairAccounts.integrationId, corsairIntegrations.id),
+        )
         .where(
           and(
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}\\_%`)
+              like(corsairAccounts.tenantId, `${userId}\\_%`),
             ),
-            eq(corsairIntegrations.name, "gmail")
-          )
+            eq(corsairIntegrations.name, "gmail"),
+          ),
         );
 
       if (input.refresh) {
@@ -147,7 +160,9 @@ export const gmailRouter = createTRPCRouter({
               top20.map(async (t) => {
                 if (t.id) {
                   try {
-                    const fullThread = await tenant.gmail.api.threads.get({ id: t.id });
+                    const fullThread = await tenant.gmail.api.threads.get({
+                      id: t.id,
+                    });
                     // Cache full thread data in corsairEntities
                     await ctx.db
                       .update(corsairEntities)
@@ -158,17 +173,23 @@ export const gmailRouter = createTRPCRouter({
                       .where(
                         and(
                           eq(corsairEntities.entityId, t.id),
-                          eq(corsairEntities.entityType, "threads")
-                        )
+                          eq(corsairEntities.entityType, "threads"),
+                        ),
                       );
                   } catch (e) {
-                    console.error(`[Pre-fetch] Failed to pre-fetch thread ${t.id}:`, e);
+                    console.error(
+                      `[Pre-fetch] Failed to pre-fetch thread ${t.id}:`,
+                      e,
+                    );
                   }
                 }
-              })
+              }),
             );
           } catch (err: any) {
-            console.error(`Failed to resync Gmail threads for ${account.emailAddress}:`, err);
+            console.error(
+              `Failed to resync Gmail threads for ${account.emailAddress}:`,
+              err,
+            );
           }
         }
       }
@@ -217,18 +238,27 @@ export const gmailRouter = createTRPCRouter({
           emailAddress: corsairAccounts.emailAddress,
         })
         .from(corsairEntities)
-        .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
-        .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
-        .leftJoin(emailPriorities, eq(corsairEntities.id, emailPriorities.emailId))
+        .innerJoin(
+          corsairAccounts,
+          eq(corsairEntities.accountId, corsairAccounts.id),
+        )
+        .innerJoin(
+          corsairIntegrations,
+          eq(corsairAccounts.integrationId, corsairIntegrations.id),
+        )
+        .leftJoin(
+          emailPriorities,
+          eq(corsairEntities.id, emailPriorities.emailId),
+        )
         .where(
           and(
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}\\_%`)
+              like(corsairAccounts.tenantId, `${userId}\\_%`),
             ),
             eq(corsairIntegrations.name, "gmail"),
-            eq(corsairEntities.entityType, "threads")
-          )
+            eq(corsairEntities.entityType, "threads"),
+          ),
         )
         .orderBy(desc(corsairEntities.updatedAt));
 
@@ -240,7 +270,9 @@ export const gmailRouter = createTRPCRouter({
           didSyncAny = true;
           const tenant = corsair.withTenant(account.tenantId);
           try {
-            console.log(`[Gmail Auto-sync] Populating Gmail threads for account ${account.emailAddress}...`);
+            console.log(
+              `[Gmail Auto-sync] Populating Gmail threads for account ${account.emailAddress}...`,
+            );
             const res = await tenant.gmail.api.threads.list({});
             const threadsList = res.threads ?? [];
 
@@ -250,7 +282,9 @@ export const gmailRouter = createTRPCRouter({
               top20.map(async (t) => {
                 if (t.id) {
                   try {
-                    const fullThread = await tenant.gmail.api.threads.get({ id: t.id });
+                    const fullThread = await tenant.gmail.api.threads.get({
+                      id: t.id,
+                    });
                     // Cache full thread data in corsairEntities
                     await ctx.db
                       .update(corsairEntities)
@@ -261,17 +295,23 @@ export const gmailRouter = createTRPCRouter({
                       .where(
                         and(
                           eq(corsairEntities.entityId, t.id),
-                          eq(corsairEntities.entityType, "threads")
-                        )
+                          eq(corsairEntities.entityType, "threads"),
+                        ),
                       );
                   } catch (e) {
-                    console.error(`[Auto-sync Pre-fetch] Failed to pre-fetch thread ${t.id}:`, e);
+                    console.error(
+                      `[Auto-sync Pre-fetch] Failed to pre-fetch thread ${t.id}:`,
+                      e,
+                    );
                   }
                 }
-              })
+              }),
             );
           } catch (err: any) {
-            console.error(`[Gmail Auto-sync] Failed to auto-sync Gmail threads for ${account.emailAddress}:`, err);
+            console.error(
+              `[Gmail Auto-sync] Failed to auto-sync Gmail threads for ${account.emailAddress}:`,
+              err,
+            );
           }
         }
       }
@@ -313,18 +353,27 @@ export const gmailRouter = createTRPCRouter({
             emailAddress: corsairAccounts.emailAddress,
           })
           .from(corsairEntities)
-          .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
-          .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
-          .leftJoin(emailPriorities, eq(corsairEntities.id, emailPriorities.emailId))
+          .innerJoin(
+            corsairAccounts,
+            eq(corsairEntities.accountId, corsairAccounts.id),
+          )
+          .innerJoin(
+            corsairIntegrations,
+            eq(corsairAccounts.integrationId, corsairIntegrations.id),
+          )
+          .leftJoin(
+            emailPriorities,
+            eq(corsairEntities.id, emailPriorities.emailId),
+          )
           .where(
             and(
               or(
                 eq(corsairAccounts.tenantId, userId),
-                like(corsairAccounts.tenantId, `${userId}\\_%`)
+                like(corsairAccounts.tenantId, `${userId}\\_%`),
               ),
               eq(corsairIntegrations.name, "gmail"),
-              eq(corsairEntities.entityType, "threads")
-            )
+              eq(corsairEntities.entityType, "threads"),
+            ),
           )
           .orderBy(desc(corsairEntities.updatedAt));
       }
@@ -332,11 +381,17 @@ export const gmailRouter = createTRPCRouter({
       // Ensure details are pre-fetched for any threads that lack message details
       const threadsToFetch = threads.filter((t) => {
         const threadData = t.data as any;
-        return !threadData || !threadData.messages || threadData.messages.length === 0;
+        return (
+          !threadData ||
+          !threadData.messages ||
+          threadData.messages.length === 0
+        );
       });
 
       if (threadsToFetch.length > 0) {
-        console.log(`[Gmail Router] Fetching full details for ${threadsToFetch.length} threads lacking message details...`);
+        console.log(
+          `[Gmail Router] Fetching full details for ${threadsToFetch.length} threads lacking message details...`,
+        );
         // Limit to top 20 at a time to prevent rate limiting
         const chunk = threadsToFetch.slice(0, 20);
         await Promise.all(
@@ -345,7 +400,9 @@ export const gmailRouter = createTRPCRouter({
               const account = accounts.find((a) => a.id === t.accountId);
               const tenantId = account?.tenantId ?? userId;
               const tenant = corsair.withTenant(tenantId);
-              const fullThread = await tenant.gmail.api.threads.get({ id: t.entityId });
+              const fullThread = await tenant.gmail.api.threads.get({
+                id: t.entityId,
+              });
               // Cache full thread data in corsairEntities
               await ctx.db
                 .update(corsairEntities)
@@ -356,16 +413,19 @@ export const gmailRouter = createTRPCRouter({
                 .where(
                   and(
                     eq(corsairEntities.entityId, t.entityId),
-                    eq(corsairEntities.entityType, "threads")
-                  )
+                    eq(corsairEntities.entityType, "threads"),
+                  ),
                 );
-              
+
               // Update in-memory data for immediate return
               t.data = fullThread;
             } catch (e) {
-              console.error(`[Pre-fetch] Failed to pre-fetch thread details for ${t.entityId}:`, e);
+              console.error(
+                `[Pre-fetch] Failed to pre-fetch thread details for ${t.entityId}:`,
+                e,
+              );
             }
-          })
+          }),
         );
       }
 
@@ -385,7 +445,9 @@ export const gmailRouter = createTRPCRouter({
         const messages = threadData?.messages ?? [];
         if (messages.length > 0) {
           const dates = messages
-            .map((m: any) => (m.internalDate ? parseInt(m.internalDate, 10) : 0))
+            .map((m: any) =>
+              m.internalDate ? parseInt(m.internalDate, 10) : 0,
+            )
             .filter((d: number) => !isNaN(d) && d > 0);
           if (dates.length > 0) {
             return Math.max(...dates);
@@ -394,7 +456,9 @@ export const gmailRouter = createTRPCRouter({
         return t.updatedAt ? new Date(t.updatedAt).getTime() : 0;
       };
 
-      uniqueThreads.sort((a, b) => getThreadTimestamp(b) - getThreadTimestamp(a));
+      uniqueThreads.sort(
+        (a, b) => getThreadTimestamp(b) - getThreadTimestamp(a),
+      );
 
       return uniqueThreads;
     }),
@@ -405,15 +469,18 @@ export const gmailRouter = createTRPCRouter({
     const accounts = await ctx.db
       .select({ id: corsairAccounts.id })
       .from(corsairAccounts)
-      .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+      .innerJoin(
+        corsairIntegrations,
+        eq(corsairAccounts.integrationId, corsairIntegrations.id),
+      )
       .where(
         and(
           or(
             eq(corsairAccounts.tenantId, userId),
-            like(corsairAccounts.tenantId, `${userId}\\_%`)
+            like(corsairAccounts.tenantId, `${userId}\\_%`),
           ),
-          eq(corsairIntegrations.name, "gmail")
-        )
+          eq(corsairIntegrations.name, "gmail"),
+        ),
       );
 
     if (accounts.length === 0) return 0;
@@ -423,7 +490,10 @@ export const gmailRouter = createTRPCRouter({
       SELECT COUNT(*) AS count
       FROM corsair_entities
       WHERE entity_type = 'threads'
-        AND account_id IN (${sql.join(accountIds.map(id => sql`${id}`), sql`, `)})
+        AND account_id IN (${sql.join(
+          accountIds.map((id) => sql`${id}`),
+          sql`, `,
+        )})
         AND data->'messages'->0->'labelIds' ? 'UNREAD'
     `);
 
@@ -441,23 +511,30 @@ export const gmailRouter = createTRPCRouter({
         emailAddress: corsairAccounts.emailAddress,
       })
       .from(corsairAccounts)
-      .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+      .innerJoin(
+        corsairIntegrations,
+        eq(corsairAccounts.integrationId, corsairIntegrations.id),
+      )
       .where(
         and(
           or(
             eq(corsairAccounts.tenantId, userId),
-            like(corsairAccounts.tenantId, `${userId}\\_%`)
+            like(corsairAccounts.tenantId, `${userId}\\_%`),
           ),
-          eq(corsairIntegrations.name, "gmail")
-        )
+          eq(corsairIntegrations.name, "gmail"),
+        ),
       );
 
-    console.log(`[Gmail Manual Sync] Syncing ${accounts.length} accounts for user ${userId}...`);
+    console.log(
+      `[Gmail Manual Sync] Syncing ${accounts.length} accounts for user ${userId}...`,
+    );
 
     for (const account of accounts) {
       const tenant = corsair.withTenant(account.tenantId);
       try {
-        console.log(`[Gmail Manual Sync] Syncing account ${account.emailAddress}...`);
+        console.log(
+          `[Gmail Manual Sync] Syncing account ${account.emailAddress}...`,
+        );
         const res = await tenant.gmail.api.threads.list({});
         const threadsList = res.threads ?? [];
 
@@ -467,7 +544,9 @@ export const gmailRouter = createTRPCRouter({
           top20.map(async (t) => {
             if (t.id) {
               try {
-                const fullThread = await tenant.gmail.api.threads.get({ id: t.id });
+                const fullThread = await tenant.gmail.api.threads.get({
+                  id: t.id,
+                });
                 // Cache full thread data in corsairEntities
                 await ctx.db
                   .update(corsairEntities)
@@ -478,14 +557,17 @@ export const gmailRouter = createTRPCRouter({
                   .where(
                     and(
                       eq(corsairEntities.entityId, t.id),
-                      eq(corsairEntities.entityType, "threads")
-                    )
+                      eq(corsairEntities.entityType, "threads"),
+                    ),
                   );
               } catch (e) {
-                console.error(`[Manual Sync Pre-fetch] Failed to pre-fetch thread ${t.id}:`, e);
+                console.error(
+                  `[Manual Sync Pre-fetch] Failed to pre-fetch thread ${t.id}:`,
+                  e,
+                );
               }
             }
-          })
+          }),
         );
       } catch (err: any) {
         console.error(`Manual sync failed for ${account.emailAddress}:`, err);
@@ -511,15 +593,18 @@ export const gmailRouter = createTRPCRouter({
         emailAddress: corsairAccounts.emailAddress,
       })
       .from(corsairAccounts)
-      .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+      .innerJoin(
+        corsairIntegrations,
+        eq(corsairAccounts.integrationId, corsairIntegrations.id),
+      )
       .where(
         and(
           or(
             eq(corsairAccounts.tenantId, userId),
-            like(corsairAccounts.tenantId, `${userId}\\_%`)
+            like(corsairAccounts.tenantId, `${userId}\\_%`),
           ),
-          eq(corsairIntegrations.name, "gmail")
-        )
+          eq(corsairIntegrations.name, "gmail"),
+        ),
       );
 
     return {
@@ -544,9 +629,9 @@ export const gmailRouter = createTRPCRouter({
             eq(corsairAccounts.id, input.accountId),
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}\\_%`)
-            )
-          )
+              like(corsairAccounts.tenantId, `${userId}\\_%`),
+            ),
+          ),
         )
         .limit(1);
 
@@ -558,17 +643,23 @@ export const gmailRouter = createTRPCRouter({
           .select({ id: corsairEntities.id })
           .from(corsairEntities)
           .where(eq(corsairEntities.accountId, accountId));
-        
-        const entityIds = entities.map(e => e.id);
+
+        const entityIds = entities.map((e) => e.id);
         if (entityIds.length > 0) {
-          await ctx.db.delete(emailPriorities).where(inArray(emailPriorities.emailId, entityIds));
+          await ctx.db
+            .delete(emailPriorities)
+            .where(inArray(emailPriorities.emailId, entityIds));
         }
 
         // Delete dependent corsair entities
-        await ctx.db.delete(corsairEntities).where(eq(corsairEntities.accountId, accountId));
+        await ctx.db
+          .delete(corsairEntities)
+          .where(eq(corsairEntities.accountId, accountId));
 
         // Delete the account
-        await ctx.db.delete(corsairAccounts).where(eq(corsairAccounts.id, accountId));
+        await ctx.db
+          .delete(corsairAccounts)
+          .where(eq(corsairAccounts.id, accountId));
 
         return { success: true };
       }
@@ -580,20 +671,26 @@ export const gmailRouter = createTRPCRouter({
       z.object({
         id: z.string().trim().min(1),
         refresh: z.boolean().optional().default(false),
-      })
+      }),
     )
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
       // Securely look up the thread entity ensuring it belongs to the current user
       const [threadAccount] = await ctx.db
-        .select({ 
+        .select({
           tenantId: corsairAccounts.tenantId,
           data: corsairEntities.data,
         })
         .from(corsairEntities)
-        .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
-        .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+        .innerJoin(
+          corsairAccounts,
+          eq(corsairEntities.accountId, corsairAccounts.id),
+        )
+        .innerJoin(
+          corsairIntegrations,
+          eq(corsairAccounts.integrationId, corsairIntegrations.id),
+        )
         .where(
           and(
             eq(corsairEntities.entityId, input.id),
@@ -601,16 +698,17 @@ export const gmailRouter = createTRPCRouter({
             eq(corsairIntegrations.name, "gmail"),
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}\\_%`)
-            )
-          )
+              like(corsairAccounts.tenantId, `${userId}\\_%`),
+            ),
+          ),
         )
         .limit(1);
 
       if (!threadAccount) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Thread not found or you do not have permission to access it.",
+          message:
+            "Thread not found or you do not have permission to access it.",
         });
       }
 
@@ -618,7 +716,9 @@ export const gmailRouter = createTRPCRouter({
       if (!input.refresh && threadAccount.data) {
         const cachedThread = threadAccount.data as any;
         if (cachedThread.messages && cachedThread.messages.length > 0) {
-          console.info(`[getThread] Serving thread ${input.id} from local database cache.`);
+          console.info(
+            `[getThread] Serving thread ${input.id} from local database cache.`,
+          );
           return cachedThread;
         }
       }
@@ -628,7 +728,7 @@ export const gmailRouter = createTRPCRouter({
 
       try {
         const thread = await tenant.gmail.api.threads.get({ id: input.id });
-        
+
         // Cache full thread data in database
         await ctx.db
           .update(corsairEntities)
@@ -639,8 +739,8 @@ export const gmailRouter = createTRPCRouter({
           .where(
             and(
               eq(corsairEntities.entityId, input.id),
-              eq(corsairEntities.entityType, "threads")
-            )
+              eq(corsairEntities.entityType, "threads"),
+            ),
           );
 
         return thread;
@@ -664,25 +764,31 @@ export const gmailRouter = createTRPCRouter({
         threadId: z.string().optional(),
         parentMessageId: headerSafeString(998).optional(),
         fromEmail: z.string().email().max(320).trim().optional(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      
+
       // Resolve tenantId based on preferred email or fallback to primary account
       const preferredEmail = input.fromEmail;
       const accounts = await ctx.db
-        .select({ tenantId: corsairAccounts.tenantId, emailAddress: corsairAccounts.emailAddress })
+        .select({
+          tenantId: corsairAccounts.tenantId,
+          emailAddress: corsairAccounts.emailAddress,
+        })
         .from(corsairAccounts)
-        .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+        .innerJoin(
+          corsairIntegrations,
+          eq(corsairAccounts.integrationId, corsairIntegrations.id),
+        )
         .where(
           and(
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}\\_%`)
+              like(corsairAccounts.tenantId, `${userId}\\_%`),
             ),
-            eq(corsairIntegrations.name, "gmail")
-          )
+            eq(corsairIntegrations.name, "gmail"),
+          ),
         );
 
       let tenantId = userId;
@@ -692,8 +798,14 @@ export const gmailRouter = createTRPCRouter({
         const [threadAccount] = await ctx.db
           .select({ tenantId: corsairAccounts.tenantId })
           .from(corsairEntities)
-          .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
-          .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+          .innerJoin(
+            corsairAccounts,
+            eq(corsairEntities.accountId, corsairAccounts.id),
+          )
+          .innerJoin(
+            corsairIntegrations,
+            eq(corsairAccounts.integrationId, corsairIntegrations.id),
+          )
           .where(
             and(
               eq(corsairEntities.entityId, input.threadId),
@@ -701,23 +813,30 @@ export const gmailRouter = createTRPCRouter({
               eq(corsairIntegrations.name, "gmail"),
               or(
                 eq(corsairAccounts.tenantId, userId),
-                like(corsairAccounts.tenantId, `${userId}\\_%`)
-              )
-            )
+                like(corsairAccounts.tenantId, `${userId}\\_%`),
+              ),
+            ),
           )
           .limit(1);
 
         if (!threadAccount) {
           throw new TRPCError({
             code: "NOT_FOUND",
-            message: "The specified threadId does not exist or you do not have access to it.",
+            message:
+              "The specified threadId does not exist or you do not have access to it.",
           });
         }
         tenantId = threadAccount.tenantId;
       } else {
         const fallbackAccount = accounts[0];
         if (fallbackAccount) {
-          const matched = preferredEmail ? accounts.find(a => a.emailAddress?.toLowerCase() === preferredEmail.toLowerCase()) : null;
+          const matched = preferredEmail
+            ? accounts.find(
+                (a) =>
+                  a.emailAddress?.toLowerCase() ===
+                  preferredEmail.toLowerCase(),
+              )
+            : null;
           tenantId = matched ? matched.tenantId : fallbackAccount.tenantId;
         }
       }
@@ -725,7 +844,14 @@ export const gmailRouter = createTRPCRouter({
       const tenant = corsair.withTenant(tenantId);
 
       try {
-        const raw = buildRawEmail(input.to, input.subject, input.body, input.cc, input.bcc, input.parentMessageId);
+        const raw = buildRawEmail(
+          input.to,
+          input.subject,
+          input.body,
+          input.cc,
+          input.bcc,
+          input.parentMessageId,
+        );
         const res = await tenant.gmail.api.messages.send({
           raw,
           threadId: input.threadId,
@@ -749,38 +875,55 @@ export const gmailRouter = createTRPCRouter({
         cc: emailListSchema.optional(),
         bcc: emailListSchema.optional(),
         fromEmail: z.string().email().max(320).trim().optional(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      
+
       // Resolve tenantId
       const preferredEmail = input.fromEmail;
       const accounts = await ctx.db
-        .select({ tenantId: corsairAccounts.tenantId, emailAddress: corsairAccounts.emailAddress })
+        .select({
+          tenantId: corsairAccounts.tenantId,
+          emailAddress: corsairAccounts.emailAddress,
+        })
         .from(corsairAccounts)
-        .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+        .innerJoin(
+          corsairIntegrations,
+          eq(corsairAccounts.integrationId, corsairIntegrations.id),
+        )
         .where(
           and(
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}\\_%`)
+              like(corsairAccounts.tenantId, `${userId}\\_%`),
             ),
-            eq(corsairIntegrations.name, "gmail")
-          )
+            eq(corsairIntegrations.name, "gmail"),
+          ),
         );
 
       let tenantId = userId;
       const fallbackAccount = accounts[0];
       if (fallbackAccount) {
-        const matched = preferredEmail ? accounts.find(a => a.emailAddress?.toLowerCase() === preferredEmail.toLowerCase()) : null;
+        const matched = preferredEmail
+          ? accounts.find(
+              (a) =>
+                a.emailAddress?.toLowerCase() === preferredEmail.toLowerCase(),
+            )
+          : null;
         tenantId = matched ? matched.tenantId : fallbackAccount.tenantId;
       }
 
       const tenant = corsair.withTenant(tenantId);
 
       try {
-        const raw = buildRawEmail(input.to ?? "", input.subject ?? "", input.body, input.cc, input.bcc);
+        const raw = buildRawEmail(
+          input.to ?? "",
+          input.subject ?? "",
+          input.body,
+          input.cc,
+          input.bcc,
+        );
         const res = await tenant.gmail.api.drafts.create({
           draft: {
             message: { raw },
@@ -805,8 +948,14 @@ export const gmailRouter = createTRPCRouter({
       const [threadAccount] = await ctx.db
         .select({ tenantId: corsairAccounts.tenantId })
         .from(corsairEntities)
-        .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
-        .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+        .innerJoin(
+          corsairAccounts,
+          eq(corsairEntities.accountId, corsairAccounts.id),
+        )
+        .innerJoin(
+          corsairIntegrations,
+          eq(corsairAccounts.integrationId, corsairIntegrations.id),
+        )
         .where(
           and(
             eq(corsairEntities.entityId, input.id),
@@ -814,16 +963,17 @@ export const gmailRouter = createTRPCRouter({
             eq(corsairIntegrations.name, "gmail"),
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}\\_%`)
-            )
-          )
+              like(corsairAccounts.tenantId, `${userId}\\_%`),
+            ),
+          ),
         )
         .limit(1);
 
       if (!threadAccount) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Thread not found or you do not have permission to access it.",
+          message:
+            "Thread not found or you do not have permission to access it.",
         });
       }
 
@@ -855,8 +1005,14 @@ export const gmailRouter = createTRPCRouter({
       const [threadAccount] = await ctx.db
         .select({ tenantId: corsairAccounts.tenantId })
         .from(corsairEntities)
-        .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
-        .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+        .innerJoin(
+          corsairAccounts,
+          eq(corsairEntities.accountId, corsairAccounts.id),
+        )
+        .innerJoin(
+          corsairIntegrations,
+          eq(corsairAccounts.integrationId, corsairIntegrations.id),
+        )
         .where(
           and(
             eq(corsairEntities.entityId, input.id),
@@ -864,16 +1020,17 @@ export const gmailRouter = createTRPCRouter({
             eq(corsairIntegrations.name, "gmail"),
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}\\_%`)
-            )
-          )
+              like(corsairAccounts.tenantId, `${userId}\\_%`),
+            ),
+          ),
         )
         .limit(1);
 
       if (!threadAccount) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Thread not found or you do not have permission to access it.",
+          message:
+            "Thread not found or you do not have permission to access it.",
         });
       }
 
@@ -940,7 +1097,10 @@ export const gmailRouter = createTRPCRouter({
 
         // Trigger priority sync asynchronously in the background
         void syncPriorities(userId).catch((err) => {
-          console.error("Background priority sync failed after updating rules:", err);
+          console.error(
+            "Background priority sync failed after updating rules:",
+            err,
+          );
         });
 
         return { success: true };
@@ -1047,24 +1207,32 @@ export const gmailRouter = createTRPCRouter({
       const threads = await ctx.db
         .select({ data: corsairEntities.data })
         .from(corsairEntities)
-        .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
+        .innerJoin(
+          corsairAccounts,
+          eq(corsairEntities.accountId, corsairAccounts.id),
+        )
         .where(
           and(
             or(
               eq(corsairAccounts.tenantId, userId),
-              like(corsairAccounts.tenantId, `${userId}\\_%`)
+              like(corsairAccounts.tenantId, `${userId}\\_%`),
             ),
-            eq(corsairEntities.entityType, "threads")
-          )
+            eq(corsairEntities.entityType, "threads"),
+          ),
         );
 
-      const contactMap = new Map<string, { name: string; email: string; count: number }>();
+      const contactMap = new Map<
+        string,
+        { name: string; email: string; count: number }
+      >();
 
       const getHeaderValue = (msg: any, name: string): string | undefined => {
         if (!msg) return undefined;
         if (msg[name.toLowerCase()]) return msg[name.toLowerCase()];
         const headers = msg.payload?.headers ?? [];
-        return headers.find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value;
+        return headers.find(
+          (h: any) => h.name?.toLowerCase() === name.toLowerCase(),
+        )?.value;
       };
 
       const processHeader = (headerValue: string) => {
@@ -1073,7 +1241,7 @@ export const gmailRouter = createTRPCRouter({
         for (const part of parts) {
           const trimmed = part.trim();
           if (!trimmed) continue;
-          
+
           let name = "";
           let email = "";
           const match = trimmed.match(/^(.*?)\s*<(.*?)>$/);
@@ -1105,7 +1273,7 @@ export const gmailRouter = createTRPCRouter({
         for (const msg of messages) {
           const fromVal = getHeaderValue(msg, "from");
           if (fromVal) processHeader(fromVal);
-          
+
           const toVal = getHeaderValue(msg, "to");
           if (toVal) processHeader(toVal);
         }
@@ -1131,8 +1299,8 @@ export const gmailRouter = createTRPCRouter({
         .where(
           and(
             eq(emailPriorities.tenantId, userId),
-            eq(emailPriorities.manuallyUpdated, true)
-          )
+            eq(emailPriorities.manuallyUpdated, true),
+          ),
         );
 
       const [totalPrioritizedRes] = await ctx.db
@@ -1146,8 +1314,8 @@ export const gmailRouter = createTRPCRouter({
         .where(
           and(
             eq(emailPriorities.tenantId, userId),
-            eq(emailPriorities.isSpam, true)
-          )
+            eq(emailPriorities.isSpam, true),
+          ),
         );
 
       const [settings] = await ctx.db
@@ -1178,7 +1346,7 @@ export const gmailRouter = createTRPCRouter({
         threadId: z.string(),
         priority: z.enum(["urgent", "normal", "low"]),
         reason: z.string().optional(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
@@ -1186,16 +1354,19 @@ export const gmailRouter = createTRPCRouter({
         const [thread] = await ctx.db
           .select({ id: corsairEntities.id })
           .from(corsairEntities)
-          .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
+          .innerJoin(
+            corsairAccounts,
+            eq(corsairEntities.accountId, corsairAccounts.id),
+          )
           .where(
             and(
               eq(corsairEntities.entityId, input.threadId),
               eq(corsairEntities.entityType, "threads"),
               or(
                 eq(corsairAccounts.tenantId, userId),
-                like(corsairAccounts.tenantId, `${userId}\\_%`)
-              )
-            )
+                like(corsairAccounts.tenantId, `${userId}\\_%`),
+              ),
+            ),
           )
           .limit(1);
 
@@ -1252,7 +1423,7 @@ export const gmailRouter = createTRPCRouter({
     const isPremium = await isPremiumUser(userEmail);
 
     const [dbUser] = await ctx.db
-      .select({ 
+      .select({
         premiumOverride: user.premiumOverride,
         premium: user.premium,
       })

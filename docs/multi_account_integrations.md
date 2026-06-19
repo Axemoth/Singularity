@@ -30,12 +30,12 @@ When connecting an account in `src/app/api/connect/route.ts`:
 
 Example:
 
-| Step | Action | Result |
-|---|---|---|
-| 1 | Connect Gmail A | `userId` has Gmail |
-| 2 | Connect Calendar A | `userId` has Gmail + Calendar |
-| 3 | Connect Gmail B | `userId_...` has Gmail |
-| 4 | Connect Calendar B | `userId_...` has Gmail + Calendar |
+| Step | Action             | Result                            |
+| ---- | ------------------ | --------------------------------- |
+| 1    | Connect Gmail A    | `userId` has Gmail                |
+| 2    | Connect Calendar A | `userId` has Gmail + Calendar     |
+| 3    | Connect Gmail B    | `userId_...` has Gmail            |
+| 4    | Connect Calendar B | `userId_...` has Gmail + Calendar |
 
 ## Query Scoping
 
@@ -45,7 +45,7 @@ Routers query all tenant slots owned by the current user:
 or(
   eq(corsairAccounts.tenantId, userId),
   like(corsairAccounts.tenantId, `${userId}\\_%`),
-)
+);
 ```
 
 Write mutations additionally verify:

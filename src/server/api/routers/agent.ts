@@ -9,7 +9,11 @@ import { corsair } from "@/server/corsair";
 import { createTool } from "@mastra/core/tools";
 import { buildRawEmail } from "./gmail";
 import { TRPCError } from "@trpc/server";
-import { corsairEntities, corsairAccounts, corsairIntegrations } from "@/server/db/schema";
+import {
+  corsairEntities,
+  corsairAccounts,
+  corsairIntegrations,
+} from "@/server/db/schema";
 import { eq, and, or, like, inArray } from "drizzle-orm";
 
 const deepseek = createOpenAI({
@@ -33,7 +37,7 @@ const agentContextSchema = z
         z.object({
           name: z.string(),
           email: z.string(),
-        })
+        }),
       )
       .optional(),
   })
@@ -81,7 +85,7 @@ const agentActionSchema = z.discriminatedUnion("type", [
       z.object({
         name: z.string(),
         email: z.string(),
-      })
+      }),
     ),
     saveAsDraft: z.boolean().optional(),
   }),
@@ -238,7 +242,12 @@ export const agentRouter = createTRPCRouter({
       const userEmail = ctx.session.user.email;
 
       try {
-        const { userSettings, corsairAccounts, corsairIntegrations, copilotUsage } = await import("@/server/db/schema");
+        const {
+          userSettings,
+          corsairAccounts,
+          corsairIntegrations,
+          copilotUsage,
+        } = await import("@/server/db/schema");
         const { eq, and, or, like, sql } = await import("drizzle-orm");
         const { isPremiumUser } = await import("@/server/subscription");
 
@@ -274,7 +283,8 @@ export const agentRouter = createTRPCRouter({
             if (usage.requestCount >= 20) {
               throw new TRPCError({
                 code: "FORBIDDEN",
-                message: "Daily Copilot limit reached. Free tier is limited to 20 requests per day. Upgrade to Premium for unlimited Copilot requests.",
+                message:
+                  "Daily Copilot limit reached. Free tier is limited to 20 requests per day. Upgrade to Premium for unlimited Copilot requests.",
               });
             }
             await ctx.db
@@ -288,9 +298,9 @@ export const agentRouter = createTRPCRouter({
         }
 
         const [settings] = await ctx.db
-          .select({ 
+          .select({
             modelMode: userSettings.modelMode,
-            learntHabits: userSettings.learntHabits
+            learntHabits: userSettings.learntHabits,
           })
           .from(userSettings)
           .where(eq(userSettings.userId, userId))
@@ -305,15 +315,18 @@ export const agentRouter = createTRPCRouter({
             emailAddress: corsairAccounts.emailAddress,
           })
           .from(corsairAccounts)
-          .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+          .innerJoin(
+            corsairIntegrations,
+            eq(corsairAccounts.integrationId, corsairIntegrations.id),
+          )
           .where(
             and(
               or(
                 eq(corsairAccounts.tenantId, userId),
-                like(corsairAccounts.tenantId, `${userId}\\_%`)
+                like(corsairAccounts.tenantId, `${userId}\\_%`),
               ),
-              eq(corsairIntegrations.name, "gmail")
-            )
+              eq(corsairIntegrations.name, "gmail"),
+            ),
           )
           .orderBy(corsairAccounts.createdAt);
 
@@ -324,15 +337,18 @@ export const agentRouter = createTRPCRouter({
             emailAddress: corsairAccounts.emailAddress,
           })
           .from(corsairAccounts)
-          .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+          .innerJoin(
+            corsairIntegrations,
+            eq(corsairAccounts.integrationId, corsairIntegrations.id),
+          )
           .where(
             and(
               or(
                 eq(corsairAccounts.tenantId, userId),
-                like(corsairAccounts.tenantId, `${userId}\\_%`)
+                like(corsairAccounts.tenantId, `${userId}\\_%`),
               ),
-              eq(corsairIntegrations.name, "googlecalendar")
-            )
+              eq(corsairIntegrations.name, "googlecalendar"),
+            ),
           )
           .orderBy(corsairAccounts.createdAt);
 
@@ -340,7 +356,9 @@ export const agentRouter = createTRPCRouter({
         let activeGmailTenantId = primaryGmailTenantId;
         if (input.context?.targetEmail) {
           const matched = gmailAccounts.find(
-            (a) => a.emailAddress?.toLowerCase() === input.context?.targetEmail?.toLowerCase()
+            (a) =>
+              a.emailAddress?.toLowerCase() ===
+              input.context?.targetEmail?.toLowerCase(),
           );
           if (matched) {
             activeGmailTenantId = matched.tenantId;
@@ -351,7 +369,9 @@ export const agentRouter = createTRPCRouter({
         let activeCalendarTenantId = primaryCalendarTenantId;
         if (input.context?.targetEmail) {
           const matched = calendarAccounts.find(
-            (a) => a.emailAddress?.toLowerCase() === input.context?.targetEmail?.toLowerCase()
+            (a) =>
+              a.emailAddress?.toLowerCase() ===
+              input.context?.targetEmail?.toLowerCase(),
           );
           if (matched) {
             activeCalendarTenantId = matched.tenantId;
@@ -364,18 +384,30 @@ export const agentRouter = createTRPCRouter({
         const provider = new MastraProvider();
 
         if (activeGmailTenantId === activeCalendarTenantId) {
-          gmailToolsList = await provider.build({ corsair: corsair.withTenant(activeGmailTenantId) });
+          gmailToolsList = await provider.build({
+            corsair: corsair.withTenant(activeGmailTenantId),
+          });
           calendarToolsList = gmailToolsList;
         } else {
-          console.log(`[agent] Building Mastra tools for separate tenants: Gmail=${activeGmailTenantId}, Calendar=${activeCalendarTenantId}`);
+          console.log(
+            `[agent] Building Mastra tools for separate tenants: Gmail=${activeGmailTenantId}, Calendar=${activeCalendarTenantId}`,
+          );
           [gmailToolsList, calendarToolsList] = await Promise.all([
-            provider.build({ corsair: corsair.withTenant(activeGmailTenantId) }),
-            provider.build({ corsair: corsair.withTenant(activeCalendarTenantId) })
+            provider.build({
+              corsair: corsair.withTenant(activeGmailTenantId),
+            }),
+            provider.build({
+              corsair: corsair.withTenant(activeCalendarTenantId),
+            }),
           ]);
         }
 
-        const runScriptGmail = gmailToolsList.find((t) => t.id === "run_script");
-        const runScriptCalendar = calendarToolsList.find((t) => t.id === "run_script");
+        const runScriptGmail = gmailToolsList.find(
+          (t) => t.id === "run_script",
+        );
+        const runScriptCalendar = calendarToolsList.find(
+          (t) => t.id === "run_script",
+        );
 
         let didExecuteWriteTool = false;
         const isCarefulMode = modelMode === "careful";
@@ -398,13 +430,13 @@ export const agentRouter = createTRPCRouter({
                 ...t,
                 execute: async (args: any, context: any) => {
                   const idLower = t.id.toLowerCase();
-                  let isWriteOp = 
-                    idLower.includes("insert") || 
-                    idLower.includes("create") || 
-                    idLower.includes("delete") || 
-                    idLower.includes("update") || 
-                    idLower.includes("send") || 
-                    idLower.includes("patch") || 
+                  let isWriteOp =
+                    idLower.includes("insert") ||
+                    idLower.includes("create") ||
+                    idLower.includes("delete") ||
+                    idLower.includes("update") ||
+                    idLower.includes("send") ||
+                    idLower.includes("patch") ||
                     idLower.includes("post");
 
                   if (t.id === "run_script" && args?.code) {
@@ -424,45 +456,69 @@ export const agentRouter = createTRPCRouter({
 
                   if (isWriteOp) {
                     blockCarefulWrite(`MCP write tool "${t.id}"`);
-                    console.log(`[mcp tool] Detected write operation for tool: ${t.id}, flagging to prevent fallback retry.`);
+                    console.log(
+                      `[mcp tool] Detected write operation for tool: ${t.id}, flagging to prevent fallback retry.`,
+                    );
                     didExecuteWriteTool = true;
                   }
 
                   if (t.id === "run_script" && args?.code) {
                     const codeStr = String(args.code);
-                    if (codeStr.includes("googlecalendar") && runScriptCalendar?.execute) {
-                      console.log(`[run_script] Routing calendar script to Calendar Tenant: ${activeCalendarTenantId}`);
+                    if (
+                      codeStr.includes("googlecalendar") &&
+                      runScriptCalendar?.execute
+                    ) {
+                      console.log(
+                        `[run_script] Routing calendar script to Calendar Tenant: ${activeCalendarTenantId}`,
+                      );
                       return runScriptCalendar.execute(args, context);
                     } else if (runScriptGmail?.execute) {
-                      console.log(`[run_script] Routing script to Gmail Tenant: ${activeGmailTenantId}`);
+                      console.log(
+                        `[run_script] Routing script to Gmail Tenant: ${activeGmailTenantId}`,
+                      );
                       return runScriptGmail.execute(args, context);
                     }
                   }
 
-                  return originalExecute ? originalExecute(args, context) : undefined;
-                }
-              }
+                  return originalExecute
+                    ? originalExecute(args, context)
+                    : undefined;
+                },
+              },
             ];
-          })
+          }),
         );
 
         const sendEmailTool = createTool({
           id: "send_email",
-          description: "Send an email to a recipient with a subject and body using Gmail.",
+          description:
+            "Send an email to a recipient with a subject and body using Gmail.",
           inputSchema: z.object({
             to: z.string().email().describe("Recipient email address"),
             subject: z.string().describe("Subject line of the email"),
-            body: z.string().describe("Body content of the email (HTML or plain text)"),
-            fromEmail: z.string().optional().describe("Sender email address (choose one of the user's connected emails)"),
+            body: z
+              .string()
+              .describe("Body content of the email (HTML or plain text)"),
+            fromEmail: z
+              .string()
+              .optional()
+              .describe(
+                "Sender email address (choose one of the user's connected emails)",
+              ),
           }),
           execute: async ({ to, subject, body, fromEmail }) => {
             blockCarefulWrite("Direct email sending");
-            console.log(`[send_email tool] Sending email to ${to} via tenant ${userId}...`);
+            console.log(
+              `[send_email tool] Sending email to ${to} via tenant ${userId}...`,
+            );
             didExecuteWriteTool = true;
-            
+
             let targetTenantId = activeGmailTenantId;
             if (fromEmail) {
-              const matched = gmailAccounts.find(a => a.emailAddress?.toLowerCase() === fromEmail.toLowerCase());
+              const matched = gmailAccounts.find(
+                (a) =>
+                  a.emailAddress?.toLowerCase() === fromEmail.toLowerCase(),
+              );
               if (matched) targetTenantId = matched.tenantId;
             }
 
@@ -475,20 +531,40 @@ export const agentRouter = createTRPCRouter({
 
         const createDraftTool = createTool({
           id: "create_draft",
-          description: "Create a draft email in Gmail with recipient, subject, and body.",
+          description:
+            "Create a draft email in Gmail with recipient, subject, and body.",
           inputSchema: z.object({
-            to: z.string().email().optional().describe("Recipient email address"),
-            subject: z.string().optional().describe("Subject line of the email"),
-            body: z.string().describe("Body content of the email (HTML or plain text)"),
-            fromEmail: z.string().optional().describe("Sender email address (choose one of the user's connected emails)"),
+            to: z
+              .string()
+              .email()
+              .optional()
+              .describe("Recipient email address"),
+            subject: z
+              .string()
+              .optional()
+              .describe("Subject line of the email"),
+            body: z
+              .string()
+              .describe("Body content of the email (HTML or plain text)"),
+            fromEmail: z
+              .string()
+              .optional()
+              .describe(
+                "Sender email address (choose one of the user's connected emails)",
+              ),
           }),
           execute: async ({ to, subject, body, fromEmail }) => {
-            console.log(`[create_draft tool] Creating draft for ${to} via tenant ${userId}...`);
+            console.log(
+              `[create_draft tool] Creating draft for ${to} via tenant ${userId}...`,
+            );
             didExecuteWriteTool = true;
 
             let targetTenantId = activeGmailTenantId;
             if (fromEmail) {
-              const matched = gmailAccounts.find(a => a.emailAddress?.toLowerCase() === fromEmail.toLowerCase());
+              const matched = gmailAccounts.find(
+                (a) =>
+                  a.emailAddress?.toLowerCase() === fromEmail.toLowerCase(),
+              );
               if (matched) targetTenantId = matched.tenantId;
             }
 
@@ -505,27 +581,40 @@ export const agentRouter = createTRPCRouter({
 
         const searchLocalTool = createTool({
           id: "search_local",
-          description: "Search local cached emails and calendar events semantically using vector search. Fast (<1s) and works entirely offline.",
+          description:
+            "Search local cached emails and calendar events semantically using vector search. Fast (<1s) and works entirely offline.",
           inputSchema: z.object({
-            query: z.string().describe("The search query in natural language (e.g., 'SRMIST emails' or 'meeting next week')"),
+            query: z
+              .string()
+              .describe(
+                "The search query in natural language (e.g., 'SRMIST emails' or 'meeting next week')",
+              ),
           }),
           execute: async ({ query }) => {
-            console.log(`[search_local tool] Semantic search for: "${query}" via tenant ${userId}...`);
-            
+            console.log(
+              `[search_local tool] Semantic search for: "${query}" via tenant ${userId}...`,
+            );
+
             try {
               // 1. Trigger syncEmbeddings to ensure any newly cached items are embedded
-              const { syncEmbeddings } = await import("@/server/api/tasks/embeddings");
+              const { syncEmbeddings } =
+                await import("@/server/api/tasks/embeddings");
               void syncEmbeddings(userId).catch((err) => {
-                console.error("[search_local] Background embedding sync failed:", err);
+                console.error(
+                  "[search_local] Background embedding sync failed:",
+                  err,
+                );
               });
 
               // 2. Generate the embedding for the query
-              const { generateEmbedding } = await import("@/server/api/tasks/embeddings");
+              const { generateEmbedding } =
+                await import("@/server/api/tasks/embeddings");
               const queryEmbedding = await generateEmbedding(query);
               const queryEmbeddingStr = `[${queryEmbedding.join(",")}]`;
-              
+
               // 2. Perform vector search in postgres
-              const { corsairEmbeddings, corsairEntities, corsairAccounts } = await import("@/server/db/schema");
+              const { corsairEmbeddings, corsairEntities, corsairAccounts } =
+                await import("@/server/db/schema");
               const { sql, eq, and, or, like } = await import("drizzle-orm");
 
               // We select the top 5 most similar matches, order by cosine distance
@@ -536,20 +625,31 @@ export const agentRouter = createTRPCRouter({
                   entityType: corsairEntities.entityType,
                   data: corsairEntities.data,
                   text: corsairEmbeddings.text,
-                  similarity: sql<number>`1 - (${corsairEmbeddings.embedding} <=> ${queryEmbeddingStr}::vector)`.as('similarity'),
+                  similarity:
+                    sql<number>`1 - (${corsairEmbeddings.embedding} <=> ${queryEmbeddingStr}::vector)`.as(
+                      "similarity",
+                    ),
                 })
                 .from(corsairEmbeddings)
-                .innerJoin(corsairEntities, eq(corsairEmbeddings.entityId, corsairEntities.id))
-                .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
+                .innerJoin(
+                  corsairEntities,
+                  eq(corsairEmbeddings.entityId, corsairEntities.id),
+                )
+                .innerJoin(
+                  corsairAccounts,
+                  eq(corsairEntities.accountId, corsairAccounts.id),
+                )
                 .where(
                   and(
                     or(
                       eq(corsairAccounts.tenantId, userId),
-                      like(corsairAccounts.tenantId, `${userId}\\_%`)
-                    )
-                  )
+                      like(corsairAccounts.tenantId, `${userId}\\_%`),
+                    ),
+                  ),
                 )
-                .orderBy(sql`${corsairEmbeddings.embedding} <=> ${queryEmbeddingStr}::vector`)
+                .orderBy(
+                  sql`${corsairEmbeddings.embedding} <=> ${queryEmbeddingStr}::vector`,
+                )
                 .limit(5);
 
               interface SearchGmailMessagePayload {
@@ -574,7 +674,7 @@ export const agentRouter = createTRPCRouter({
                 end?: { dateTime?: string; date?: string };
               }
 
-              return results.map(r => {
+              return results.map((r) => {
                 if (r.entityType === "threads") {
                   const threadData = r.data as SearchGmailThreadPayload;
                   return {
@@ -583,11 +683,14 @@ export const agentRouter = createTRPCRouter({
                     entityType: r.entityType,
                     similarity: r.similarity,
                     details: {
-                      subject: threadData.messages?.[0]?.subject ?? threadData.snippet ?? "No Subject",
+                      subject:
+                        threadData.messages?.[0]?.subject ??
+                        threadData.snippet ??
+                        "No Subject",
                       snippet: threadData.snippet ?? "",
                       from: threadData.messages?.[0]?.from ?? "",
                       date: threadData.messages?.[0]?.internalDate ?? "",
-                    }
+                    },
                   };
                 } else {
                   const eventData = r.data as SearchCalendarEventPayload;
@@ -600,9 +703,12 @@ export const agentRouter = createTRPCRouter({
                       summary: eventData.summary ?? "",
                       description: eventData.description ?? "",
                       location: eventData.location ?? "",
-                      start: eventData.start?.dateTime ?? eventData.start?.date ?? "",
+                      start:
+                        eventData.start?.dateTime ??
+                        eventData.start?.date ??
+                        "",
                       end: eventData.end?.dateTime ?? eventData.end?.date ?? "",
-                    }
+                    },
                   };
                 }
               });
@@ -616,37 +722,56 @@ export const agentRouter = createTRPCRouter({
 
         const searchContactsTool = createTool({
           id: "search_contacts",
-          description: "Search for contacts (name and email) in the local cache to resolve email addresses.",
+          description:
+            "Search for contacts (name and email) in the local cache to resolve email addresses.",
           inputSchema: z.object({
-            query: z.string().describe("The name or part of the email address to search for (e.g., 'Dipti')"),
+            query: z
+              .string()
+              .describe(
+                "The name or part of the email address to search for (e.g., 'Dipti')",
+              ),
           }),
           execute: async ({ query }) => {
-            console.log(`[search_contacts tool] Searching contacts for query: "${query}" via tenant ${userId}...`);
+            console.log(
+              `[search_contacts tool] Searching contacts for query: "${query}" via tenant ${userId}...`,
+            );
             try {
-              const { corsairEntities, corsairAccounts } = await import("@/server/db/schema");
+              const { corsairEntities, corsairAccounts } =
+                await import("@/server/db/schema");
               const { eq, and, or, like } = await import("drizzle-orm");
 
               const threads = await ctx.db
                 .select({ data: corsairEntities.data })
                 .from(corsairEntities)
-                .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
+                .innerJoin(
+                  corsairAccounts,
+                  eq(corsairEntities.accountId, corsairAccounts.id),
+                )
                 .where(
                   and(
                     or(
                       eq(corsairAccounts.tenantId, userId),
-                      like(corsairAccounts.tenantId, `${userId}\\_%`)
+                      like(corsairAccounts.tenantId, `${userId}\\_%`),
                     ),
-                    eq(corsairEntities.entityType, "threads")
-                  )
+                    eq(corsairEntities.entityType, "threads"),
+                  ),
                 );
 
-              const contactMap = new Map<string, { name: string; email: string; count: number }>();
+              const contactMap = new Map<
+                string,
+                { name: string; email: string; count: number }
+              >();
 
-              const getHeaderValue = (msg: any, name: string): string | undefined => {
+              const getHeaderValue = (
+                msg: any,
+                name: string,
+              ): string | undefined => {
                 if (!msg) return undefined;
                 if (msg[name.toLowerCase()]) return msg[name.toLowerCase()];
                 const headers = msg.payload?.headers ?? [];
-                return headers.find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value;
+                return headers.find(
+                  (h: any) => h.name?.toLowerCase() === name.toLowerCase(),
+                )?.value;
               };
 
               const processHeader = (headerValue: string) => {
@@ -655,7 +780,7 @@ export const agentRouter = createTRPCRouter({
                 for (const part of parts) {
                   const trimmed = part.trim();
                   if (!trimmed) continue;
-                  
+
                   let name = "";
                   let email = "";
                   const match = trimmed.match(/^(.*?)\s*<(.*?)>$/);
@@ -687,7 +812,7 @@ export const agentRouter = createTRPCRouter({
                 for (const msg of messages) {
                   const fromVal = getHeaderValue(msg, "from");
                   if (fromVal) processHeader(fromVal);
-                  
+
                   const toVal = getHeaderValue(msg, "to");
                   if (toVal) processHeader(toVal);
                 }
@@ -698,7 +823,7 @@ export const agentRouter = createTRPCRouter({
                 .filter(
                   (c) =>
                     c.name.toLowerCase().includes(normalizedQuery) ||
-                    c.email.toLowerCase().includes(normalizedQuery)
+                    c.email.toLowerCase().includes(normalizedQuery),
                 )
                 .sort((a, b) => b.count - a.count)
                 .slice(0, 10);
@@ -706,7 +831,9 @@ export const agentRouter = createTRPCRouter({
               return results;
             } catch (err: any) {
               console.error("Failed to search contacts:", err);
-              return { error: `Failed to search contacts: ${err.message || err}` };
+              return {
+                error: `Failed to search contacts: ${err.message || err}`,
+              };
             }
           },
         });
@@ -727,13 +854,13 @@ export const agentRouter = createTRPCRouter({
           day: "numeric",
           hour: "numeric",
           minute: "numeric",
-          timeZoneName: "short"
+          timeZoneName: "short",
         });
         const timeInstruction = `\n\nCURRENT TIME AND DATE: ${formattedDate}. Any reference to dates/times (like '19 June', 'tomorrow', 'next week') MUST be resolved relative to this exact date, and specifically, the year MUST default to ${now.getFullYear()} unless a different year is explicitly specified.`;
 
         const connectionInstructions = `\n\nCONNECTION STATUS:
-- Gmail Accounts connected: ${gmailAccounts.length} (${gmailAccounts.map(a => a.emailAddress).join(", ") || "None"})
-- Google Calendar connected: ${calendarAccounts.length} (${calendarAccounts.map(a => a.emailAddress).join(", ") || "None"})
+- Gmail Accounts connected: ${gmailAccounts.length} (${gmailAccounts.map((a) => a.emailAddress).join(", ") || "None"})
+- Google Calendar connected: ${calendarAccounts.length} (${calendarAccounts.map((a) => a.emailAddress).join(", ") || "None"})
 
 CRITICAL CONNECTION REQUIREMENTS:
 If the user asks a workspace-related query, verify if the specific service required is connected:
@@ -847,8 +974,13 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
 
         for (const model of models) {
           try {
-            const modelName = typeof model === "string" ? model : (model?.modelId || "deepseek-v4-pro");
-            console.log(`Attempting execution in live chat using model: ${modelName}...`);
+            const modelName =
+              typeof model === "string"
+                ? model
+                : model?.modelId || "deepseek-v4-pro";
+            console.log(
+              `Attempting execution in live chat using model: ${modelName}...`,
+            );
             const tools: any = {
               ...wrappedMcpTools,
               create_draft: createDraftTool,
@@ -860,7 +992,7 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
               tools.send_email = sendEmailTool;
             }
 
-             const agent = new Agent({
+            const agent = new Agent({
               id: "singularity-workflow-agent",
               name: "Singularity Workflow Agent",
               model: model,
@@ -869,48 +1001,80 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
             });
 
             // Set up a 2-minute timeout for the generation to avoid hanging
-            const generatePromise = agent.generate(messagesList as any, { maxSteps: 5 });
+            const generatePromise = agent.generate(messagesList as any, {
+              maxSteps: 5,
+            });
 
             const timeoutPromise = new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("Model execution timed out after 2 minutes.")), 120000)
+              setTimeout(
+                () =>
+                  reject(
+                    new Error("Model execution timed out after 2 minutes."),
+                  ),
+                120000,
+              ),
             );
 
             response = await Promise.race([generatePromise, timeoutPromise]);
             break;
           } catch (err: unknown) {
-            const modelName = typeof model === "string" ? model : (model?.modelId || "deepseek-v4-pro");
+            const modelName =
+              typeof model === "string"
+                ? model
+                : model?.modelId || "deepseek-v4-pro";
             console.warn(`Live chat model ${modelName} failed:`, err);
             lastError = err;
-            
-            // Abort fallback retry if a write action has already been performed 
+
+            // Abort fallback retry if a write action has already been performed
             // to avoid duplicates (e.g. sending emails twice, creating multiple events).
             if (didExecuteWriteTool) {
-              console.warn("Write tool was already executed by the failed model. Aborting fallback loop to prevent duplicate actions.");
+              console.warn(
+                "Write tool was already executed by the failed model. Aborting fallback loop to prevent duplicate actions.",
+              );
               break;
             }
           }
         }
 
         if (!response) {
-          throw lastError || new Error("All fallback models failed to generate a response.");
+          throw (
+            lastError ||
+            new Error("All fallback models failed to generate a response.")
+          );
         }
 
         // Check if send_email or create_draft tools were executed
-        const toolCalls = response.toolCalls ?? (response as any).steps?.flatMap((s: any) => s.toolCalls ?? []) ?? [];
-        const sentEmail = toolCalls.some((tc: any) => tc.toolName === "send_email");
-        const createdDraft = toolCalls.some((tc: any) => tc.toolName === "create_draft");
+        const toolCalls =
+          response.toolCalls ??
+          (response as any).steps?.flatMap((s: any) => s.toolCalls ?? []) ??
+          [];
+        const sentEmail = toolCalls.some(
+          (tc: any) => tc.toolName === "send_email",
+        );
+        const createdDraft = toolCalls.some(
+          (tc: any) => tc.toolName === "create_draft",
+        );
 
         const rawReasoning = (response as any).reasoning;
-        const reasoning = 
-          (typeof rawReasoning === "string" && rawReasoning) || 
-          (Array.isArray(rawReasoning) && rawReasoning.length > 0 && rawReasoning.join("\n")) || 
-          (response as any).steps?.[0]?.response?.body?.choices?.[0]?.message?.reasoning_content || 
+        const reasoning =
+          (typeof rawReasoning === "string" && rawReasoning) ||
+          (Array.isArray(rawReasoning) &&
+            rawReasoning.length > 0 &&
+            rawReasoning.join("\n")) ||
+          (response as any).steps?.[0]?.response?.body?.choices?.[0]?.message
+            ?.reasoning_content ||
           null;
 
         return {
-          text: response.text || "I completed the requested actions but have nothing additional to say.",
+          text:
+            response.text ||
+            "I completed the requested actions but have nothing additional to say.",
           reasoning,
-          actions: inferFrontendActions(input.message, input.context, response.text),
+          actions: inferFrontendActions(
+            input.message,
+            input.context,
+            response.text,
+          ),
           sentEmail,
           createdDraft,
         };
@@ -930,7 +1094,10 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
       const userId = ctx.session.user.id;
 
       try {
-        if (input.type === "confirm_archive_threads" || input.type === "confirm_delete_threads") {
+        if (
+          input.type === "confirm_archive_threads" ||
+          input.type === "confirm_delete_threads"
+        ) {
           const requestedThreadIds = Array.from(new Set(input.threadIds));
 
           // Look up all thread accounts for the requested thread IDs ensuring user ownership
@@ -940,8 +1107,14 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
               tenantId: corsairAccounts.tenantId,
             })
             .from(corsairEntities)
-            .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
-            .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+            .innerJoin(
+              corsairAccounts,
+              eq(corsairEntities.accountId, corsairAccounts.id),
+            )
+            .innerJoin(
+              corsairIntegrations,
+              eq(corsairAccounts.integrationId, corsairIntegrations.id),
+            )
             .where(
               and(
                 inArray(corsairEntities.entityId, requestedThreadIds),
@@ -949,18 +1122,23 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
                 eq(corsairIntegrations.name, "gmail"),
                 or(
                   eq(corsairAccounts.tenantId, userId),
-                  like(corsairAccounts.tenantId, `${userId}\\_%`)
-                )
-              )
+                  like(corsairAccounts.tenantId, `${userId}\\_%`),
+                ),
+              ),
             );
 
-          const foundThreadIds = new Set(threadAccounts.map((thread) => thread.entityId));
-          const missingThreadIds = requestedThreadIds.filter((id) => !foundThreadIds.has(id));
+          const foundThreadIds = new Set(
+            threadAccounts.map((thread) => thread.entityId),
+          );
+          const missingThreadIds = requestedThreadIds.filter(
+            (id) => !foundThreadIds.has(id),
+          );
 
           if (missingThreadIds.length > 0) {
             throw new TRPCError({
               code: "NOT_FOUND",
-              message: "One or more threads were not found or you do not have permission to access them.",
+              message:
+                "One or more threads were not found or you do not have permission to access them.",
             });
           }
 
@@ -982,10 +1160,10 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
                     tenant.gmail.api.threads.modify({
                       id,
                       removeLabelIds: ["INBOX"],
-                    })
-                  )
+                    }),
+                  ),
                 );
-              })
+              }),
             );
 
             return {
@@ -1001,8 +1179,10 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
             await Promise.all(
               Array.from(tenantThreadsMap.entries()).map(async ([tid, ids]) => {
                 const tenant = corsair.withTenant(tid);
-                return Promise.all(ids.map((id) => tenant.gmail.api.threads.trash({ id })));
-              })
+                return Promise.all(
+                  ids.map((id) => tenant.gmail.api.threads.trash({ id })),
+                );
+              }),
             );
 
             return {
@@ -1027,11 +1207,13 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
           if (recipients.length > 200) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message: "Bulk email list exceeds the limit of 200 recipients per broadcast.",
+              message:
+                "Bulk email list exceeds the limit of 200 recipients per broadcast.",
             });
           }
 
-          const { corsairAccounts, corsairIntegrations } = await import("@/server/db/schema");
+          const { corsairAccounts, corsairIntegrations } =
+            await import("@/server/db/schema");
           const { eq, and, or, like } = await import("drizzle-orm");
 
           // Ensure user has at least one Gmail connection
@@ -1041,21 +1223,25 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
               emailAddress: corsairAccounts.emailAddress,
             })
             .from(corsairAccounts)
-            .innerJoin(corsairIntegrations, eq(corsairAccounts.integrationId, corsairIntegrations.id))
+            .innerJoin(
+              corsairIntegrations,
+              eq(corsairAccounts.integrationId, corsairIntegrations.id),
+            )
             .where(
               and(
                 eq(corsairIntegrations.name, "gmail"),
                 or(
                   eq(corsairAccounts.tenantId, userId),
-                  like(corsairAccounts.tenantId, `${userId}\\_%`)
-                )
-              )
+                  like(corsairAccounts.tenantId, `${userId}\\_%`),
+                ),
+              ),
             );
 
           if (gmailAccounts.length === 0) {
             throw new TRPCError({
               code: "PRECONDITION_FAILED",
-              message: "Please connect your Gmail account under Settings first.",
+              message:
+                "Please connect your Gmail account under Settings first.",
             });
           }
 
@@ -1072,14 +1258,30 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
               let personalizedBody = input.body;
 
               const nameRegex = /\{name\}/gi;
-              personalizedSubject = personalizedSubject.replace(nameRegex, recipient.name);
-              personalizedBody = personalizedBody.replace(nameRegex, recipient.name);
+              personalizedSubject = personalizedSubject.replace(
+                nameRegex,
+                recipient.name,
+              );
+              personalizedBody = personalizedBody.replace(
+                nameRegex,
+                recipient.name,
+              );
 
               const emailRegex = /\{email\}/gi;
-              personalizedSubject = personalizedSubject.replace(emailRegex, recipient.email);
-              personalizedBody = personalizedBody.replace(emailRegex, recipient.email);
+              personalizedSubject = personalizedSubject.replace(
+                emailRegex,
+                recipient.email,
+              );
+              personalizedBody = personalizedBody.replace(
+                emailRegex,
+                recipient.email,
+              );
 
-              const raw = buildRawEmail(recipient.email, personalizedSubject, personalizedBody);
+              const raw = buildRawEmail(
+                recipient.email,
+                personalizedSubject,
+                personalizedBody,
+              );
               if (input.saveAsDraft) {
                 await tenant.gmail.api.drafts.create({
                   draft: {
@@ -1092,8 +1294,13 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
               successCount++;
             } catch (err: any) {
               failureCount++;
-              errors.push(`Failed for ${recipient.email}: ${err.message || err}`);
-              console.error(`Bulk send/draft failure for ${recipient.email}:`, err);
+              errors.push(
+                `Failed for ${recipient.email}: ${err.message || err}`,
+              );
+              console.error(
+                `Bulk send/draft failure for ${recipient.email}:`,
+                err,
+              );
             }
 
             // Rate limit: 200ms delay between sends to avoid hitting Gmail API quotas
@@ -1109,7 +1316,9 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
             });
           }
 
-          const actionVerb = input.saveAsDraft ? "created drafts for" : "broadcasted to";
+          const actionVerb = input.saveAsDraft
+            ? "created drafts for"
+            : "broadcasted to";
           return {
             success: true,
             message: `Successfully ${actionVerb} ${successCount} recipients.${

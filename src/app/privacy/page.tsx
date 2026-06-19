@@ -32,7 +32,7 @@ export default function PrivacyPolicyPage() {
             Privacy Policy
           </h1>
           <p className="mb-8 text-xs text-text-tertiary">
-            Last Updated: June 16, 2026
+            Last Updated: June 19, 2026
           </p>
 
           <div className="space-y-6 text-sm leading-relaxed text-text-secondary">
@@ -53,13 +53,31 @@ export default function PrivacyPolicyPage() {
                   <strong>Local Storage & Sync:</strong> We sync and cache your email threads, messages, drafts, and calendar events locally on your secured database instance to provide fast search and offline reading.
                 </li>
                 <li>
-                  <strong>No Third-Party Access:</strong> We do not sell, trade, rent, or distribute your email content, calendar schedules, or contact lists to any third parties or external servers. All operations happen directly between your browser, your secured backend instance, and Google API servers.
+                  <strong>Data Ownership:</strong> You retain complete ownership of all data. We do not use your emails, calendar events, or personal information for advertising, marketing, or any purposes other than rendering the application service to you.
                 </li>
               </ul>
             </section>
 
             <section className="space-y-3">
-              <h2 className="text-lg font-bold text-text-primary">3. Google API Scopes and Usage</h2>
+              <h2 className="text-lg font-bold text-text-primary">3. Data Sharing, Transfer, and Disclosure</h2>
+              <p>
+                We do not sell, trade, rent, or lease your Google user data. We do not share, transfer, or disclose your Google user data (including email contents, calendar events, contact lists, and metadata) to any third parties, except in the following limited circumstances:
+              </p>
+              <ul className="list-disc pl-5 space-y-2">
+                <li>
+                  <strong>AI Processing (User-Initiated & Non-Training):</strong> If you choose to use our optional AI features (such as draft composition or priority triaging), relevant email and calendar text may be sent securely to LLM providers (e.g., OpenAI or Anthropic) for real-time processing. This data is transmitted via secure SSL/TLS channels, is not stored or logged by the LLM providers, and is <strong>never</strong> used by them to train their AI models.
+                </li>
+                <li>
+                  <strong>Service Delivery:</strong> We only transfer Google user data to provide, maintain, or improve the core productivity features of Singularity (such as sending emails or scheduling calendar events via Google APIs on your behalf).
+                </li>
+                <li>
+                  <strong>Legal Compliance:</strong> We may disclose data if required to do so by law, regulation, or legal process.
+                </li>
+              </ul>
+            </section>
+
+            <section className="space-y-3">
+              <h2 className="text-lg font-bold text-text-primary">4. Google API Scopes and Usage</h2>
               <p>
                 To provide our core features, Singularity requests access to your Google account using specific, limited OAuth scopes:
               </p>
@@ -94,7 +112,7 @@ export default function PrivacyPolicyPage() {
             </section>
 
             <section className="space-y-3">
-              <h2 className="text-lg font-bold text-text-primary">4. Google API Limited Use Policy</h2>
+              <h2 className="text-lg font-bold text-text-primary">5. Google API Limited Use Policy</h2>
               <p>
                 Singularity's use and transfer of information received from Google APIs to any other app will adhere to the{" "}
                 <a 
@@ -109,14 +127,32 @@ export default function PrivacyPolicyPage() {
             </section>
 
             <section className="space-y-3">
-              <h2 className="text-lg font-bold text-text-primary">5. Security of Your Data</h2>
+              <h2 className="text-lg font-bold text-text-primary">6. Data Retention and Deletion</h2>
+              <p>
+                We retain your Google user data only for as long as necessary to provide you with the Singularity service.
+              </p>
+              <ul className="list-disc pl-5 space-y-2">
+                <li>
+                  <strong>Retention Period:</strong> Synced email metadata, calendar events, and cached credentials are retained only as long as you maintain an active account with Singularity.
+                </li>
+                <li>
+                  <strong>User-Initiated Deletion:</strong> You can disconnect your Google account or delete your Singularity account at any time through the Settings panel in the application.
+                </li>
+                <li>
+                  <strong>Data Purge:</strong> Upon account deletion or disconnection, all associated Google user data, access tokens, and cached emails/events are permanently and securely deleted from our databases within 30 days. You can also request manual deletion of all your stored data by contacting us directly at <span className="font-semibold">dipti.gorasia@gmail.com</span>.
+                </li>
+              </ul>
+            </section>
+
+            <section className="space-y-3">
+              <h2 className="text-lg font-bold text-text-primary">7. Security of Your Data</h2>
               <p>
                 We employ industry-standard encryption protocols (SSL/TLS) to secure all communications between your device, the backend, and Google API servers. User authentication tokens and keys are securely stored, encrypted, and isolated to ensure your personal communication hub remains completely secure.
               </p>
             </section>
 
             <section className="space-y-3">
-              <h2 className="text-lg font-bold text-text-primary">6. Contact Us</h2>
+              <h2 className="text-lg font-bold text-text-primary">8. Contact Us</h2>
               <p>
                 If you have any questions or feedback regarding this Privacy Policy, please contact us at:
               </p>

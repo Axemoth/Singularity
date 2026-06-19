@@ -177,8 +177,18 @@ function UsersIcon({ className }: { className?: string }) {
 
 function PlusIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={2.5}
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 4.5v15m7.5-7.5h-15"
+      />
     </svg>
   );
 }
@@ -204,9 +214,24 @@ function TrashIcon({ className }: { className?: string }) {
 
 function SpinnerIcon({ className }: { className?: string }) {
   return (
-    <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+    <svg
+      className={`animate-spin ${className}`}
+      viewBox="0 0 24 24"
+      fill="none"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
     </svg>
   );
 }
@@ -218,17 +243,17 @@ function EventSkeleton() {
     <div className="animate-pulse space-y-4">
       {[1, 2, 3].map((group) => (
         <div key={group} className="space-y-3">
-          <div className="h-5 w-28 rounded bg-bg-surface" />
+          <div className="bg-bg-surface h-5 w-28 rounded" />
           {[1, 2].map((item) => (
             <div
               key={item}
-              className="rounded-[var(--radius-md)] border border-border-subtle bg-bg-raised p-4"
+              className="border-border-subtle bg-bg-raised rounded-[var(--radius-md)] border p-4"
             >
               <div className="flex gap-4">
-                <div className="h-4 w-24 rounded bg-bg-surface" />
+                <div className="bg-bg-surface h-4 w-24 rounded" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-48 rounded bg-bg-surface" />
-                  <div className="h-3 w-32 rounded bg-bg-surface" />
+                  <div className="bg-bg-surface h-4 w-48 rounded" />
+                  <div className="bg-bg-surface h-3 w-32 rounded" />
                 </div>
               </div>
             </div>
@@ -257,7 +282,8 @@ function EventCard({
   const isTentative = data.status === "tentative";
   const attendeeCount = data.attendees?.length ?? 0;
   const description = data.description
-    ? data.description.slice(0, 120) + (data.description.length > 120 ? "..." : "")
+    ? data.description.slice(0, 120) +
+      (data.description.length > 120 ? "..." : "")
     : null;
 
   return (
@@ -265,13 +291,13 @@ function EventCard({
       href={data.htmlLink ?? undefined}
       target="_blank"
       rel="noopener noreferrer"
-      className={`group relative block rounded-[var(--radius-md)] border border-border-subtle bg-bg-raised p-4 transition-colors duration-[var(--transition-fast)] hover:border-border-default ${
+      className={`group border-border-subtle bg-bg-raised hover:border-border-default relative block rounded-[var(--radius-md)] border p-4 transition-colors duration-[var(--transition-fast)] ${
         data.htmlLink ? "cursor-pointer" : "cursor-default"
-      } ${isDeleting ? "opacity-50 pointer-events-none" : ""}`}
+      } ${isDeleting ? "pointer-events-none opacity-50" : ""}`}
     >
       <div className="flex gap-4">
         {/* Time column */}
-        <div className="w-28 shrink-0 pt-0.5 text-sm text-text-tertiary">
+        <div className="text-text-tertiary w-28 shrink-0 pt-0.5 text-sm">
           {time}
         </div>
 
@@ -280,7 +306,7 @@ function EventCard({
           {/* Title + status badges */}
           <div className="flex items-center gap-2">
             <h3
-              className={`truncate text-sm font-medium text-text-primary ${
+              className={`text-text-primary truncate text-sm font-medium ${
                 isCancelled ? "line-through opacity-60" : ""
               }`}
             >
@@ -292,7 +318,7 @@ function EventCard({
 
           {/* Location */}
           {data.location && (
-            <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+            <div className="text-text-secondary flex items-center gap-1.5 text-xs">
               <MapPinIcon className="h-3 w-3 shrink-0" />
               <span className="truncate">{data.location}</span>
             </div>
@@ -300,14 +326,14 @@ function EventCard({
 
           {/* Description */}
           {description && (
-            <p className="text-xs leading-relaxed text-text-tertiary">
+            <p className="text-text-tertiary text-xs leading-relaxed">
               {description}
             </p>
           )}
 
           {/* Attendees */}
           {attendeeCount > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-text-tertiary">
+            <div className="text-text-tertiary flex items-center gap-1.5 text-xs">
               <UsersIcon className="h-3 w-3 shrink-0" />
               <span>
                 {attendeeCount} attendee{attendeeCount !== 1 ? "s" : ""}
@@ -326,7 +352,7 @@ function EventCard({
           onDelete(event.entityId);
         }}
         disabled={isDeleting}
-        className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg text-text-tertiary hover:text-accent-danger hover:bg-accent-danger/10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-[var(--transition-fast)] cursor-pointer"
+        className="text-text-tertiary hover:text-accent-danger hover:bg-accent-danger/10 absolute top-1/2 right-4 -translate-y-1/2 cursor-pointer rounded-lg p-2 opacity-0 transition-all duration-[var(--transition-fast)] group-hover:opacity-100 focus:opacity-100"
         title="Delete Event"
       >
         {isDeleting ? (
@@ -357,7 +383,7 @@ function DateGroupSection({
       {/* Group heading */}
       <div
         className={`mb-3 flex items-center gap-3 ${
-          isToday ? "border-l-2 border-accent-primary pl-3" : "pl-[14px]"
+          isToday ? "border-accent-primary border-l-2 pl-3" : "pl-[14px]"
         }`}
       >
         <h2
@@ -367,7 +393,7 @@ function DateGroupSection({
         >
           {group.heading}
         </h2>
-        <span className="text-xs text-text-tertiary">
+        <span className="text-text-tertiary text-xs">
           {group.events.length} event{group.events.length !== 1 ? "s" : ""}
         </span>
       </div>
@@ -426,8 +452,8 @@ function WeekView({
   const todayStr = getDayKey(new Date());
 
   return (
-    <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0 scrollbar-none">
-      <div className="grid grid-cols-7 gap-3 min-w-[900px] md:min-w-0 pb-2 animate-fade-in">
+    <div className="-mx-6 scrollbar-none overflow-x-auto px-6 md:mx-0 md:px-0">
+      <div className="animate-fade-in grid min-w-[900px] grid-cols-7 gap-3 pb-2 md:min-w-0">
         {weekDays.map((day) => {
           const key = getDayKey(day);
           const dayEvents = eventsByDate.get(key) ?? [];
@@ -436,35 +462,38 @@ function WeekView({
           const dateNum = day.getDate();
 
           const sortedEvents = [...dayEvents].sort(
-            (a, b) => getEventSortTime(a) - getEventSortTime(b)
+            (a, b) => getEventSortTime(a) - getEventSortTime(b),
           );
 
           return (
             <div
               key={key}
               onClick={(e) => {
-                if ((e.target as HTMLElement).closest("a") || (e.target as HTMLElement).closest("button")) {
+                if (
+                  (e.target as HTMLElement).closest("a") ||
+                  (e.target as HTMLElement).closest("button")
+                ) {
                   return;
                 }
                 onDateClick(key);
               }}
-              className={`group relative flex flex-col gap-3 min-h-[420px] p-3 rounded-[var(--radius-md)] border bg-bg-raised/40 transition-all duration-[var(--transition-base)] hover:bg-bg-raised hover:shadow-md cursor-pointer ${
+              className={`group bg-bg-raised/40 hover:bg-bg-raised relative flex min-h-[420px] cursor-pointer flex-col gap-3 rounded-[var(--radius-md)] border p-3 transition-all duration-[var(--transition-base)] hover:shadow-md ${
                 isToday
                   ? "border-accent-info/40 bg-accent-info/[0.02]"
                   : "border-border-subtle/50"
               }`}
             >
               {isToday && (
-                <div className="absolute top-0 left-0 right-0 h-[3px] bg-accent-info rounded-t-[var(--radius-md)]" />
+                <div className="bg-accent-info absolute top-0 right-0 left-0 h-[3px] rounded-t-[var(--radius-md)]" />
               )}
 
               {/* Header */}
-              <div className="flex flex-col items-center gap-1 pb-2 border-b border-border-subtle/40 shrink-0">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+              <div className="border-border-subtle/40 flex shrink-0 flex-col items-center gap-1 border-b pb-2">
+                <span className="text-text-tertiary text-[10px] font-bold tracking-wider uppercase">
                   {dayName}
                 </span>
                 <span
-                  className={`text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full transition-colors ${
+                  className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold transition-colors ${
                     isToday
                       ? "bg-accent-info text-text-inverse shadow-xs"
                       : "text-text-primary group-hover:text-accent-info"
@@ -475,11 +504,14 @@ function WeekView({
               </div>
 
               {/* Events */}
-              <div className="flex-1 flex flex-col gap-2 overflow-y-auto max-h-[340px] scrollbar-none pr-0.5">
+              <div className="flex max-h-[340px] flex-1 scrollbar-none flex-col gap-2 overflow-y-auto pr-0.5">
                 {sortedEvents.length > 0 ? (
                   sortedEvents.map((event) => {
                     const title = event.data.summary || "Untitled Event";
-                    const time = formatEventTime(event.data.start, event.data.end);
+                    const time = formatEventTime(
+                      event.data.start,
+                      event.data.end,
+                    );
                     const isDeleting = !!deletingIds[event.entityId];
                     return (
                       <a
@@ -487,23 +519,31 @@ function WeekView({
                         href={event.data.htmlLink ?? undefined}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`group/card block p-2.5 bg-bg-surface/50 hover:bg-bg-surface border border-border-subtle/60 hover:border-border-default rounded-[var(--radius-sm)] transition-all duration-[var(--transition-fast)] text-left shadow-2xs hover:shadow-xs relative overflow-hidden ${
-                          isDeleting ? "opacity-50 pointer-events-none" : ""
+                        className={`group/card bg-bg-surface/50 hover:bg-bg-surface border-border-subtle/60 hover:border-border-default relative block overflow-hidden rounded-[var(--radius-sm)] border p-2.5 text-left shadow-2xs transition-all duration-[var(--transition-fast)] hover:shadow-xs ${
+                          isDeleting ? "pointer-events-none opacity-50" : ""
                         }`}
                       >
                         {/* Left border indicator */}
-                        <div className="absolute top-0 left-0 bottom-0 w-[3px] bg-accent-info/70 group-hover/card:bg-accent-info" />
-                        <div className="pl-1.5 pr-4">
-                          <div className="text-[10px] text-accent-info font-bold mb-1 tracking-wide">
+                        <div className="bg-accent-info/70 group-hover/card:bg-accent-info absolute top-0 bottom-0 left-0 w-[3px]" />
+                        <div className="pr-4 pl-1.5">
+                          <div className="text-accent-info mb-1 text-[10px] font-bold tracking-wide">
                             {time}
                           </div>
-                          <div className="text-xs font-semibold text-text-primary leading-snug line-clamp-2" title={title}>
+                          <div
+                            className="text-text-primary line-clamp-2 text-xs leading-snug font-semibold"
+                            title={title}
+                          >
                             {title}
                           </div>
                           {event.data.location && (
-                            <div className="text-[10px] text-text-tertiary mt-1.5 flex items-center gap-1 truncate" title={event.data.location}>
+                            <div
+                              className="text-text-tertiary mt-1.5 flex items-center gap-1 truncate text-[10px]"
+                              title={event.data.location}
+                            >
                               <span>📍</span>
-                              <span className="truncate">{event.data.location}</span>
+                              <span className="truncate">
+                                {event.data.location}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -517,7 +557,7 @@ function WeekView({
                             onDelete(event.entityId);
                           }}
                           disabled={isDeleting}
-                          className="absolute right-1 top-1 p-1 rounded text-text-tertiary hover:text-accent-danger hover:bg-accent-danger/10 opacity-0 group-hover/card:opacity-100 transition-all duration-[var(--transition-fast)] cursor-pointer"
+                          className="text-text-tertiary hover:text-accent-danger hover:bg-accent-danger/10 absolute top-1 right-1 cursor-pointer rounded p-1 opacity-0 transition-all duration-[var(--transition-fast)] group-hover/card:opacity-100"
                           title="Delete Event"
                         >
                           {isDeleting ? (
@@ -530,10 +570,12 @@ function WeekView({
                     );
                   })
                 ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center gap-1.5 opacity-40 group-hover:opacity-100 transition-all duration-[var(--transition-base)] select-none">
-                    <span className="text-[10px] text-text-tertiary font-medium">No events</span>
-                    <div className="h-6 w-6 rounded-full border border-dashed border-border-default/80 flex items-center justify-center group-hover:bg-bg-surface group-hover:border-solid transition-colors">
-                      <PlusIcon className="h-3.5 w-3.5 text-text-tertiary" />
+                  <div className="flex flex-1 flex-col items-center justify-center gap-1.5 opacity-40 transition-all duration-[var(--transition-base)] select-none group-hover:opacity-100">
+                    <span className="text-text-tertiary text-[10px] font-medium">
+                      No events
+                    </span>
+                    <div className="border-border-default/80 group-hover:bg-bg-surface flex h-6 w-6 items-center justify-center rounded-full border border-dashed transition-colors group-hover:border-solid">
+                      <PlusIcon className="text-text-tertiary h-3.5 w-3.5" />
                     </div>
                   </div>
                 )}
@@ -608,16 +650,19 @@ function MonthView({
   const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
-    <div className="flex flex-col border border-border-subtle bg-bg-raised rounded-[var(--radius-lg)] overflow-hidden shadow-sm animate-fade-in">
-      <div className="grid grid-cols-7 border-b border-border-subtle bg-bg-surface/50 text-center shrink-0">
+    <div className="border-border-subtle bg-bg-raised animate-fade-in flex flex-col overflow-hidden rounded-[var(--radius-lg)] border shadow-sm">
+      <div className="border-border-subtle bg-bg-surface/50 grid shrink-0 grid-cols-7 border-b text-center">
         {weekdays.map((wd) => (
-          <div key={wd} className="py-2 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+          <div
+            key={wd}
+            className="text-text-tertiary py-2 text-[10px] font-bold tracking-wider uppercase"
+          >
             {wd}
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 divide-x divide-y divide-border-subtle">
+      <div className="divide-border-subtle grid grid-cols-7 divide-x divide-y">
         {monthCells.map((cell, idx) => {
           const key = getDayKey(cell.date);
           const dayEvents = eventsByDate.get(key) ?? [];
@@ -625,37 +670,42 @@ function MonthView({
           const dateNum = cell.date.getDate();
 
           const sortedEvents = [...dayEvents].sort(
-            (a, b) => getEventSortTime(a) - getEventSortTime(b)
+            (a, b) => getEventSortTime(a) - getEventSortTime(b),
           );
 
           return (
             <div
               key={`${key}-${idx}`}
               onClick={(e) => {
-                if ((e.target as HTMLElement).closest("a") || (e.target as HTMLElement).closest("button")) {
+                if (
+                  (e.target as HTMLElement).closest("a") ||
+                  (e.target as HTMLElement).closest("button")
+                ) {
                   return;
                 }
                 onDateClick(key);
               }}
-              className={`min-h-[95px] p-2 flex flex-col gap-1.5 transition-colors duration-[var(--transition-fast)] cursor-pointer hover:bg-bg-surface/40 hover:border-border-default border border-transparent ${
-                cell.isCurrentMonth ? "bg-bg-raised" : "bg-bg-base/20 opacity-60"
+              className={`hover:bg-bg-surface/40 hover:border-border-default flex min-h-[95px] cursor-pointer flex-col gap-1.5 border border-transparent p-2 transition-colors duration-[var(--transition-fast)] ${
+                cell.isCurrentMonth
+                  ? "bg-bg-raised"
+                  : "bg-bg-base/20 opacity-60"
               } ${isToday ? "bg-accent-primary/5 border-accent-primary/20" : ""}`}
             >
-              <div className="flex justify-end shrink-0">
+              <div className="flex shrink-0 justify-end">
                 <span
-                  className={`text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full ${
+                  className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${
                     isToday
                       ? "bg-accent-primary text-text-inverse"
                       : cell.isCurrentMonth
-                      ? "text-text-primary"
-                      : "text-text-tertiary"
+                        ? "text-text-primary"
+                        : "text-text-tertiary"
                   }`}
                 >
                   {dateNum}
                 </span>
               </div>
 
-              <div className="flex-1 flex flex-col gap-1 overflow-y-auto max-h-[60px] scrollbar-none">
+              <div className="flex max-h-[60px] flex-1 scrollbar-none flex-col gap-1 overflow-y-auto">
                 {sortedEvents.slice(0, 3).map((event) => {
                   const title = event.data.summary || "Untitled Event";
                   return (
@@ -665,14 +715,14 @@ function MonthView({
                       target="_blank"
                       rel="noopener noreferrer"
                       title={title}
-                      className="block truncate text-[9px] px-1.5 py-0.5 bg-bg-surface hover:bg-bg-inset border-l-2 border-accent-info text-text-secondary rounded font-medium text-left leading-tight"
+                      className="bg-bg-surface hover:bg-bg-inset border-accent-info text-text-secondary block truncate rounded border-l-2 px-1.5 py-0.5 text-left text-[9px] leading-tight font-medium"
                     >
                       {title}
                     </a>
                   );
                 })}
                 {sortedEvents.length > 3 && (
-                  <span className="text-[8px] font-bold text-text-tertiary text-right pr-0.5">
+                  <span className="text-text-tertiary pr-0.5 text-right text-[8px] font-bold">
                     +{sortedEvents.length - 3} more
                   </span>
                 )}
@@ -719,21 +769,27 @@ function DayView({
   });
 
   return (
-    <div className="bg-bg-raised border border-border-subtle rounded-[var(--radius-lg)] overflow-hidden shadow-sm animate-fade-in flex flex-col max-h-[600px]">
+    <div className="bg-bg-raised border-border-subtle animate-fade-in flex max-h-[600px] flex-col overflow-hidden rounded-[var(--radius-lg)] border shadow-sm">
       {/* Day view header */}
-      <div className="p-4 border-b border-border-subtle bg-bg-surface/30 flex items-center justify-between shrink-0">
+      <div className="border-border-subtle bg-bg-surface/30 flex shrink-0 items-center justify-between border-b p-4">
         <div>
-          <h3 className="text-sm font-semibold text-text-primary">
-            {currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+          <h3 className="text-text-primary text-sm font-semibold">
+            {currentDate.toLocaleDateString("en-US", {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            })}
           </h3>
-          <p className="text-xs text-text-tertiary">
-            {dayEvents.length} event{dayEvents.length !== 1 ? "s" : ""} scheduled
+          <p className="text-text-tertiary text-xs">
+            {dayEvents.length} event{dayEvents.length !== 1 ? "s" : ""}{" "}
+            scheduled
           </p>
         </div>
       </div>
 
       {/* Hourly Timeline */}
-      <div className="flex-1 overflow-y-auto divide-y divide-border-subtle/40 pr-1">
+      <div className="divide-border-subtle/40 flex-1 divide-y overflow-y-auto pr-1">
         {hours.map(({ hour, label, timeStr }) => {
           const hourEvents = dayEvents.filter((event) => {
             const startStr = event.data?.start?.dateTime;
@@ -745,27 +801,33 @@ function DayView({
           return (
             <div
               key={hour}
-              className="group flex min-h-[64px] transition-colors duration-[var(--transition-fast)] hover:bg-bg-surface/20"
+              className="group hover:bg-bg-surface/20 flex min-h-[64px] transition-colors duration-[var(--transition-fast)]"
             >
               {/* Hour Label */}
-              <div className="w-16 shrink-0 py-2 px-3 text-right text-[10px] font-bold text-text-tertiary border-r border-border-subtle/30 select-none">
+              <div className="text-text-tertiary border-border-subtle/30 w-16 shrink-0 border-r px-3 py-2 text-right text-[10px] font-bold select-none">
                 {label}
               </div>
 
               {/* Slots/Events Content area */}
               <div
                 onClick={(e) => {
-                  if ((e.target as HTMLElement).closest("a") || (e.target as HTMLElement).closest("button")) {
+                  if (
+                    (e.target as HTMLElement).closest("a") ||
+                    (e.target as HTMLElement).closest("button")
+                  ) {
                     return;
                   }
                   onSlotClick(key, timeStr);
                 }}
-                className="flex-1 p-2 flex gap-2 overflow-x-auto scrollbar-none cursor-pointer relative"
+                className="relative flex flex-1 cursor-pointer scrollbar-none gap-2 overflow-x-auto p-2"
               >
                 {hourEvents.length > 0 ? (
                   hourEvents.map((event) => {
                     const title = event.data.summary || "Untitled Event";
-                    const timeRange = formatEventTime(event.data.start, event.data.end);
+                    const timeRange = formatEventTime(
+                      event.data.start,
+                      event.data.end,
+                    );
                     const isDeleting = !!deletingIds[event.entityId];
                     return (
                       <a
@@ -773,24 +835,29 @@ function DayView({
                         href={event.data.htmlLink ?? undefined}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`group/card flex-1 min-w-[220px] max-w-md p-2.5 bg-bg-surface/50 hover:bg-bg-surface border border-border-subtle/60 hover:border-border-default rounded-[var(--radius-sm)] transition-all duration-[var(--transition-fast)] text-left shadow-2xs hover:shadow-xs relative overflow-hidden flex flex-col justify-between ${
-                          isDeleting ? "opacity-50 pointer-events-none" : ""
+                        className={`group/card bg-bg-surface/50 hover:bg-bg-surface border-border-subtle/60 hover:border-border-default relative flex max-w-md min-w-[220px] flex-1 flex-col justify-between overflow-hidden rounded-[var(--radius-sm)] border p-2.5 text-left shadow-2xs transition-all duration-[var(--transition-fast)] hover:shadow-xs ${
+                          isDeleting ? "pointer-events-none opacity-50" : ""
                         }`}
                       >
                         {/* Left border indicator */}
-                        <div className="absolute top-0 left-0 bottom-0 w-[3px] bg-accent-info/70 group-hover/card:bg-accent-info" />
-                        <div className="pl-1.5 pr-6">
-                          <div className="text-xs font-semibold text-text-primary truncate" title={title}>
+                        <div className="bg-accent-info/70 group-hover/card:bg-accent-info absolute top-0 bottom-0 left-0 w-[3px]" />
+                        <div className="pr-6 pl-1.5">
+                          <div
+                            className="text-text-primary truncate text-xs font-semibold"
+                            title={title}
+                          >
                             {title}
                           </div>
-                          <div className="flex items-center justify-between mt-1.5">
-                            <span className="text-[10px] text-accent-info font-bold tracking-wide">
+                          <div className="mt-1.5 flex items-center justify-between">
+                            <span className="text-accent-info text-[10px] font-bold tracking-wide">
                               {timeRange}
                             </span>
                             {event.data.location && (
-                              <span className="text-[10px] text-text-tertiary truncate max-w-[140px] flex items-center gap-0.5">
+                              <span className="text-text-tertiary flex max-w-[140px] items-center gap-0.5 truncate text-[10px]">
                                 <span>📍</span>
-                                <span className="truncate">{event.data.location}</span>
+                                <span className="truncate">
+                                  {event.data.location}
+                                </span>
                               </span>
                             )}
                           </div>
@@ -805,7 +872,7 @@ function DayView({
                             onDelete(event.entityId);
                           }}
                           disabled={isDeleting}
-                          className="absolute right-1 top-1 p-1 rounded text-text-tertiary hover:text-accent-danger hover:bg-accent-danger/10 opacity-0 group-hover/card:opacity-100 transition-all duration-[var(--transition-fast)] cursor-pointer"
+                          className="text-text-tertiary hover:text-accent-danger hover:bg-accent-danger/10 absolute top-1 right-1 cursor-pointer rounded p-1 opacity-0 transition-all duration-[var(--transition-fast)] group-hover/card:opacity-100"
                           title="Delete Event"
                         >
                           {isDeleting ? (
@@ -818,8 +885,8 @@ function DayView({
                     );
                   })
                 ) : (
-                  <div className="w-full h-full flex items-center justify-start opacity-0 group-hover:opacity-100 transition-opacity pl-2 select-none">
-                    <span className="text-[10px] text-accent-primary font-bold flex items-center gap-1">
+                  <div className="flex h-full w-full items-center justify-start pl-2 opacity-0 transition-opacity select-none group-hover:opacity-100">
+                    <span className="text-accent-primary flex items-center gap-1 text-[10px] font-bold">
                       <PlusIcon className="h-3 w-3" />
                       Add event at {label}
                     </span>
@@ -844,7 +911,9 @@ export default function CalendarPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
-  const [selectedCalendars, setSelectedCalendars] = useState<Record<string, boolean>>({});
+  const [selectedCalendars, setSelectedCalendars] = useState<
+    Record<string, boolean>
+  >({});
   const [deletingIds, setDeletingIds] = useState<Record<string, boolean>>({});
 
   const toggleCalendar = (emailAddress: string) => {
@@ -855,7 +924,8 @@ export default function CalendarPage() {
   };
 
   const utils = api.useUtils();
-  const { data: calendarStatus, isLoading: isStatusLoading } = api.calendar.getConnectionStatus.useQuery();
+  const { data: calendarStatus, isLoading: isStatusLoading } =
+    api.calendar.getConnectionStatus.useQuery();
   const {
     data: events,
     isLoading: isEventsLoading,
@@ -916,9 +986,7 @@ export default function CalendarPage() {
       .map(([dateKey, evts]) => ({
         dateKey,
         heading: formatDateHeading(dateKey),
-        events: evts.sort(
-          (a, b) => getEventSortTime(b) - getEventSortTime(a),
-        ),
+        events: evts.sort((a, b) => getEventSortTime(b) - getEventSortTime(a)),
       }));
 
     return sorted;
@@ -1007,14 +1075,14 @@ export default function CalendarPage() {
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-3xl px-6 py-8">
         {/* Header */}
-        <header className="mb-6 flex items-center justify-between animate-fade-in">
+        <header className="animate-fade-in mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <CalendarIcon className="h-5 w-5 text-text-secondary" />
-            <h1 className="text-xl font-semibold text-text-primary">
+            <CalendarIcon className="text-text-secondary h-5 w-5" />
+            <h1 className="text-text-primary text-xl font-semibold">
               Calendar
             </h1>
             {!isLoading && totalEvents > 0 && (
-              <span className="text-sm text-text-tertiary">
+              <span className="text-text-tertiary text-sm">
                 {totalEvents} event{totalEvents !== 1 ? "s" : ""}
               </span>
             )}
@@ -1029,7 +1097,7 @@ export default function CalendarPage() {
                   setSelectedTime("");
                   setIsCreateOpen(true);
                 }}
-                className="font-bold flex items-center gap-1.5 cursor-pointer"
+                className="flex cursor-pointer items-center gap-1.5 font-bold"
               >
                 <PlusIcon className="h-4 w-4" />
                 Create Event
@@ -1049,135 +1117,158 @@ export default function CalendarPage() {
         </header>
 
         {/* Date Navigation & View Switcher */}
-        {!isLoading && !isError && calendarStatus?.connected && totalEvents > 0 && searchQuery.trim() === "" && (
-          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in">
-            {view !== "list" ? (
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="h-8 w-8 p-0 flex items-center justify-center font-bold text-xs"
-                  onClick={handlePrev}
-                >
-                  &larr;
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="h-8 px-3 text-xs font-semibold"
-                  onClick={handleToday}
-                >
-                  Today
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="h-8 w-8 p-0 flex items-center justify-center font-bold text-xs"
-                  onClick={handleNext}
-                >
-                  &rarr;
-                </Button>
-                <span className="text-sm font-semibold text-text-primary ml-2 tabular-nums">
-                  {view === "month"
-                    ? currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })
-                    : view === "day"
-                    ? currentDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })
-                    : (() => {
-                        const start = new Date(currentDate);
-                        start.setDate(currentDate.getDate() - currentDate.getDay());
-                        const end = new Date(start);
-                        end.setDate(start.getDate() + 6);
-                        const optionsStart: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-                        const optionsEnd: Intl.DateTimeFormatOptions = {
-                          month: "short",
-                          day: "numeric",
+        {!isLoading &&
+          !isError &&
+          calendarStatus?.connected &&
+          totalEvents > 0 &&
+          searchQuery.trim() === "" && (
+            <div className="animate-fade-in mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              {view !== "list" ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex h-8 w-8 items-center justify-center p-0 text-xs font-bold"
+                    onClick={handlePrev}
+                  >
+                    &larr;
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 px-3 text-xs font-semibold"
+                    onClick={handleToday}
+                  >
+                    Today
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex h-8 w-8 items-center justify-center p-0 text-xs font-bold"
+                    onClick={handleNext}
+                  >
+                    &rarr;
+                  </Button>
+                  <span className="text-text-primary ml-2 text-sm font-semibold tabular-nums">
+                    {view === "month"
+                      ? currentDate.toLocaleDateString("en-US", {
+                          month: "long",
                           year: "numeric",
-                        };
-                        if (start.getFullYear() !== end.getFullYear()) {
-                          optionsStart.year = "numeric";
-                        }
-                        return `${start.toLocaleDateString("en-US", optionsStart)} – ${end.toLocaleDateString("en-US", optionsEnd)}`;
-                      })()}
-                </span>
-              </div>
-            ) : (
-              <div className="text-sm font-semibold text-text-primary py-1">
-                Upcoming Schedule
-              </div>
-            )}
+                        })
+                      : view === "day"
+                        ? currentDate.toLocaleDateString("en-US", {
+                            weekday: "long",
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : (() => {
+                            const start = new Date(currentDate);
+                            start.setDate(
+                              currentDate.getDate() - currentDate.getDay(),
+                            );
+                            const end = new Date(start);
+                            end.setDate(start.getDate() + 6);
+                            const optionsStart: Intl.DateTimeFormatOptions = {
+                              month: "short",
+                              day: "numeric",
+                            };
+                            const optionsEnd: Intl.DateTimeFormatOptions = {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            };
+                            if (start.getFullYear() !== end.getFullYear()) {
+                              optionsStart.year = "numeric";
+                            }
+                            return `${start.toLocaleDateString("en-US", optionsStart)} – ${end.toLocaleDateString("en-US", optionsEnd)}`;
+                          })()}
+                  </span>
+                </div>
+              ) : (
+                <div className="text-text-primary py-1 text-sm font-semibold">
+                  Upcoming Schedule
+                </div>
+              )}
 
-            <div className="flex bg-bg-raised border border-border-subtle rounded-[var(--radius-md)] p-1 gap-1 shrink-0 self-start sm:self-auto shadow-sm">
-              <button
-                onClick={() => setView("list")}
-                className={`px-3 py-1 text-xs font-semibold rounded-[var(--radius-sm)] cursor-pointer transition-all duration-[var(--transition-fast)] ${
-                  view === "list"
-                    ? "bg-bg-surface text-text-primary border border-border-default shadow-xs"
-                    : "text-text-tertiary hover:text-text-primary"
-                }`}
-              >
-                List
-              </button>
-              <button
-                onClick={() => setView("day")}
-                className={`px-3 py-1 text-xs font-semibold rounded-[var(--radius-sm)] cursor-pointer transition-all duration-[var(--transition-fast)] ${
-                  view === "day"
-                    ? "bg-bg-surface text-text-primary border border-border-default shadow-xs"
-                    : "text-text-tertiary hover:text-text-primary"
-                }`}
-              >
-                Day
-              </button>
-              <button
-                onClick={() => setView("week")}
-                className={`px-3 py-1 text-xs font-semibold rounded-[var(--radius-sm)] cursor-pointer transition-all duration-[var(--transition-fast)] ${
-                  view === "week"
-                    ? "bg-bg-surface text-text-primary border border-border-default shadow-xs"
-                    : "text-text-tertiary hover:text-text-primary"
-                }`}
-              >
-                Week
-              </button>
-              <button
-                onClick={() => setView("month")}
-                className={`px-3 py-1 text-xs font-semibold rounded-[var(--radius-sm)] cursor-pointer transition-all duration-[var(--transition-fast)] ${
-                  view === "month"
-                    ? "bg-bg-surface text-text-primary border border-border-default shadow-xs"
-                    : "text-text-tertiary hover:text-text-primary"
-                }`}
-              >
-                Month
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Calendar Filter Pills */}
-        {!isLoading && !isError && calendarStatus?.connected && calendarStatus.accounts && calendarStatus.accounts.length > 1 && (
-          <div className="mb-6 flex flex-wrap gap-2 animate-fade-in">
-            {calendarStatus.accounts.map((acc: any) => {
-              const isChecked = selectedCalendars[acc.emailAddress] !== false;
-              return (
+              <div className="bg-bg-raised border-border-subtle flex shrink-0 gap-1 self-start rounded-[var(--radius-md)] border p-1 shadow-sm sm:self-auto">
                 <button
-                  key={acc.id}
-                  type="button"
-                  onClick={() => toggleCalendar(acc.emailAddress)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all duration-[var(--transition-fast)] ${
-                    isChecked
-                      ? "bg-accent-primary/10 border-accent-primary/25 text-accent-primary animate-fade-in"
-                      : "border-border-default text-text-tertiary bg-transparent hover:text-text-primary"
+                  onClick={() => setView("list")}
+                  className={`cursor-pointer rounded-[var(--radius-sm)] px-3 py-1 text-xs font-semibold transition-all duration-[var(--transition-fast)] ${
+                    view === "list"
+                      ? "bg-bg-surface text-text-primary border-border-default border shadow-xs"
+                      : "text-text-tertiary hover:text-text-primary"
                   }`}
                 >
-                  <span className={`h-2 w-2 rounded-full transition-all ${isChecked ? "bg-accent-primary animate-pulse-subtle" : "bg-text-tertiary/40"}`} />
-                  {acc.emailAddress}
+                  List
                 </button>
-              );
-            })}
-          </div>
-        )}
+                <button
+                  onClick={() => setView("day")}
+                  className={`cursor-pointer rounded-[var(--radius-sm)] px-3 py-1 text-xs font-semibold transition-all duration-[var(--transition-fast)] ${
+                    view === "day"
+                      ? "bg-bg-surface text-text-primary border-border-default border shadow-xs"
+                      : "text-text-tertiary hover:text-text-primary"
+                  }`}
+                >
+                  Day
+                </button>
+                <button
+                  onClick={() => setView("week")}
+                  className={`cursor-pointer rounded-[var(--radius-sm)] px-3 py-1 text-xs font-semibold transition-all duration-[var(--transition-fast)] ${
+                    view === "week"
+                      ? "bg-bg-surface text-text-primary border-border-default border shadow-xs"
+                      : "text-text-tertiary hover:text-text-primary"
+                  }`}
+                >
+                  Week
+                </button>
+                <button
+                  onClick={() => setView("month")}
+                  className={`cursor-pointer rounded-[var(--radius-sm)] px-3 py-1 text-xs font-semibold transition-all duration-[var(--transition-fast)] ${
+                    view === "month"
+                      ? "bg-bg-surface text-text-primary border-border-default border shadow-xs"
+                      : "text-text-tertiary hover:text-text-primary"
+                  }`}
+                >
+                  Month
+                </button>
+              </div>
+            </div>
+          )}
+
+        {/* Calendar Filter Pills */}
+        {!isLoading &&
+          !isError &&
+          calendarStatus?.connected &&
+          calendarStatus.accounts &&
+          calendarStatus.accounts.length > 1 && (
+            <div className="animate-fade-in mb-6 flex flex-wrap gap-2">
+              {calendarStatus.accounts.map((acc: any) => {
+                const isChecked = selectedCalendars[acc.emailAddress] !== false;
+                return (
+                  <button
+                    key={acc.id}
+                    type="button"
+                    onClick={() => toggleCalendar(acc.emailAddress)}
+                    className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all duration-[var(--transition-fast)] ${
+                      isChecked
+                        ? "bg-accent-primary/10 border-accent-primary/25 text-accent-primary animate-fade-in"
+                        : "border-border-default text-text-tertiary hover:text-text-primary bg-transparent"
+                    }`}
+                  >
+                    <span
+                      className={`h-2 w-2 rounded-full transition-all ${isChecked ? "bg-accent-primary animate-pulse-subtle" : "bg-text-tertiary/40"}`}
+                    />
+                    {acc.emailAddress}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
         {/* Search Input Bar */}
         {!isLoading && !isError && totalEvents > 0 && (
-          <div className="mb-6 animate-fade-in">
+          <div className="animate-fade-in mb-6">
             <SearchInput
               placeholder="Search meetings, locations, attendees..."
               value={searchQuery}
@@ -1193,10 +1284,10 @@ export default function CalendarPage() {
 
         {/* Error state */}
         {isError && !isLoading && (
-          <div className="animate-fade-in rounded-[var(--radius-md)] border border-border-subtle bg-bg-raised p-8 text-center">
-            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-accent-danger/10">
+          <div className="animate-fade-in border-border-subtle bg-bg-raised rounded-[var(--radius-md)] border p-8 text-center">
+            <div className="bg-accent-danger/10 mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full">
               <svg
-                className="h-5 w-5 text-accent-danger"
+                className="text-accent-danger h-5 w-5"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -1209,10 +1300,10 @@ export default function CalendarPage() {
                 <line x1="12" y1="16" x2="12.01" y2="16" />
               </svg>
             </div>
-            <p className="mb-1 text-sm font-medium text-text-primary">
+            <p className="text-text-primary mb-1 text-sm font-medium">
               Failed to load events
             </p>
-            <p className="mb-4 text-xs text-text-tertiary">
+            <p className="text-text-tertiary mb-4 text-xs">
               {error?.message || "Something went wrong. Please try again."}
             </p>
             <Button variant="secondary" size="sm" onClick={() => refetch()}>
@@ -1223,15 +1314,16 @@ export default function CalendarPage() {
 
         {/* Disconnected state */}
         {!isLoading && !isError && !calendarStatus?.connected && (
-          <div className="animate-fade-in rounded-[var(--radius-md)] border border-border-subtle bg-bg-raised p-8 text-center">
-            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-bg-surface">
-              <CalendarIcon className="h-5 w-5 text-text-tertiary" />
+          <div className="animate-fade-in border-border-subtle bg-bg-raised rounded-[var(--radius-md)] border p-8 text-center">
+            <div className="bg-bg-surface mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full">
+              <CalendarIcon className="text-text-tertiary h-5 w-5" />
             </div>
-            <p className="mb-1 text-sm font-medium text-text-primary">
+            <p className="text-text-primary mb-1 text-sm font-medium">
               Calendar is not connected
             </p>
-            <p className="mb-4 text-xs text-text-tertiary leading-relaxed max-w-sm mx-auto">
-              Authorize Singularity to access your Google Calendar and manage events.
+            <p className="text-text-tertiary mx-auto mb-4 max-w-sm text-xs leading-relaxed">
+              Authorize Singularity to access your Google Calendar and manage
+              events.
             </p>
             <Button
               variant="primary"
@@ -1247,39 +1339,50 @@ export default function CalendarPage() {
         )}
 
         {/* Connected but empty state */}
-        {!isLoading && !isError && calendarStatus?.connected && totalEvents === 0 && (
-          <div className="animate-fade-in rounded-[var(--radius-md)] border border-border-subtle bg-bg-raised p-8 text-center">
-            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-bg-surface">
-              <CalendarIcon className="h-5 w-5 text-text-tertiary" />
+        {!isLoading &&
+          !isError &&
+          calendarStatus?.connected &&
+          totalEvents === 0 && (
+            <div className="animate-fade-in border-border-subtle bg-bg-raised rounded-[var(--radius-md)] border p-8 text-center">
+              <div className="bg-bg-surface mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full">
+                <CalendarIcon className="text-text-tertiary h-5 w-5" />
+              </div>
+              <p className="text-text-primary mb-1 text-sm font-medium">
+                No events found
+              </p>
+              <p className="text-text-tertiary mb-4 text-xs leading-relaxed">
+                Connected as{" "}
+                {calendarStatus?.accounts?.[0]?.emailAddress || "Connected"}.
+                Sync your calendar to import events.
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleRefresh}
+                isLoading={isRefreshing}
+              >
+                <RefreshIcon className="h-3.5 w-3.5" />
+                Sync Calendar
+              </Button>
             </div>
-            <p className="mb-1 text-sm font-medium text-text-primary">
-              No events found
-            </p>
-            <p className="mb-4 text-xs text-text-tertiary leading-relaxed">
-              Connected as {calendarStatus?.accounts?.[0]?.emailAddress || "Connected"}. Sync your calendar to import events.
-            </p>
-            <Button variant="secondary" size="sm" onClick={handleRefresh} isLoading={isRefreshing}>
-              <RefreshIcon className="h-3.5 w-3.5" />
-              Sync Calendar
-            </Button>
-          </div>
-        )}
+          )}
 
         {/* Views */}
         {!isLoading && !isError && totalEvents > 0 && (
           <>
             {searchQuery.trim() !== "" ? (
               <div className="space-y-6">
-                <div className="flex items-center justify-between border-b border-border-subtle/40 pb-3 animate-fade-in">
-                  <h2 className="text-sm font-semibold text-text-primary">
+                <div className="border-border-subtle/40 animate-fade-in flex items-center justify-between border-b pb-3">
+                  <h2 className="text-text-primary text-sm font-semibold">
                     Search Results for "{searchQuery}"
                   </h2>
-                  <span className="text-xs text-text-tertiary tabular-nums">
-                    {Array.from(eventsByDate.values()).flat().length} match(es) found
+                  <span className="text-text-tertiary text-xs tabular-nums">
+                    {Array.from(eventsByDate.values()).flat().length} match(es)
+                    found
                   </span>
                 </div>
                 {groups.length > 0 ? (
-                  <div className="space-y-8 animate-fade-in">
+                  <div className="animate-fade-in space-y-8">
                     {groups.map((group) => (
                       <DateGroupSection
                         key={group.dateKey}
@@ -1290,9 +1393,11 @@ export default function CalendarPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="animate-fade-in rounded-[var(--radius-md)] border border-border-subtle bg-bg-raised p-8 text-center">
-                    <p className="text-sm font-medium text-text-primary">No results found</p>
-                    <p className="text-xs text-text-tertiary mt-1">
+                  <div className="animate-fade-in border-border-subtle bg-bg-raised rounded-[var(--radius-md)] border p-8 text-center">
+                    <p className="text-text-primary text-sm font-medium">
+                      No results found
+                    </p>
+                    <p className="text-text-tertiary mt-1 text-xs">
                       No calendar events match "{searchQuery}"
                     </p>
                   </div>
@@ -1301,7 +1406,7 @@ export default function CalendarPage() {
             ) : (
               <>
                 {view === "list" && (
-                  <div className="space-y-8 animate-fade-in">
+                  <div className="animate-fade-in space-y-8">
                     {groups.length > 0 ? (
                       groups.map((group) => (
                         <DateGroupSection
@@ -1312,9 +1417,11 @@ export default function CalendarPage() {
                         />
                       ))
                     ) : (
-                      <div className="rounded-[var(--radius-md)] border border-border-subtle bg-bg-raised p-8 text-center">
-                        <p className="text-sm font-medium text-text-primary">No events scheduled</p>
-                        <p className="text-xs text-text-tertiary mt-1">
+                      <div className="border-border-subtle bg-bg-raised rounded-[var(--radius-md)] border p-8 text-center">
+                        <p className="text-text-primary text-sm font-medium">
+                          No events scheduled
+                        </p>
+                        <p className="text-text-tertiary mt-1 text-xs">
                           You have no events in your calendar.
                         </p>
                       </div>
@@ -1395,13 +1502,13 @@ function CreateEventModal({
 }) {
   const [activeTab, setActiveTab] = useState<"manual" | "ai">("manual");
   const { data: calendarStatus } = api.calendar.getConnectionStatus.useQuery();
-  
+
   // Form Fields
   const [summary, setSummary] = useState("");
   const [fromEmail, setFromEmail] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
-  
+
   // Set default start/end dates to today, start time to next hour
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -1413,10 +1520,10 @@ function CreateEventModal({
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
   const [endTime, setEndTime] = useState("11:00");
-  
+
   const [attendees, setAttendees] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  
+
   // AI Form State
   const [aiText, setAiText] = useState("");
 
@@ -1486,12 +1593,14 @@ function CreateEventModal({
         if (parsed.attendees && Array.isArray(parsed.attendees)) {
           setAttendees(parsed.attendees.join(", "));
         }
-        
+
         setActiveTab("manual");
         setAiText("");
       } catch (err) {
         console.error("Failed to parse AI response for calendar event:", err);
-        setErrorMsg("Failed to parse AI response. Please try describing it differently or use the manual form.");
+        setErrorMsg(
+          "Failed to parse AI response. Please try describing it differently or use the manual form.",
+        );
       }
     },
     onError: (err) => {
@@ -1550,7 +1659,7 @@ function CreateEventModal({
     const now = new Date();
     const prompt = `Translate this natural language event request into a structured JSON object.
 Request: "${aiText}"
-Current local time reference: ${now.toISOString()} (Today is ${now.toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })})
+Current local time reference: ${now.toISOString()} (Today is ${now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })})
 
 Output ONLY a JSON block wrapped in \`\`\`json and \`\`\` containing:
 {
@@ -1577,32 +1686,44 @@ Do not output any conversational text, notes, markdown formatting other than the
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
-      <div className="bg-bg-raised border border-border-default rounded-xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
+    <div className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+      <div className="bg-bg-raised border-border-default animate-slide-up flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-xl border shadow-2xl">
         {/* Header */}
-        <div className="border-b border-border-subtle p-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-text-primary">Create Event</h2>
+        <div className="border-border-subtle flex items-center justify-between border-b p-4">
+          <h2 className="text-text-primary text-sm font-semibold">
+            Create Event
+          </h2>
           <button
             onClick={() => {
               resetForm();
               onClose();
             }}
-            className="text-text-tertiary hover:text-text-primary transition-colors cursor-pointer p-1"
+            className="text-text-tertiary hover:text-text-primary cursor-pointer p-1 transition-colors"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.8}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
 
         {/* Tab Switcher */}
-        <div className="p-4 pb-2 border-b border-border-subtle bg-bg-raised/10 shrink-0">
-          <div className="flex bg-bg-inset border border-border-subtle rounded-xl p-1 gap-1 w-full shadow-inner">
+        <div className="border-border-subtle bg-bg-raised/10 shrink-0 border-b p-4 pb-2">
+          <div className="bg-bg-inset border-border-subtle flex w-full gap-1 rounded-xl border p-1 shadow-inner">
             <button
               onClick={() => setActiveTab("manual")}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg cursor-pointer transition-all duration-[var(--transition-fast)] ${
+              className={`flex-1 cursor-pointer rounded-lg py-1.5 text-xs font-semibold transition-all duration-[var(--transition-fast)] ${
                 activeTab === "manual"
-                  ? "bg-bg-surface text-text-primary border border-border-default shadow-xs"
+                  ? "bg-bg-surface text-text-primary border-border-default border shadow-xs"
                   : "text-text-tertiary hover:text-text-primary"
               }`}
             >
@@ -1610,9 +1731,9 @@ Do not output any conversational text, notes, markdown formatting other than the
             </button>
             <button
               onClick={() => setActiveTab("ai")}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg cursor-pointer transition-all duration-[var(--transition-fast)] ${
+              className={`flex-1 cursor-pointer rounded-lg py-1.5 text-xs font-semibold transition-all duration-[var(--transition-fast)] ${
                 activeTab === "ai"
-                  ? "bg-bg-surface text-text-primary border border-border-default shadow-xs"
+                  ? "bg-bg-surface text-text-primary border-border-default border shadow-xs"
                   : "text-text-tertiary hover:text-text-primary"
               }`}
             >
@@ -1622,142 +1743,163 @@ Do not output any conversational text, notes, markdown formatting other than the
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 space-y-4 overflow-y-auto p-5">
           {errorMsg && (
-            <div className="bg-red-500/10 border border-red-500/35 text-red-400 p-3 rounded-xl text-xs font-semibold animate-fade-in leading-relaxed">
+            <div className="animate-fade-in rounded-xl border border-red-500/35 bg-red-500/10 p-3 text-xs leading-relaxed font-semibold text-red-400">
               {errorMsg}
             </div>
           )}
 
           {activeTab === "ai" ? (
-            <div className="flex flex-col gap-4 animate-fade-in">
+            <div className="animate-fade-in flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Describe Event</label>
+                <label className="text-text-tertiary text-[10px] font-bold tracking-wider uppercase">
+                  Describe Event
+                </label>
                 <textarea
                   value={aiText}
                   onChange={(e) => setAiText(e.target.value)}
                   placeholder="e.g. Lunch with Sarah tomorrow at 1:00 PM to 2:00 PM at Olive Garden..."
                   rows={4}
-                  className="w-full resize-none border border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary outline-none px-3.5 py-2.5 text-xs rounded-xl transition-all font-medium leading-relaxed"
+                  className="border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary w-full resize-none rounded-xl border px-3.5 py-2.5 text-xs leading-relaxed font-medium transition-all outline-none"
                 />
               </div>
               <Button
                 onClick={handleAiDraft}
                 isLoading={isAiLoading}
                 disabled={isAiLoading || !aiText.trim()}
-                className="w-full font-bold uppercase tracking-wider text-xs h-10 cursor-pointer"
+                className="h-10 w-full cursor-pointer text-xs font-bold tracking-wider uppercase"
               >
                 Generate Event Details
               </Button>
             </div>
           ) : (
-            <div className="flex flex-col gap-3.5 animate-fade-in">
+            <div className="animate-fade-in flex flex-col gap-3.5">
               {/* Summary */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Title</label>
+                <label className="text-text-tertiary text-[10px] font-bold tracking-wider uppercase">
+                  Title
+                </label>
                 <input
                   type="text"
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
                   placeholder="Event title"
-                  className="w-full border border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary outline-none px-3.5 py-2 text-xs rounded-xl transition-colors font-semibold"
+                  className="border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary w-full rounded-xl border px-3.5 py-2 text-xs font-semibold transition-colors outline-none"
                 />
               </div>
 
               {/* Calendar Account Selector (Only if multiple connected) */}
-              {calendarStatus?.accounts && calendarStatus.accounts.length > 1 && (
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Calendar Account</label>
-                  <select
-                    value={fromEmail}
-                    onChange={(e) => setFromEmail(e.target.value)}
-                    className="w-full border border-border-subtle bg-bg-inset text-text-primary focus:border-accent-primary outline-none px-3.5 py-2 text-xs rounded-xl transition-colors font-semibold"
-                  >
-                    {calendarStatus.accounts.map((acc: any) => (
-                      <option key={acc.id} value={acc.emailAddress}>
-                        {acc.emailAddress}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {calendarStatus?.accounts &&
+                calendarStatus.accounts.length > 1 && (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-text-tertiary text-[10px] font-bold tracking-wider uppercase">
+                      Calendar Account
+                    </label>
+                    <select
+                      value={fromEmail}
+                      onChange={(e) => setFromEmail(e.target.value)}
+                      className="border-border-subtle bg-bg-inset text-text-primary focus:border-accent-primary w-full rounded-xl border px-3.5 py-2 text-xs font-semibold transition-colors outline-none"
+                    >
+                      {calendarStatus.accounts.map((acc: any) => (
+                        <option key={acc.id} value={acc.emailAddress}>
+                          {acc.emailAddress}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
               {/* Date & Time Grid */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Start Date</label>
+                  <label className="text-text-tertiary text-[10px] font-bold tracking-wider uppercase">
+                    Start Date
+                  </label>
                   <input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full border border-border-subtle bg-bg-inset text-text-primary focus:border-accent-primary outline-none px-3 py-1.5 text-xs rounded-xl transition-colors font-medium"
+                    className="border-border-subtle bg-bg-inset text-text-primary focus:border-accent-primary w-full rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Start Time</label>
+                  <label className="text-text-tertiary text-[10px] font-bold tracking-wider uppercase">
+                    Start Time
+                  </label>
                   <input
                     type="time"
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full border border-border-subtle bg-bg-inset text-text-primary focus:border-accent-primary outline-none px-3 py-1.5 text-xs rounded-xl transition-colors font-medium"
+                    className="border-border-subtle bg-bg-inset text-text-primary focus:border-accent-primary w-full rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">End Date</label>
+                  <label className="text-text-tertiary text-[10px] font-bold tracking-wider uppercase">
+                    End Date
+                  </label>
                   <input
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full border border-border-subtle bg-bg-inset text-text-primary focus:border-accent-primary outline-none px-3 py-1.5 text-xs rounded-xl transition-colors font-medium"
+                    className="border-border-subtle bg-bg-inset text-text-primary focus:border-accent-primary w-full rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">End Time</label>
+                  <label className="text-text-tertiary text-[10px] font-bold tracking-wider uppercase">
+                    End Time
+                  </label>
                   <input
                     type="time"
                     value={endTime}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full border border-border-subtle bg-bg-inset text-text-primary focus:border-accent-primary outline-none px-3 py-1.5 text-xs rounded-xl transition-colors font-medium"
+                    className="border-border-subtle bg-bg-inset text-text-primary focus:border-accent-primary w-full rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors outline-none"
                   />
                 </div>
               </div>
 
               {/* Location */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Location</label>
+                <label className="text-text-tertiary text-[10px] font-bold tracking-wider uppercase">
+                  Location
+                </label>
                 <input
                   type="text"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   placeholder="e.g. Zoom, Office, Cafe..."
-                  className="w-full border border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary outline-none px-3.5 py-2 text-xs rounded-xl transition-colors font-medium"
+                  className="border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary w-full rounded-xl border px-3.5 py-2 text-xs font-medium transition-colors outline-none"
                 />
               </div>
 
               {/* Attendees */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Attendees (Optional)</label>
+                <label className="text-text-tertiary text-[10px] font-bold tracking-wider uppercase">
+                  Attendees (Optional)
+                </label>
                 <input
                   type="text"
                   value={attendees}
                   onChange={(e) => setAttendees(e.target.value)}
                   placeholder="e.g. sarah@example.com, bob@example.com"
-                  className="w-full border border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary outline-none px-3.5 py-2 text-xs rounded-xl transition-colors font-medium"
+                  className="border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary w-full rounded-xl border px-3.5 py-2 text-xs font-medium transition-colors outline-none"
                 />
               </div>
 
               {/* Description */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider">Description (Optional)</label>
+                <label className="text-text-tertiary text-[10px] font-bold tracking-wider uppercase">
+                  Description (Optional)
+                </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Event description..."
                   rows={3}
-                  className="w-full resize-none border border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary outline-none px-3.5 py-2 text-xs rounded-xl transition-colors font-medium leading-relaxed"
+                  className="border-border-subtle bg-bg-inset text-text-primary placeholder:text-text-tertiary focus:border-accent-primary w-full resize-none rounded-xl border px-3.5 py-2 text-xs leading-relaxed font-medium transition-colors outline-none"
                 />
               </div>
             </div>
@@ -1765,10 +1907,10 @@ Do not output any conversational text, notes, markdown formatting other than the
         </div>
 
         {/* Footer Actions */}
-        <div className="border-t border-border-subtle p-4 flex items-center gap-2 shrink-0 bg-bg-raised/10">
+        <div className="border-border-subtle bg-bg-raised/10 flex shrink-0 items-center gap-2 border-t p-4">
           <Button
             variant="secondary"
-            className="flex-1 font-bold text-xs h-9 cursor-pointer"
+            className="h-9 flex-1 cursor-pointer text-xs font-bold"
             onClick={() => {
               resetForm();
               onClose();
@@ -1778,7 +1920,7 @@ Do not output any conversational text, notes, markdown formatting other than the
           </Button>
           {activeTab === "manual" && (
             <Button
-              className="flex-1 font-bold uppercase tracking-wider text-xs h-9 cursor-pointer"
+              className="h-9 flex-1 cursor-pointer text-xs font-bold tracking-wider uppercase"
               onClick={handleSave}
               isLoading={createMutation.isPending}
             >
