@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomUUID } from "crypto";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
 import {
@@ -163,19 +164,29 @@ export const gmailRouter = createTRPCRouter({
                     const fullThread = await tenant.gmail.api.threads.get({
                       id: t.id,
                     });
-                    // Cache full thread data in corsairEntities
+                    // Cache full thread data in corsairEntities using upsert
                     await ctx.db
-                      .update(corsairEntities)
-                      .set({
+                      .insert(corsairEntities)
+                      .values({
+                        id: randomUUID(),
+                        accountId: account.id,
+                        entityId: t.id,
+                        entityType: "threads",
+                        version: "1",
                         data: fullThread,
                         updatedAt: new Date(),
                       })
-                      .where(
-                        and(
-                          eq(corsairEntities.entityId, t.id),
-                          eq(corsairEntities.entityType, "threads"),
-                        ),
-                      );
+                      .onConflictDoUpdate({
+                        target: [
+                          corsairEntities.accountId,
+                          corsairEntities.entityId,
+                          corsairEntities.entityType,
+                        ],
+                        set: {
+                          data: fullThread,
+                          updatedAt: new Date(),
+                        },
+                      });
                   } catch (e) {
                     console.error(
                       `[Pre-fetch] Failed to pre-fetch thread ${t.id}:`,
@@ -285,19 +296,29 @@ export const gmailRouter = createTRPCRouter({
                     const fullThread = await tenant.gmail.api.threads.get({
                       id: t.id,
                     });
-                    // Cache full thread data in corsairEntities
+                    // Cache full thread data in corsairEntities using upsert
                     await ctx.db
-                      .update(corsairEntities)
-                      .set({
+                      .insert(corsairEntities)
+                      .values({
+                        id: randomUUID(),
+                        accountId: account.id,
+                        entityId: t.id,
+                        entityType: "threads",
+                        version: "1",
                         data: fullThread,
                         updatedAt: new Date(),
                       })
-                      .where(
-                        and(
-                          eq(corsairEntities.entityId, t.id),
-                          eq(corsairEntities.entityType, "threads"),
-                        ),
-                      );
+                      .onConflictDoUpdate({
+                        target: [
+                          corsairEntities.accountId,
+                          corsairEntities.entityId,
+                          corsairEntities.entityType,
+                        ],
+                        set: {
+                          data: fullThread,
+                          updatedAt: new Date(),
+                        },
+                      });
                   } catch (e) {
                     console.error(
                       `[Auto-sync Pre-fetch] Failed to pre-fetch thread ${t.id}:`,
@@ -494,7 +515,7 @@ export const gmailRouter = createTRPCRouter({
           accountIds.map((id) => sql`${id}`),
           sql`, `,
         )})
-        AND data->'messages'->0->'labelIds' ? 'UNREAD'
+        AND jsonb_path_exists(data, '$.messages[*].labelIds[*] ? (@ == "UNREAD")')
     `);
 
     return Number((result[0] as any)?.count ?? 0);
@@ -547,19 +568,29 @@ export const gmailRouter = createTRPCRouter({
                 const fullThread = await tenant.gmail.api.threads.get({
                   id: t.id,
                 });
-                // Cache full thread data in corsairEntities
+                // Cache full thread data in corsairEntities using upsert
                 await ctx.db
-                  .update(corsairEntities)
-                  .set({
+                  .insert(corsairEntities)
+                  .values({
+                    id: randomUUID(),
+                    accountId: account.id,
+                    entityId: t.id,
+                    entityType: "threads",
+                    version: "1",
                     data: fullThread,
                     updatedAt: new Date(),
                   })
-                  .where(
-                    and(
-                      eq(corsairEntities.entityId, t.id),
-                      eq(corsairEntities.entityType, "threads"),
-                    ),
-                  );
+                  .onConflictDoUpdate({
+                    target: [
+                      corsairEntities.accountId,
+                      corsairEntities.entityId,
+                      corsairEntities.entityType,
+                    ],
+                    set: {
+                      data: fullThread,
+                      updatedAt: new Date(),
+                    },
+                  });
               } catch (e) {
                 console.error(
                   `[Manual Sync Pre-fetch] Failed to pre-fetch thread ${t.id}:`,

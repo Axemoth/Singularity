@@ -202,7 +202,7 @@ function ThreadListItem({
   const [isHovered, setIsHovered] = useState(false);
   const threadData = getThreadData(thread);
   const firstMessage = threadData.messages?.[0];
-  const isUnread = firstMessage?.labelIds?.includes("UNREAD") ?? false;
+  const isUnread = threadData.messages?.some((m) => m.labelIds?.includes("UNREAD")) ?? false;
   
   const fromHeader = getMessageHeader(firstMessage, "from");
   const subjectHeader = getMessageHeader(firstMessage, "subject");
@@ -1802,8 +1802,8 @@ export default function InboxPage() {
 
   const sortedAllThreads = filteredByEmailThreads.length > 0
     ? [...filteredByEmailThreads].sort((a, b) => {
-        const aUnread = getThreadData(a).messages?.[0]?.labelIds?.includes("UNREAD") ?? false;
-        const bUnread = getThreadData(b).messages?.[0]?.labelIds?.includes("UNREAD") ?? false;
+        const aUnread = getThreadData(a).messages?.some((m) => m.labelIds?.includes("UNREAD")) ?? false;
+        const bUnread = getThreadData(b).messages?.some((m) => m.labelIds?.includes("UNREAD")) ?? false;
 
         // 1. Unread status first
         if (aUnread && !bUnread) return -1;
