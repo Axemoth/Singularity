@@ -1802,21 +1802,6 @@ export default function InboxPage() {
 
   const sortedAllThreads = filteredByEmailThreads.length > 0
     ? [...filteredByEmailThreads].sort((a, b) => {
-        const aUnread = getThreadData(a).messages?.some((m) => m.labelIds?.includes("UNREAD")) ?? false;
-        const bUnread = getThreadData(b).messages?.some((m) => m.labelIds?.includes("UNREAD")) ?? false;
-
-        // 1. Unread status first
-        if (aUnread && !bUnread) return -1;
-        if (!aUnread && bUnread) return 1;
-
-        // 2. Priority weight second
-        const aWeight = getPriorityWeight(a.priority);
-        const bWeight = getPriorityWeight(b.priority);
-        if (aWeight !== bWeight) {
-          return bWeight - aWeight;
-        }
-
-        // 3. Date third (most recent first)
         const aTime = getThreadTimestamp(a);
         const bTime = getThreadTimestamp(b);
         return bTime - aTime;
