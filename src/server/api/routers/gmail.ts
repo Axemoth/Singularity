@@ -399,8 +399,40 @@ export const gmailRouter = createTRPCRouter({
           .orderBy(desc(corsairEntities.updatedAt));
       }
 
-      // Ensure details are pre-fetched for any threads that lack message details
-      const threadsToFetch = threads.filter((t) => {
+      // Deduplicate threads by id to ensure we never return duplicates to the client (e.g. from multiple left-joined priorities)
+      const seenIds = new Set<string>();
+      const uniqueThreads = [];
+      for (const t of threads) {
+        if (!seenIds.has(t.id)) {
+          seenIds.add(t.id);
+          uniqueThreads.push(t);
+        }
+      }
+
+      // Helper to get thread timestamp
+      const getThreadTimestamp = (t: any) => {
+        const threadData = t.data as any;
+        const messages = threadData?.messages ?? [];
+        if (messages.length > 0) {
+          const dates = messages
+            .map((m: any) =>
+              m.internalDate ? parseInt(m.internalDate, 10) : 0,
+            )
+            .filter((d: number) => !isNaN(d) && d > 0);
+          if (dates.length > 0) {
+            return Math.max(...dates);
+          }
+        }
+        return t.updatedAt ? new Date(t.updatedAt).getTime() : 0;
+      };
+
+      // Sort unique threads by timestamp chronologically first
+      uniqueThreads.sort(
+        (a, b) => getThreadTimestamp(b) - getThreadTimestamp(a),
+      );
+
+      // Identify threads in this sorted list lacking message details
+      const threadsToFetch = uniqueThreads.filter((t) => {
         const threadData = t.data as any;
         return (
           !threadData ||
@@ -411,7 +443,7 @@ export const gmailRouter = createTRPCRouter({
 
       if (threadsToFetch.length > 0) {
         console.log(
-          `[Gmail Router] Fetching full details for ${threadsToFetch.length} threads lacking message details...`,
+          `[Gmail Router] Fetching full details for ${threadsToFetch.length} sorted threads lacking message details...`,
         );
         // Limit to top 20 at a time to prevent rate limiting
         const chunk = threadsToFetch.slice(0, 20);
@@ -448,40 +480,25 @@ export const gmailRouter = createTRPCRouter({
             }
           }),
         );
+
+        // Re-sort unique threads by timestamp now that details have been fetched
+        uniqueThreads.sort(
+          (a, b) => getThreadTimestamp(b) - getThreadTimestamp(a),
+        );
       }
 
-      // Deduplicate threads by id to ensure we never return duplicates to the client (e.g. from multiple left-joined priorities)
-      const seenIds = new Set<string>();
-      const uniqueThreads = [];
-      for (const t of threads) {
-        if (!seenIds.has(t.id)) {
-          seenIds.add(t.id);
-          uniqueThreads.push(t);
-        }
-      }
-
-      // Sort by the date of the latest message in each thread descending (most recent first)
-      const getThreadTimestamp = (t: any) => {
+      // Filter out any threads that are still missing messages (e.g. failed to pre-fetch due to expired tokens)
+      const finalThreads = uniqueThreads.filter((t) => {
         const threadData = t.data as any;
-        const messages = threadData?.messages ?? [];
-        if (messages.length > 0) {
-          const dates = messages
-            .map((m: any) =>
-              m.internalDate ? parseInt(m.internalDate, 10) : 0,
-            )
-            .filter((d: number) => !isNaN(d) && d > 0);
-          if (dates.length > 0) {
-            return Math.max(...dates);
-          }
-        }
-        return t.updatedAt ? new Date(t.updatedAt).getTime() : 0;
-      };
+        return (
+          threadData &&
+          threadData.messages &&
+          Array.isArray(threadData.messages) &&
+          threadData.messages.length > 0
+        );
+      });
 
-      uniqueThreads.sort(
-        (a, b) => getThreadTimestamp(b) - getThreadTimestamp(a),
-      );
-
-      return uniqueThreads;
+      return finalThreads;
     }),
 
   getUnreadCount: protectedProcedure.query(async ({ ctx }) => {

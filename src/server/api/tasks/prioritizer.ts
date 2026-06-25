@@ -618,8 +618,33 @@ export async function syncPriorities(userId: string): Promise<void> {
       const emails = [];
 
       for (const thread of batch) {
-        const threadData = thread.data as any;
-        const messages = threadData.messages ?? [];
+        let threadData = thread.data as any;
+        let messages = threadData?.messages ?? [];
+
+        if (messages.length === 0) {
+          try {
+            console.log(`[Prioritizer] Thread ${thread.entityId} lacks messages. Fetching full details...`);
+            const tenant = corsair.withTenant(thread.tenantId);
+            const fullThread = await tenant.gmail.api.threads.get({
+              id: thread.entityId,
+            });
+            // Update database
+            await db
+              .update(corsairEntities)
+              .set({
+                data: fullThread,
+                updatedAt: new Date(),
+              })
+              .where(eq(corsairEntities.id, thread.id));
+            
+            thread.data = fullThread;
+            threadData = fullThread;
+            messages = fullThread.messages ?? [];
+          } catch (fetchErr) {
+            console.error(`[Prioritizer] Failed to fetch details for thread ${thread.entityId}:`, fetchErr);
+          }
+        }
+
         const firstMessage = messages[0] ?? {};
         const fromEmail = getMessageHeader(firstMessage, "from");
         

@@ -2,6 +2,7 @@ import { db } from "@/server/db";
 import { corsairEntities, corsairAccounts, corsairEmbeddings } from "@/server/db/schema";
 import { eq, and, isNull, or, like } from "drizzle-orm";
 import { env } from "@/env";
+import { corsair } from "@/server/corsair";
 
 interface GmailMessagePayload {
   id?: string;
@@ -167,6 +168,7 @@ export async function syncEmbeddings(userId: string): Promise<void> {
         entityId: corsairEntities.entityId,
         entityType: corsairEntities.entityType,
         data: corsairEntities.data,
+        tenantId: corsairAccounts.tenantId,
       })
       .from(corsairEntities)
       .innerJoin(corsairAccounts, eq(corsairEntities.accountId, corsairAccounts.id))
@@ -193,8 +195,33 @@ export async function syncEmbeddings(userId: string): Promise<void> {
         let textToEmbed = "";
 
         if (entity.entityType === "threads") {
-          const threadData = entity.data as GmailThreadPayload;
-          const messages = threadData.messages ?? [];
+          let threadData = entity.data as GmailThreadPayload;
+          let messages = threadData.messages ?? [];
+
+          if (messages.length === 0) {
+            try {
+              console.log(`[EmbeddingsSync] Thread ${entity.entityId} lacks messages. Fetching full details...`);
+              const tenant = corsair.withTenant(entity.tenantId);
+              const fullThread = await tenant.gmail.api.threads.get({
+                id: entity.entityId,
+              }) as GmailThreadPayload;
+              // Update database
+              await db
+                .update(corsairEntities)
+                .set({
+                  data: fullThread,
+                  updatedAt: new Date(),
+                })
+                .where(eq(corsairEntities.id, entity.id));
+              
+              entity.data = fullThread;
+              threadData = fullThread;
+              messages = fullThread.messages ?? [];
+            } catch (fetchErr) {
+              console.error(`[EmbeddingsSync] Failed to fetch details for thread ${entity.entityId}:`, fetchErr);
+            }
+          }
+
           const firstMessage = messages[0] ?? {};
           const subject = firstMessage.subject ?? threadData.snippet ?? "No Subject";
           const from = firstMessage.from ?? "";
