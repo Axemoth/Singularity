@@ -665,7 +665,7 @@ export const gmailRouter = createTRPCRouter({
   }),
 
   disconnect: protectedProcedure
-    .input(z.object({ accountId: z.string().uuid() }))
+    .input(z.object({ accountId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
