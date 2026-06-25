@@ -1002,7 +1002,7 @@ HOWEVER, if the instructions are vague, incomplete, or ambiguous (e.g. "schedule
 
             // Set up a 2-minute timeout for the generation to avoid hanging
             const generatePromise = agent.generate(messagesList as any, {
-              maxSteps: 5,
+              maxSteps: 12,
             });
 
             const timeoutPromise = new Promise<never>((_, reject) =>
